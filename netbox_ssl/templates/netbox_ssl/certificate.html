@@ -1,0 +1,202 @@
+{% extends 'generic/object.html' %}
+{% load helpers %}
+{% load plugins %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  {{ block.super }}
+  <li class="breadcrumb-item">
+    <a href="{% url 'plugins:netbox_ssl:certificate_list' %}">Certificates</a>
+  </li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col col-md-6">
+    <div class="card">
+      <h5 class="card-header">Certificate Details</h5>
+      <div class="card-body">
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Common Name</th>
+            <td>{{ object.common_name }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Status</th>
+            <td>{% badge object.get_status_display bg_color=object.get_status_color %}</td>
+          </tr>
+          <tr>
+            <th scope="row">Serial Number</th>
+            <td><code>{{ object.serial_number }}</code></td>
+          </tr>
+          <tr>
+            <th scope="row">Fingerprint (SHA256)</th>
+            <td><code class="small">{{ object.fingerprint_sha256 }}</code></td>
+          </tr>
+          <tr>
+            <th scope="row">Issuer</th>
+            <td>{{ object.issuer }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Tenant</th>
+            <td>
+              {% if object.tenant %}
+                <a href="{{ object.tenant.get_absolute_url }}">{{ object.tenant }}</a>
+              {% else %}
+                <span class="text-muted">None</span>
+              {% endif %}
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col col-md-6">
+    <div class="card">
+      <h5 class="card-header">Validity</h5>
+      <div class="card-body">
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Valid From</th>
+            <td>{{ object.valid_from|date:"Y-m-d H:i" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Valid To</th>
+            <td>{{ object.valid_to|date:"Y-m-d H:i" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Days Remaining</th>
+            <td>
+              {% if object.days_remaining < 0 %}
+                <span class="badge text-bg-danger">Expired ({{ object.days_remaining|abs }} days ago)</span>
+              {% elif object.days_remaining <= 14 %}
+                <span class="badge text-bg-danger">{{ object.days_remaining }} days</span>
+              {% elif object.days_remaining <= 30 %}
+                <span class="badge text-bg-warning">{{ object.days_remaining }} days</span>
+              {% else %}
+                <span class="badge text-bg-success">{{ object.days_remaining }} days</span>
+              {% endif %}
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    <div class="card mt-3">
+      <h5 class="card-header">Key Information</h5>
+      <div class="card-body">
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Algorithm</th>
+            <td>{% badge object.get_algorithm_display %}</td>
+          </tr>
+          <tr>
+            <th scope="row">Key Size</th>
+            <td>{{ object.key_size|default:"N/A" }} bits</td>
+          </tr>
+          <tr>
+            <th scope="row">Private Key Location</th>
+            <td>
+              {% if object.private_key_location %}
+                <code>{{ object.private_key_location }}</code>
+              {% else %}
+                <span class="text-muted">Not specified</span>
+              {% endif %}
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if object.sans %}
+<div class="row mb-3">
+  <div class="col col-12">
+    <div class="card">
+      <h5 class="card-header">Subject Alternative Names</h5>
+      <div class="card-body">
+        <ul class="list-unstyled mb-0">
+          {% for san in object.sans %}
+            <li><code>{{ san }}</code></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if assignments %}
+<div class="row mb-3">
+  <div class="col col-12">
+    <div class="card">
+      <h5 class="card-header">Assignments ({{ assignments_count }})</h5>
+      <div class="card-body">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Assigned To</th>
+              <th>Primary</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for assignment in assignments %}
+            <tr>
+              <td>{% badge assignment.assigned_object_type_name %}</td>
+              <td>
+                {% if assignment.assigned_object %}
+                  <a href="{{ assignment.assigned_object.get_absolute_url }}">
+                    {{ assignment.assigned_object }}
+                  </a>
+                {% else %}
+                  <span class="text-muted">Unknown</span>
+                {% endif %}
+              </td>
+              <td>{% checkmark assignment.is_primary %}</td>
+              <td>{{ assignment.notes|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if object.replaced_by %}
+<div class="row mb-3">
+  <div class="col col-12">
+    <div class="alert alert-info">
+      <strong>Replaced by:</strong>
+      <a href="{{ object.replaced_by.get_absolute_url }}">{{ object.replaced_by.common_name }}</a>
+      (Serial: {{ object.replaced_by.serial_number|truncatechars:20 }})
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if object.replaces.exists %}
+<div class="row mb-3">
+  <div class="col col-12">
+    <div class="card">
+      <h5 class="card-header">Previous Certificates</h5>
+      <div class="card-body">
+        <ul class="list-unstyled mb-0">
+          {% for old_cert in object.replaces.all %}
+            <li>
+              <a href="{{ old_cert.get_absolute_url }}">{{ old_cert.common_name }}</a>
+              ({{ old_cert.valid_from|date:"Y-m-d" }} - {{ old_cert.valid_to|date:"Y-m-d" }})
+              {% badge old_cert.get_status_display bg_color=old_cert.get_status_color %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock content %}

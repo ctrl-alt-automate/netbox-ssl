@@ -1,0 +1,107 @@
+{% load i18n %}
+
+<div class="card">
+  <h5 class="card-header">
+    <i class="mdi mdi-certificate"></i>
+    {% trans "SSL Certificate Status" %}
+  </h5>
+  <div class="card-body">
+    {% if expired_count or critical_count or warning_count %}
+    <div class="row mb-3">
+      {% if expired_count %}
+      <div class="col">
+        <div class="alert alert-danger text-center mb-0 py-2">
+          <strong>{{ expired_count }}</strong>
+          <small class="d-block">{% trans "Expired" %}</small>
+        </div>
+      </div>
+      {% endif %}
+      {% if critical_count %}
+      <div class="col">
+        <div class="alert alert-danger text-center mb-0 py-2">
+          <strong>{{ critical_count }}</strong>
+          <small class="d-block">{% trans "Critical" %} (&lt;14d)</small>
+        </div>
+      </div>
+      {% endif %}
+      {% if warning_count %}
+      <div class="col">
+        <div class="alert alert-warning text-center mb-0 py-2">
+          <strong>{{ warning_count }}</strong>
+          <small class="d-block">{% trans "Warning" %} (&lt;30d)</small>
+        </div>
+      </div>
+      {% endif %}
+      {% if orphan_count %}
+      <div class="col">
+        <div class="alert alert-secondary text-center mb-0 py-2">
+          <strong>{{ orphan_count }}</strong>
+          <small class="d-block">{% trans "Orphan" %}</small>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if expired_certs %}
+    <h6 class="text-danger"><i class="mdi mdi-alert-circle"></i> {% trans "Expired Certificates" %}</h6>
+    <ul class="list-unstyled mb-3">
+      {% for cert in expired_certs %}
+      <li>
+        <a href="{{ cert.get_absolute_url }}">{{ cert.common_name }}</a>
+        <span class="badge text-bg-danger">{{ cert.days_remaining|abs }} days ago</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if critical_certs %}
+    <h6 class="text-danger"><i class="mdi mdi-alert"></i> {% trans "Critical" %} (&lt;14 days)</h6>
+    <ul class="list-unstyled mb-3">
+      {% for cert in critical_certs %}
+      <li>
+        <a href="{{ cert.get_absolute_url }}">{{ cert.common_name }}</a>
+        <span class="badge text-bg-danger">{{ cert.days_remaining }} days</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if warning_certs %}
+    <h6 class="text-warning"><i class="mdi mdi-alert-outline"></i> {% trans "Warning" %} (&lt;30 days)</h6>
+    <ul class="list-unstyled mb-3">
+      {% for cert in warning_certs %}
+      <li>
+        <a href="{{ cert.get_absolute_url }}">{{ cert.common_name }}</a>
+        <span class="badge text-bg-warning">{{ cert.days_remaining }} days</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if orphan_certs %}
+    <h6 class="text-secondary"><i class="mdi mdi-link-off"></i> {% trans "Orphan Certificates" %}</h6>
+    <ul class="list-unstyled mb-0">
+      {% for cert in orphan_certs %}
+      <li>
+        <a href="{{ cert.get_absolute_url }}">{{ cert.common_name }}</a>
+        <span class="badge text-bg-secondary">No assignments</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if not expired_certs and not critical_certs and not warning_certs and not orphan_certs %}
+    <p class="text-success mb-0">
+      <i class="mdi mdi-check-circle"></i>
+      {% trans "All certificates are healthy!" %}
+    </p>
+    {% endif %}
+
+    <div class="text-end mt-3">
+      <a href="{% url 'plugins:netbox_ssl:certificate_list' %}" class="btn btn-sm btn-outline-primary">
+        {% trans "View All Certificates" %}
+      </a>
+    </div>
+  </div>
+</div>

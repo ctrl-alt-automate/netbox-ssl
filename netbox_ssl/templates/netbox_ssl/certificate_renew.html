@@ -1,0 +1,167 @@
+{% extends 'generic/object_edit.html' %}
+{% load i18n %}
+
+{% block title %}Certificate Renewal{% endblock %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'plugins:netbox_ssl:certificate_list' %}">Certificates</a>
+  </li>
+  <li class="breadcrumb-item active" aria-current="page">Renewal</li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+<div class="row">
+  <div class="col col-12">
+    <div class="card border-warning mb-4">
+      <h5 class="card-header bg-warning text-dark">
+        <i class="mdi mdi-swap-horizontal"></i> Janus Renewal Detected
+      </h5>
+      <div class="card-body">
+        <p class="lead">
+          A certificate with the same Common Name (<strong>{{ pending_certificate.common_name }}</strong>)
+          already exists in the system.
+        </p>
+        <p>
+          Is this new certificate a <strong>renewal</strong> of the existing one?
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col col-md-6">
+    <div class="card">
+      <h5 class="card-header bg-secondary text-white">
+        <i class="mdi mdi-certificate"></i> Existing Certificate
+      </h5>
+      <div class="card-body">
+        <table class="table table-sm attr-table">
+          <tr>
+            <th>Common Name</th>
+            <td>{{ old_certificate.common_name }}</td>
+          </tr>
+          <tr>
+            <th>Serial Number</th>
+            <td><code class="small">{{ old_certificate.serial_number }}</code></td>
+          </tr>
+          <tr>
+            <th>Valid From</th>
+            <td>{{ old_certificate.valid_from|date:"Y-m-d H:i" }}</td>
+          </tr>
+          <tr>
+            <th>Valid To</th>
+            <td>{{ old_certificate.valid_to|date:"Y-m-d H:i" }}</td>
+          </tr>
+          <tr>
+            <th>Days Remaining</th>
+            <td>
+              {% if old_certificate.days_remaining < 0 %}
+                <span class="badge text-bg-danger">Expired</span>
+              {% elif old_certificate.days_remaining <= 14 %}
+                <span class="badge text-bg-danger">{{ old_certificate.days_remaining }} days</span>
+              {% elif old_certificate.days_remaining <= 30 %}
+                <span class="badge text-bg-warning">{{ old_certificate.days_remaining }} days</span>
+              {% else %}
+                <span class="badge text-bg-success">{{ old_certificate.days_remaining }} days</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th>Issuer</th>
+            <td>{{ old_certificate.issuer|truncatechars:50 }}</td>
+          </tr>
+          <tr>
+            <th>Assignments</th>
+            <td>
+              <span class="badge text-bg-info">{{ old_certificate.assignments.count }} assignment(s)</span>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col col-md-6">
+    <div class="card border-success">
+      <h5 class="card-header bg-success text-white">
+        <i class="mdi mdi-certificate-outline"></i> New Certificate
+      </h5>
+      <div class="card-body">
+        <table class="table table-sm attr-table">
+          <tr>
+            <th>Common Name</th>
+            <td>{{ pending_certificate.common_name }}</td>
+          </tr>
+          <tr>
+            <th>Serial Number</th>
+            <td><code class="small">{{ pending_certificate.serial_number }}</code></td>
+          </tr>
+          <tr>
+            <th>Valid From</th>
+            <td>{{ pending_certificate.valid_from }}</td>
+          </tr>
+          <tr>
+            <th>Valid To</th>
+            <td>{{ pending_certificate.valid_to }}</td>
+          </tr>
+          <tr>
+            <th>Issuer</th>
+            <td>{{ pending_certificate.issuer|truncatechars:50 }}</td>
+          </tr>
+          <tr>
+            <th>Algorithm</th>
+            <td>{{ pending_certificate.algorithm|upper }}</td>
+          </tr>
+          <tr>
+            <th>Key Size</th>
+            <td>{{ pending_certificate.key_size|default:"N/A" }} bits</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mt-4">
+  <div class="col col-12">
+    <div class="card">
+      <h5 class="card-header">Choose Action</h5>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+
+          <div class="alert alert-success">
+            <h6><i class="mdi mdi-swap-horizontal"></i> Yes, this is a renewal</h6>
+            <p class="mb-0">
+              The new certificate will be created, <strong>all {{ old_certificate.assignments.count }} assignment(s)</strong>
+              will be transferred, and the old certificate will be archived with status "Replaced".
+            </p>
+          </div>
+
+          <div class="alert alert-info">
+            <h6><i class="mdi mdi-plus"></i> No, this is a new certificate</h6>
+            <p class="mb-0">
+              The new certificate will be created as a separate entry. The existing certificate
+              will remain unchanged.
+            </p>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2">
+            <a href="{% url 'plugins:netbox_ssl:certificate_import' %}" class="btn btn-outline-secondary">
+              Cancel
+            </a>
+            <button type="submit" name="is_renewal" value="no" class="btn btn-secondary">
+              <i class="mdi mdi-plus"></i> Create as New Certificate
+            </button>
+            <button type="submit" name="is_renewal" value="yes" class="btn btn-success">
+              <i class="mdi mdi-swap-horizontal"></i> Renew & Transfer Assignments
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

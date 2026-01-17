@@ -1,0 +1,1 @@
+# NetBox SSL template tags

@@ -1,0 +1,124 @@
+# NetBox SSL Plugin - Development Environment
+#
+# Usage:
+#   docker-compose up -d        # Start NetBox
+#   docker-compose logs -f      # View logs
+#   docker-compose down         # Stop everything
+#
+# Switch NetBox version by setting NETBOX_VERSION:
+#   NETBOX_VERSION=v4.4-latest docker-compose up -d
+
+services:
+  netbox:
+    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.5-latest}
+    depends_on:
+      - postgres
+      - redis
+      - redis-cache
+    env_file: env/netbox.env
+    user: "unit:root"
+    healthcheck:
+      test: curl -f http://localhost:8080/login/ || exit 1
+      start_period: 90s
+      timeout: 3s
+      interval: 15s
+    volumes:
+      # Mount plugin source for development (hot-reload)
+      - ./netbox_ssl:/opt/netbox/netbox/netbox_ssl:ro
+      # Plugin configuration
+      - ./development/configuration/plugins.py:/etc/netbox/config/plugins.py:ro
+      # Media files
+      - netbox-media-files:/opt/netbox/netbox/media
+      # Reports and scripts
+      - netbox-reports-files:/opt/netbox/netbox/reports
+      - netbox-scripts-files:/opt/netbox/netbox/scripts
+    ports:
+      - "8000:8080"
+
+  netbox-worker:
+    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.5-latest}
+    depends_on:
+      netbox:
+        condition: service_healthy
+    command:
+      - /opt/netbox/venv/bin/python
+      - /opt/netbox/netbox/manage.py
+      - rqworker
+    env_file: env/netbox.env
+    healthcheck:
+      test: ps -aux | grep -v grep | grep -q rqworker || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+    volumes:
+      - ./netbox_ssl:/opt/netbox/netbox/netbox_ssl:ro
+      - ./development/configuration/plugins.py:/etc/netbox/config/plugins.py:ro
+      - netbox-media-files:/opt/netbox/netbox/media
+      - netbox-reports-files:/opt/netbox/netbox/reports
+      - netbox-scripts-files:/opt/netbox/netbox/scripts
+
+  netbox-housekeeping:
+    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.5-latest}
+    depends_on:
+      netbox:
+        condition: service_healthy
+    command:
+      - /opt/netbox/housekeeping.sh
+    env_file: env/netbox.env
+    healthcheck:
+      test: ps -aux | grep -v grep | grep -q housekeeping || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+    volumes:
+      - ./netbox_ssl:/opt/netbox/netbox/netbox_ssl:ro
+      - ./development/configuration/plugins.py:/etc/netbox/config/plugins.py:ro
+      - netbox-media-files:/opt/netbox/netbox/media
+      - netbox-reports-files:/opt/netbox/netbox/reports
+      - netbox-scripts-files:/opt/netbox/netbox/scripts
+
+  postgres:
+    image: postgres:16-alpine
+    env_file: env/postgres.env
+    volumes:
+      - netbox-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -q -t 2 -d $$POSTGRES_DB -U $$POSTGRES_USER
+      start_period: 20s
+      timeout: 5s
+      interval: 10s
+
+  redis:
+    image: redis:7-alpine
+    command:
+      - sh
+      - -c
+      - redis-server --appendonly yes --requirepass $$REDIS_PASSWORD
+    env_file: env/redis.env
+    volumes:
+      - netbox-redis-data:/data
+    healthcheck:
+      test: '[ $$(redis-cli --pass "$${REDIS_PASSWORD}" ping) = "PONG" ]'
+      start_period: 5s
+      timeout: 3s
+      interval: 5s
+
+  redis-cache:
+    image: redis:7-alpine
+    command:
+      - sh
+      - -c
+      - redis-server --requirepass $$REDIS_PASSWORD
+    env_file: env/redis-cache.env
+    healthcheck:
+      test: '[ $$(redis-cli --pass "$${REDIS_PASSWORD}" ping) = "PONG" ]'
+      start_period: 5s
+      timeout: 3s
+      interval: 5s
+
+volumes:
+  netbox-media-files:
+  netbox-postgres-data:
+  netbox-redis-data:
+  netbox-reports-files:
+  netbox-scripts-files:

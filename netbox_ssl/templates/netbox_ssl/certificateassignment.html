@@ -1,0 +1,97 @@
+{% extends 'generic/object.html' %}
+{% load helpers %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  {{ block.super }}
+  <li class="breadcrumb-item">
+    <a href="{% url 'plugins:netbox_ssl:certificateassignment_list' %}">Assignments</a>
+  </li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col col-md-6">
+    <div class="card">
+      <h5 class="card-header">Assignment Details</h5>
+      <div class="card-body">
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Certificate</th>
+            <td>
+              <a href="{{ object.certificate.get_absolute_url }}">
+                {{ object.certificate.common_name }}
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Object Type</th>
+            <td>{% badge object.assigned_object_type_name %}</td>
+          </tr>
+          <tr>
+            <th scope="row">Assigned To</th>
+            <td>
+              {% if object.assigned_object %}
+                <a href="{{ object.assigned_object.get_absolute_url }}">
+                  {{ object.assigned_object }}
+                </a>
+              {% else %}
+                <span class="text-muted">Unknown</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Primary</th>
+            <td>{% checkmark object.is_primary %}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col col-md-6">
+    <div class="card">
+      <h5 class="card-header">Certificate Info</h5>
+      <div class="card-body">
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Status</th>
+            <td>{% badge object.certificate.get_status_display bg_color=object.certificate.get_status_color %}</td>
+          </tr>
+          <tr>
+            <th scope="row">Valid To</th>
+            <td>{{ object.certificate.valid_to|date:"Y-m-d H:i" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Days Remaining</th>
+            <td>
+              {% if object.certificate.days_remaining < 0 %}
+                <span class="badge text-bg-danger">Expired</span>
+              {% elif object.certificate.days_remaining <= 14 %}
+                <span class="badge text-bg-danger">{{ object.certificate.days_remaining }} days</span>
+              {% elif object.certificate.days_remaining <= 30 %}
+                <span class="badge text-bg-warning">{{ object.certificate.days_remaining }} days</span>
+              {% else %}
+                <span class="badge text-bg-success">{{ object.certificate.days_remaining }} days</span>
+              {% endif %}
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if object.notes %}
+<div class="row mb-3">
+  <div class="col col-12">
+    <div class="card">
+      <h5 class="card-header">Notes</h5>
+      <div class="card-body">
+        {{ object.notes }}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock content %}

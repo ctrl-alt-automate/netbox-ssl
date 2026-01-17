@@ -1,0 +1,103 @@
+{% extends 'generic/object_edit.html' %}
+{% load form_helpers %}
+{% load i18n %}
+
+{% block title %}Import Certificate{% endblock %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'plugins:netbox_ssl:certificate_list' %}">Certificates</a>
+  </li>
+  <li class="breadcrumb-item active" aria-current="page">Import</li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+<div class="row">
+  <div class="col col-md-8">
+    <div class="card">
+      <h5 class="card-header">
+        <i class="mdi mdi-upload"></i> Import Certificate (Smart Paste)
+      </h5>
+      <div class="card-body">
+        <form method="post" class="form">
+          {% csrf_token %}
+
+          <div class="alert alert-info">
+            <h6><i class="mdi mdi-information"></i> Instructions</h6>
+            <ul class="mb-0">
+              <li>Paste your certificate in PEM format below</li>
+              <li>You may include the full certificate chain (intermediates and root)</li>
+              <li><strong>Private keys will be rejected</strong> - they are never stored for security reasons</li>
+              <li>Duplicate certificates (same serial + issuer) will be rejected</li>
+            </ul>
+          </div>
+
+          <div class="mb-3">
+            <label for="id_pem_content" class="form-label">Certificate (PEM format) *</label>
+            {{ form.pem_content }}
+            {% if form.pem_content.help_text %}
+              <div class="form-text">{{ form.pem_content.help_text }}</div>
+            {% endif %}
+            {% if form.pem_content.errors %}
+              <div class="invalid-feedback d-block">
+                {% for error in form.pem_content.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="id_private_key_location" class="form-label">Private Key Location</label>
+            {{ form.private_key_location }}
+            {% if form.private_key_location.help_text %}
+              <div class="form-text">{{ form.private_key_location.help_text }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="id_tenant" class="form-label">Tenant</label>
+            {{ form.tenant }}
+            {% if form.tenant.help_text %}
+              <div class="form-text">{{ form.tenant.help_text }}</div>
+            {% endif %}
+          </div>
+
+          <div class="text-end">
+            <a href="{% url 'plugins:netbox_ssl:certificate_list' %}" class="btn btn-outline-secondary">
+              Cancel
+            </a>
+            <button type="submit" class="btn btn-primary">
+              <i class="mdi mdi-upload"></i> Import Certificate
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col col-md-4">
+    <div class="card">
+      <h5 class="card-header">Example PEM Format</h5>
+      <div class="card-body">
+        <pre class="mb-0"><code>-----BEGIN CERTIFICATE-----
+MIIDdzCCAl+gAwIBAgIEAgAAuTA...
+(base64 encoded data)
+...xQIDAQABo2MwYTA=
+-----END CERTIFICATE-----</code></pre>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <h5 class="card-header">
+        <i class="mdi mdi-shield-alert text-warning"></i> Security Notice
+      </h5>
+      <div class="card-body">
+        <p class="mb-0">
+          This plugin <strong>never</strong> stores private keys. If you paste a private key,
+          it will be rejected. You can optionally provide a <em>hint</em> about where the
+          private key is stored (e.g., a Vault path).
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
