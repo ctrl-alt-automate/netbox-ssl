@@ -28,5 +28,11 @@ class NetBoxSSLConfig(PluginConfig):
         "expiry_critical_days": 14,
     }
 
+    def ready(self):
+        """Called when the plugin is ready. Register system checks."""
+        super().ready()
+        # Import checks to register them with Django's check framework
+        from . import checks  # noqa: F401
+
 
 config = NetBoxSSLConfig
