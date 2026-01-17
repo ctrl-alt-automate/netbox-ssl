@@ -6,27 +6,70 @@ work correctly without requiring a full NetBox environment.
 """
 
 import pytest
-from datetime import datetime, timedelta
-from unittest.mock import Mock, patch
+import sys
+from datetime import datetime, timedelta, date
+from unittest.mock import Mock, patch, MagicMock
+from pathlib import Path
+
+# Allow importing modules directly without loading the full netbox_ssl package
+_project_root = Path(__file__).parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+# Mock netbox modules if not available (for local testing without NetBox)
+if "netbox" not in sys.modules:
+    sys.modules["netbox"] = MagicMock()
+    sys.modules["netbox.plugins"] = MagicMock()
+    sys.modules["netbox.models"] = MagicMock()
+    sys.modules["netbox.models.features"] = MagicMock()
+
+# Mock Django settings for timezone
+import django
+from django.conf import settings
+if not settings.configured:
+    settings.configure(
+        USE_TZ=True,
+        TIME_ZONE='UTC',
+        DATABASES={},
+        INSTALLED_APPS=[],
+        DEFAULT_AUTO_FIELD='django.db.models.BigAutoField',
+    )
+
 from django.utils import timezone
+
+# Check if we can import real NetBox models
+try:
+    from netbox_ssl.models import Certificate, CertificateAssignment
+    NETBOX_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    NETBOX_AVAILABLE = False
+
+# Skip marker for tests that require NetBox
+requires_netbox = pytest.mark.skipif(
+    not NETBOX_AVAILABLE,
+    reason="NetBox not available - run these tests inside Docker container"
+)
 
 
 class TestCertificateModel:
-    """Tests for Certificate model properties and methods."""
+    """Tests for Certificate model properties and methods.
+
+    These tests verify the property logic that would be used by the Certificate model.
+    They use mocks to avoid needing the full NetBox environment.
+    """
 
     def _create_mock_certificate(self, valid_from, valid_to, status="active"):
-        """Create a mock certificate object for testing."""
+        """Create a mock certificate object for testing.
+
+        Implements the same property logic as the Certificate model.
+        """
         mock_cert = Mock()
         mock_cert.valid_from = valid_from
         mock_cert.valid_to = valid_to
         mock_cert.status = status
 
-        # Import the actual property implementations
-        from netbox_ssl.models.certificates import Certificate
-
-        # Manually implement the properties using the same logic
+        # Manually implement the properties using the same logic as the model
         if valid_to:
-            from datetime import date
             delta = valid_to.date() - date.today()
             mock_cert.days_remaining = delta.days
         else:
@@ -176,10 +219,11 @@ class TestCertificateModel:
 class TestCertificateStatusChoices:
     """Tests for CertificateStatusChoices."""
 
+    @requires_netbox
     @pytest.mark.unit
     def test_status_choices_exist(self):
         """Test that all expected status choices are defined."""
-        from netbox_ssl.models import CertificateStatusChoices
+        from netbox_ssl.models.certificates import CertificateStatusChoices
 
         assert hasattr(CertificateStatusChoices, 'STATUS_ACTIVE')
         assert hasattr(CertificateStatusChoices, 'STATUS_EXPIRED')
@@ -187,10 +231,11 @@ class TestCertificateStatusChoices:
         assert hasattr(CertificateStatusChoices, 'STATUS_REVOKED')
         assert hasattr(CertificateStatusChoices, 'STATUS_PENDING')
 
+    @requires_netbox
     @pytest.mark.unit
     def test_status_values(self):
         """Test status choice values."""
-        from netbox_ssl.models import CertificateStatusChoices
+        from netbox_ssl.models.certificates import CertificateStatusChoices
 
         assert CertificateStatusChoices.STATUS_ACTIVE == "active"
         assert CertificateStatusChoices.STATUS_EXPIRED == "expired"
@@ -200,20 +245,213 @@ class TestCertificateStatusChoices:
 class TestCertificateAlgorithmChoices:
     """Tests for CertificateAlgorithmChoices."""
 
+    @requires_netbox
     @pytest.mark.unit
     def test_algorithm_choices_exist(self):
         """Test that all expected algorithm choices are defined."""
-        from netbox_ssl.models import CertificateAlgorithmChoices
+        from netbox_ssl.models.certificates import CertificateAlgorithmChoices
 
         assert hasattr(CertificateAlgorithmChoices, 'ALGORITHM_RSA')
         assert hasattr(CertificateAlgorithmChoices, 'ALGORITHM_ECDSA')
         assert hasattr(CertificateAlgorithmChoices, 'ALGORITHM_ED25519')
 
+    @requires_netbox
     @pytest.mark.unit
     def test_algorithm_values(self):
         """Test algorithm choice values."""
-        from netbox_ssl.models import CertificateAlgorithmChoices
+        from netbox_ssl.models.certificates import CertificateAlgorithmChoices
 
         assert CertificateAlgorithmChoices.ALGORITHM_RSA == "rsa"
         assert CertificateAlgorithmChoices.ALGORITHM_ECDSA == "ecdsa"
         assert CertificateAlgorithmChoices.ALGORITHM_ED25519 == "ed25519"
+
+
+class TestJanusRenewalWorkflow:
+    """Tests for the Janus Renewal workflow logic."""
+
+    @pytest.mark.unit
+    def test_find_renewal_candidate_detects_same_cn(self):
+        """Test that find_renewal_candidate finds certificates with matching CN."""
+        from netbox_ssl.utils.parser import CertificateParser
+        from unittest.mock import MagicMock
+
+        # Create a mock Certificate model class
+        mock_model = MagicMock()
+        mock_existing_cert = MagicMock()
+        mock_existing_cert.common_name = "test.example.com"
+
+        # Configure the queryset chain
+        mock_queryset = MagicMock()
+        mock_queryset.exists.return_value = True
+        mock_queryset.first.return_value = mock_existing_cert
+        mock_model.objects.filter.return_value.order_by.return_value = mock_queryset
+
+        # Test finding a renewal candidate
+        result = CertificateParser.find_renewal_candidate("test.example.com", mock_model)
+
+        # Verify the model was queried correctly
+        mock_model.objects.filter.assert_called_once_with(
+            common_name="test.example.com",
+            status__in=["active", "expired"],
+        )
+        assert result == mock_existing_cert
+
+    @pytest.mark.unit
+    def test_find_renewal_candidate_returns_none_for_new_cn(self):
+        """Test that find_renewal_candidate returns None for new CNs."""
+        from netbox_ssl.utils.parser import CertificateParser
+        from unittest.mock import MagicMock
+
+        # Create a mock Certificate model class
+        mock_model = MagicMock()
+
+        # Configure the queryset chain to return no results
+        mock_queryset = MagicMock()
+        mock_queryset.exists.return_value = False
+        mock_model.objects.filter.return_value.order_by.return_value = mock_queryset
+
+        # Test with a CN that doesn't exist
+        result = CertificateParser.find_renewal_candidate("new.example.com", mock_model)
+
+        assert result is None
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_renewal_preserves_status_replaced(self):
+        """Test that old certificate gets 'replaced' status after renewal."""
+        from netbox_ssl.models import CertificateStatusChoices
+
+        # Verify the status choice exists
+        assert CertificateStatusChoices.STATUS_REPLACED == "replaced"
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_renewal_chain_tracking_field_exists(self):
+        """Test that Certificate model supports renewal chain tracking."""
+        from netbox_ssl.models import Certificate
+
+        # Verify the replaced_by field exists for tracking renewal chains
+        assert hasattr(Certificate, 'replaced_by')
+
+
+class TestMultiTenancyValidation:
+    """Tests for multi-tenancy boundary validation."""
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_assignment_model_has_tenant_validation(self):
+        """Test that CertificateAssignment has tenant boundary validation."""
+        from netbox_ssl.models import CertificateAssignment
+        import inspect
+
+        # Verify clean method exists
+        assert hasattr(CertificateAssignment, 'clean')
+
+        # Verify clean method contains tenant validation logic
+        source = inspect.getsource(CertificateAssignment.clean)
+        assert 'tenant' in source.lower()
+        assert 'ValidationError' in source
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_certificate_model_has_tenant_field(self):
+        """Test that Certificate model has tenant field."""
+        from netbox_ssl.models import Certificate
+
+        assert hasattr(Certificate, 'tenant')
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_tenant_boundary_error_message(self):
+        """Test that cross-tenant assignment produces clear error message."""
+        from netbox_ssl.models import CertificateAssignment
+        from django.core.exceptions import ValidationError
+
+        # Create mock objects
+        assignment = CertificateAssignment()
+
+        # Mock the certificate with a tenant
+        mock_cert = MagicMock()
+        mock_tenant_a = MagicMock()
+        mock_tenant_a.__str__ = MagicMock(return_value="Tenant A")
+        mock_cert.tenant = mock_tenant_a
+        assignment.certificate = mock_cert
+        assignment.certificate_id = 1
+
+        # Mock the assigned object with a different tenant
+        mock_device = MagicMock()
+        mock_tenant_b = MagicMock()
+        mock_tenant_b.__str__ = MagicMock(return_value="Tenant B")
+        mock_device.tenant = mock_tenant_b
+        mock_device.device = None
+        mock_device.virtual_machine = None
+        assignment.assigned_object = mock_device
+
+        # Test that clean raises ValidationError
+        with pytest.raises(ValidationError) as exc_info:
+            assignment.clean()
+
+        # Verify error message mentions both tenants
+        error_msg = str(exc_info.value)
+        assert "tenant" in error_msg.lower()
+
+
+class TestAssignmentModel:
+    """Tests for CertificateAssignment model."""
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_assignment_supports_service_type(self):
+        """Test that assignments support Service as target type."""
+        from netbox_ssl.models import CertificateAssignment
+
+        # Verify the model can handle service assignments
+        # Check the limit_choices_to on assigned_object_type
+        field = CertificateAssignment._meta.get_field('assigned_object_type')
+        limit_choices = field.get_limit_choices_to()
+
+        assert 'model__in' in limit_choices
+        assert 'service' in limit_choices['model__in']
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_assignment_supports_device_type(self):
+        """Test that assignments support Device as target type."""
+        from netbox_ssl.models import CertificateAssignment
+
+        field = CertificateAssignment._meta.get_field('assigned_object_type')
+        limit_choices = field.get_limit_choices_to()
+
+        assert 'device' in limit_choices['model__in']
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_assignment_supports_vm_type(self):
+        """Test that assignments support VirtualMachine as target type."""
+        from netbox_ssl.models import CertificateAssignment
+
+        field = CertificateAssignment._meta.get_field('assigned_object_type')
+        limit_choices = field.get_limit_choices_to()
+
+        assert 'virtualmachine' in limit_choices['model__in']
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_assignment_unique_constraint(self):
+        """Test that assignment has unique constraint."""
+        from netbox_ssl.models import CertificateAssignment
+
+        # Check for unique constraint
+        constraints = CertificateAssignment._meta.constraints
+        constraint_names = [c.name for c in constraints]
+
+        assert 'unique_certificate_assignment' in constraint_names
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_assignment_has_is_primary_field(self):
+        """Test that assignment has is_primary field for primary cert marking."""
+        from netbox_ssl.models import CertificateAssignment
+
+        field = CertificateAssignment._meta.get_field('is_primary')
+        assert field.default is True

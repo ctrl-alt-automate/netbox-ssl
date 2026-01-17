@@ -44,19 +44,27 @@ class CertificateAssignmentForm(NetBoxModelForm):
     )
 
     # Device selection (for filtering services or direct assignment)
+    # Filtered by tenant when certificate has a tenant assigned
     device = DynamicModelChoiceField(
         queryset=Device.objects.all(),
         required=False,
         label=_("Device"),
-        help_text=_("Select a device (required for service assignment)"),
+        help_text=_("Select a device (filtered by certificate tenant if applicable)"),
+        query_params={
+            "tenant_id": "$tenant",
+        },
     )
 
     # VM selection (for filtering services or direct assignment)
+    # Filtered by tenant when certificate has a tenant assigned
     virtual_machine = DynamicModelChoiceField(
         queryset=VirtualMachine.objects.all(),
         required=False,
         label=_("Virtual Machine"),
-        help_text=_("Select a VM (required for service assignment)"),
+        help_text=_("Select a VM (filtered by certificate tenant if applicable)"),
+        query_params={
+            "tenant_id": "$tenant",
+        },
     )
 
     # Service selection (filtered by device/VM via HTMX)
@@ -70,6 +78,7 @@ class CertificateAssignmentForm(NetBoxModelForm):
             "virtual_machine_id": "$virtual_machine",
         },
     )
+
 
     fieldsets = (
         FieldSet(

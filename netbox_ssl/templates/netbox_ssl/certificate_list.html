@@ -1,0 +1,11 @@
+{% extends 'generic/object_list.html' %}
+{% load i18n %}
+
+{% block title %}Certificates{% endblock %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'plugins:netbox_ssl:certificate_list' %}">SSL Certificates</a>
+  </li>
+  <li class="breadcrumb-item active" aria-current="page">Certificates</li>
+{% endblock breadcrumbs %}
