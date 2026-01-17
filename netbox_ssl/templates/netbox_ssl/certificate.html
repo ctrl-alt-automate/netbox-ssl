@@ -68,7 +68,7 @@
             <th scope="row">Days Remaining</th>
             <td>
               {% if object.days_remaining < 0 %}
-                <span class="badge text-bg-danger">Expired ({{ object.days_remaining|abs }} days ago)</span>
+                <span class="badge text-bg-danger">Expired ({{ object.days_expired }} days ago)</span>
               {% elif object.days_remaining <= 14 %}
                 <span class="badge text-bg-danger">{{ object.days_remaining }} days</span>
               {% elif object.days_remaining <= 30 %}

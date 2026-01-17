@@ -174,6 +174,13 @@ class Certificate(NetBoxModel):
         return None
 
     @property
+    def days_expired(self):
+        """Calculate days since expiration (absolute value for display)."""
+        if self.days_remaining is not None and self.days_remaining < 0:
+            return abs(self.days_remaining)
+        return 0
+
+    @property
     def is_expired(self):
         """Check if the certificate has expired."""
         return self.valid_to and self.valid_to < timezone.now()

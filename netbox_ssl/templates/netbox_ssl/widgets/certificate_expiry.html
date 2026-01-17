@@ -49,7 +49,7 @@
       {% for cert in expired_certs %}
       <li>
         <a href="{{ cert.get_absolute_url }}">{{ cert.common_name }}</a>
-        <span class="badge text-bg-danger">{{ cert.days_remaining|abs }} days ago</span>
+        <span class="badge text-bg-danger">{{ cert.days_expired }} days ago</span>
       </li>
       {% endfor %}
     </ul>
