@@ -6,17 +6,19 @@
 #   docker-compose down         # Stop everything
 #
 # Switch NetBox version by setting NETBOX_VERSION:
-#   NETBOX_VERSION=v4.4-latest docker-compose up -d
+#   NETBOX_VERSION=v4.4 docker-compose up -d
 
 services:
   netbox:
-    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.5-latest}
+    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.5}
     depends_on:
-      - postgres
-      - redis
-      - redis-cache
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
     env_file: env/netbox.env
-    user: "unit:root"
     healthcheck:
       test: curl -f http://localhost:8080/login/ || exit 1
       start_period: 90s
@@ -36,7 +38,7 @@ services:
       - "8000:8080"
 
   netbox-worker:
-    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.5-latest}
+    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.5}
     depends_on:
       netbox:
         condition: service_healthy
@@ -58,7 +60,7 @@ services:
       - netbox-scripts-files:/opt/netbox/netbox/scripts
 
   netbox-housekeeping:
-    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.5-latest}
+    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.5}
     depends_on:
       netbox:
         condition: service_healthy
