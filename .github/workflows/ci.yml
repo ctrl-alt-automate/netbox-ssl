@@ -121,15 +121,26 @@ jobs:
 
       - name: Start NetBox
         run: |
-          NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d
+          # Start database and cache services first
+          NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d postgres redis redis-cache
+
+          # Wait for database to be ready
+          echo "Waiting for PostgreSQL..."
+          timeout 60 bash -c 'until docker compose exec -T postgres pg_isready -q; do sleep 2; done'
+
+          # Start NetBox (will run migrations)
+          echo "Starting NetBox..."
+          NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d netbox
+
+          # Wait for NetBox to be healthy (longer timeout for migrations)
+          echo "Waiting for NetBox to be healthy..."
+          timeout 300 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting for NetBox..."; sleep 15; done'
+
+          # Start worker and housekeeping
+          NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d netbox-worker netbox-housekeeping
+          echo "All services started!"
         env:
           NETBOX_VERSION: ${{ matrix.netbox_version }}
-
-      - name: Wait for NetBox to be ready
-        run: |
-          echo "Waiting for NetBox to be healthy..."
-          timeout 300 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting..."; sleep 10; done'
-          echo "NetBox is ready!"
 
       - name: Install pytest in NetBox container
         run: |
