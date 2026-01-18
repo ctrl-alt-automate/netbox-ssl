@@ -40,10 +40,10 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% with days=assignment.certificate.days_remaining %}
+                        {% with days=assignment.certificate.days_remaining expired_days=assignment.certificate.days_expired %}
                             {% if days is not None %}
                                 {% if days < 0 %}
-                                    <span class="badge text-bg-danger">Expired {{ days|abs }} days ago</span>
+                                    <span class="badge text-bg-danger">Expired {{ expired_days }} days ago</span>
                                 {% elif days <= 14 %}
                                     <span class="badge text-bg-danger">{{ days }} days</span>
                                 {% elif days <= 30 %}
