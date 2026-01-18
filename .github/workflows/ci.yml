@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run ruff check
+        run: ruff check netbox_ssl/
+
+      - name: Run ruff format check
+        run: ruff format --check netbox_ssl/
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install pytest cryptography django
+
+      - name: Run unit tests
+        run: |
+          python -m pytest tests/test_parser.py tests/test_models.py -v -p no:django
+
+  integration-tests:
+    name: Integration Tests (NetBox ${{ matrix.netbox_version }})
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        netbox_version: ["v4.5", "v4.4"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start NetBox
+        run: |
+          NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d
+        env:
+          NETBOX_VERSION: ${{ matrix.netbox_version }}
+
+      - name: Wait for NetBox to be ready
+        run: |
+          echo "Waiting for NetBox to be healthy..."
+          timeout 300 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting..."; sleep 10; done'
+          echo "NetBox is ready!"
+
+      - name: Install pytest in NetBox container
+        run: |
+          docker compose exec -T netbox bash -c "curl -sS https://bootstrap.pypa.io/get-pip.py | /opt/netbox/venv/bin/python"
+          docker compose exec -T netbox /opt/netbox/venv/bin/pip install pytest
+
+      - name: Copy tests to container
+        run: |
+          docker cp tests/. $(docker compose ps -q netbox):/tmp/plugin_tests/
+
+      - name: Create test data
+        run: |
+          docker cp scripts/create_test_data.py $(docker compose ps -q netbox):/tmp/create_test_data.py
+          docker compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "exec(open('/tmp/create_test_data.py').read())" || true
+
+      - name: Run integration tests
+        run: |
+          docker compose exec -T netbox /opt/netbox/venv/bin/python -m pytest /tmp/plugin_tests/ -v --tb=short
+
+      - name: Run Django system checks
+        run: |
+          docker compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py check --tag netbox_ssl
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs netbox
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v

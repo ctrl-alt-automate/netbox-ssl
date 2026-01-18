@@ -28,9 +28,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-org/netbox-ssl"
-Documentation = "https://github.com/your-org/netbox-ssl/wiki"
-Repository = "https://github.com/your-org/netbox-ssl"
+Homepage = "https://github.com/ctrl-alt-automate/netbox-ssl"
+Documentation = "https://github.com/ctrl-alt-automate/netbox-ssl/wiki"
+Repository = "https://github.com/ctrl-alt-automate/netbox-ssl"
 
 [tool.setuptools.packages.find]
 include = ["netbox_ssl*"]

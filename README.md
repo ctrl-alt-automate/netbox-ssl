@@ -1,5 +1,9 @@
 # NetBox SSL Plugin
 
+[![CI](https://github.com/ctrl-alt-automate/netbox-ssl/actions/workflows/ci.yml/badge.svg)](https://github.com/ctrl-alt-automate/netbox-ssl/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![NetBox](https://img.shields.io/badge/NetBox-4.4%20%7C%204.5-blue.svg)](https://github.com/netbox-community/netbox)
+
 **Project Janus** - A NetBox plugin for TLS/SSL certificate management.
 
 > *Janus, the Roman god of beginnings and endings, doorways and passages.*
@@ -44,7 +48,7 @@ pip install netbox-ssl
 
 ```bash
 cd /opt/netbox/netbox
-git clone https://github.com/your-org/netbox-ssl.git
+git clone https://github.com/ctrl-alt-automate/netbox-ssl.git
 pip install ./netbox-ssl
 ```
 
@@ -127,7 +131,7 @@ The dashboard widget shows:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/netbox-ssl.git
+git clone https://github.com/ctrl-alt-automate/netbox-ssl.git
 cd netbox-ssl
 
 # Start development environment
@@ -154,8 +158,17 @@ NETBOX_VERSION=v4.4-latest docker-compose up -d
 ### Running Tests
 
 ```bash
-# In the NetBox container
-docker-compose exec netbox python manage.py test netbox_ssl
+# Unit tests (no NetBox required)
+python -m pytest tests/test_parser.py tests/test_models.py -v -p no:django
+
+# Integration tests in Docker container
+docker-compose exec netbox bash -c "curl -sS https://bootstrap.pypa.io/get-pip.py | /opt/netbox/venv/bin/python"
+docker-compose exec netbox /opt/netbox/venv/bin/pip install pytest
+docker cp tests/. $(docker-compose ps -q netbox):/tmp/plugin_tests/
+docker-compose exec netbox /opt/netbox/venv/bin/python -m pytest /tmp/plugin_tests/ -v
+
+# Django system checks
+docker-compose exec netbox python manage.py check --tag netbox_ssl
 ```
 
 ## Data Models
