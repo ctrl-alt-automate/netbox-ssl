@@ -13,8 +13,6 @@ from datetime import timedelta
 from django.db.models import Count
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
-
 from extras.dashboard.utils import register_widget
 from extras.dashboard.widgets import DashboardWidget
 
@@ -23,13 +21,10 @@ from extras.dashboard.widgets import DashboardWidget
 class CertificateExpiryWidget(DashboardWidget):
     """Dashboard widget showing certificate expiry status."""
 
-    default_title = _("SSL Certificate Status")
-    description = _("Shows certificates that are expiring soon, expired, or without assignments.")
+    default_title = "SSL Certificate Status"
+    description = "Shows certificates that are expiring soon, expired, or without assignments."
     width = 4
     height = 3
-
-    class Meta:
-        name = "certificate_expiry"
 
     def render(self, request):
         """Render the widget content."""
