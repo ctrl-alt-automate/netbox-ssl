@@ -240,8 +240,6 @@ class CertificateParser:
         Returns:
             An existing Certificate instance if found, None otherwise
         """
-        from django.utils import timezone
-
         # Find active certificates with same CN
         candidates = certificate_model.objects.filter(
             common_name=common_name,

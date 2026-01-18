@@ -16,33 +16,57 @@ _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-# Mock netbox modules if not available (for local testing without NetBox)
-if "netbox" not in sys.modules:
+# Check if we're running inside Docker with full NetBox available
+# Detection: Check if NetBox settings module exists
+import os
+
+# Two scenarios:
+# 1. Running locally without NetBox: mock everything
+# 2. Running in Docker with NetBox: use real Django setup
+
+# Try to detect if we're in a NetBox environment by checking for settings
+_in_netbox_env = os.path.exists('/opt/netbox/netbox/netbox/settings.py') or \
+                 'DJANGO_SETTINGS_MODULE' in os.environ
+
+if _in_netbox_env:
+    # Running in Docker with NetBox: set up Django first
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'netbox.settings')
+    import django
+    try:
+        django.setup()
+    except RuntimeError:
+        # Already set up
+        pass
+    NETBOX_AVAILABLE = True
+else:
+    # Local testing: mock netbox modules
     sys.modules["netbox"] = MagicMock()
     sys.modules["netbox.plugins"] = MagicMock()
     sys.modules["netbox.models"] = MagicMock()
     sys.modules["netbox.models.features"] = MagicMock()
 
-# Mock Django settings for timezone
-import django
-from django.conf import settings
-if not settings.configured:
-    settings.configure(
-        USE_TZ=True,
-        TIME_ZONE='UTC',
-        DATABASES={},
-        INSTALLED_APPS=[],
-        DEFAULT_AUTO_FIELD='django.db.models.BigAutoField',
-    )
+    # Configure minimal Django settings
+    import django
+    from django.conf import settings
+    if not settings.configured:
+        settings.configure(
+            USE_TZ=True,
+            TIME_ZONE='UTC',
+            DATABASES={},
+            INSTALLED_APPS=[],
+            DEFAULT_AUTO_FIELD='django.db.models.BigAutoField',
+        )
+    NETBOX_AVAILABLE = False
 
 from django.utils import timezone
 
-# Check if we can import real NetBox models
-try:
-    from netbox_ssl.models import Certificate, CertificateAssignment
-    NETBOX_AVAILABLE = True
-except (ImportError, ModuleNotFoundError):
-    NETBOX_AVAILABLE = False
+# Try to import real NetBox models (only if NETBOX_AVAILABLE)
+if NETBOX_AVAILABLE:
+    try:
+        from netbox_ssl.models import Certificate, CertificateAssignment
+    except (ImportError, ModuleNotFoundError) as e:
+        print(f"Warning: Could not import netbox_ssl models: {e}")
+        NETBOX_AVAILABLE = False
 
 # Skip marker for tests that require NetBox
 requires_netbox = pytest.mark.skipif(
@@ -367,33 +391,37 @@ class TestMultiTenancyValidation:
         from netbox_ssl.models import CertificateAssignment
         from django.core.exceptions import ValidationError
 
-        # Create mock objects
-        assignment = CertificateAssignment()
-
-        # Mock the certificate with a tenant
-        mock_cert = MagicMock()
+        # Create mock tenants
         mock_tenant_a = MagicMock()
         mock_tenant_a.__str__ = MagicMock(return_value="Tenant A")
-        mock_cert.tenant = mock_tenant_a
-        assignment.certificate = mock_cert
-        assignment.certificate_id = 1
+        mock_tenant_a.pk = 1
 
-        # Mock the assigned object with a different tenant
-        mock_device = MagicMock()
         mock_tenant_b = MagicMock()
         mock_tenant_b.__str__ = MagicMock(return_value="Tenant B")
+        mock_tenant_b.pk = 2
+
+        # Mock the certificate with tenant A
+        mock_cert = MagicMock()
+        mock_cert.tenant = mock_tenant_a
+
+        # Mock the assigned object with tenant B
+        mock_device = MagicMock()
         mock_device.tenant = mock_tenant_b
-        mock_device.device = None
-        mock_device.virtual_machine = None
-        assignment.assigned_object = mock_device
 
-        # Test that clean raises ValidationError
-        with pytest.raises(ValidationError) as exc_info:
-            assignment.clean()
+        # Create assignment and use patching to bypass ForeignKey validation
+        assignment = CertificateAssignment()
+        assignment.certificate_id = 1  # Set a fake ID
 
-        # Verify error message mentions both tenants
-        error_msg = str(exc_info.value)
-        assert "tenant" in error_msg.lower()
+        # Patch the properties to return our mocks
+        with patch.object(CertificateAssignment, 'certificate', new_callable=lambda: property(lambda s: mock_cert)):
+            with patch.object(CertificateAssignment, 'assigned_object', new_callable=lambda: property(lambda s: mock_device)):
+                # Test that clean raises ValidationError
+                with pytest.raises(ValidationError) as exc_info:
+                    assignment.clean()
+
+                # Verify error message mentions tenant
+                error_msg = str(exc_info.value)
+                assert "tenant" in error_msg.lower()
 
 
 class TestAssignmentModel:
