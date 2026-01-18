@@ -29,10 +29,12 @@ class NetBoxSSLConfig(PluginConfig):
     }
 
     def ready(self):
-        """Called when the plugin is ready. Register system checks."""
+        """Called when the plugin is ready. Register system checks and template extensions."""
         super().ready()
         # Import checks to register them with Django's check framework
         from . import checks  # noqa: F401
+        # Import template extensions
+        from .template_content import template_extensions  # noqa: F401
 
 
 config = NetBoxSSLConfig
