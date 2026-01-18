@@ -150,6 +150,11 @@
                   <a href="{{ assignment.assigned_object.get_absolute_url }}">
                     {{ assignment.assigned_object }}
                   </a>
+                  {% if assignment.assigned_object_type.model == 'service' and assignment.assigned_object.parent %}
+                    <span class="text-muted">
+                      on <a href="{{ assignment.assigned_object.parent.get_absolute_url }}">{{ assignment.assigned_object.parent }}</a>
+                    </span>
+                  {% endif %}
                 {% else %}
                   <span class="text-muted">Unknown</span>
                 {% endif %}
