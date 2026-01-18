@@ -2,26 +2,36 @@
 Dashboard widgets for NetBox SSL plugin.
 
 Provides an expiry alert widget showing certificates organized by status:
-- Critical: < 14 days
-- Warning: < 30 days
+- Expired: Already expired certificates
+- Critical: < 14 days until expiry
+- Warning: < 30 days until expiry
 - Orphan: Certificates without assignments
 """
 
 from datetime import timedelta
 
-from django.db.models import Count, Q
+from django.db.models import Count
+from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from netbox.plugins import PluginTemplateExtension
+from extras.dashboard.utils import register_widget
+from extras.dashboard.widgets import DashboardWidget
 
 
-class CertificateExpiryWidget(PluginTemplateExtension):
+@register_widget
+class CertificateExpiryWidget(DashboardWidget):
     """Dashboard widget showing certificate expiry status."""
 
-    model = "netbox_ssl.certificate"
+    default_title = _("SSL Certificate Status")
+    description = _("Shows certificates that are expiring soon, expired, or without assignments.")
+    width = 4
+    height = 3
 
-    def right_page(self):
+    class Meta:
+        name = "certificate_expiry"
+
+    def render(self, request):
         """Render the widget content."""
         from .models import Certificate
 
@@ -29,7 +39,7 @@ class CertificateExpiryWidget(PluginTemplateExtension):
         critical_threshold = now + timedelta(days=14)
         warning_threshold = now + timedelta(days=30)
 
-        # Get certificate counts by status
+        # Get certificate lists by status (limit to 5 each)
         critical_certs = Certificate.objects.filter(
             status="active",
             valid_to__gt=now,
@@ -55,7 +65,7 @@ class CertificateExpiryWidget(PluginTemplateExtension):
             assignment_count=0
         ).order_by("valid_to")[:5]
 
-        # Counts for badges
+        # Get counts for badges
         critical_count = Certificate.objects.filter(
             status="active",
             valid_to__gt=now,
@@ -81,9 +91,9 @@ class CertificateExpiryWidget(PluginTemplateExtension):
             assignment_count=0
         ).count()
 
-        return self.render(
+        return render_to_string(
             "netbox_ssl/widgets/certificate_expiry.html",
-            extra_context={
+            {
                 "critical_certs": critical_certs,
                 "critical_count": critical_count,
                 "warning_certs": warning_certs,
@@ -93,8 +103,5 @@ class CertificateExpiryWidget(PluginTemplateExtension):
                 "orphan_certs": orphan_certs,
                 "orphan_count": orphan_count,
             },
+            request=request,
         )
-
-
-# Register template extensions
-template_extensions = [CertificateExpiryWidget]
