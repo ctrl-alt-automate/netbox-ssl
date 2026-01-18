@@ -87,6 +87,7 @@ jobs:
           REDIS_PASSWORD=netbox
           REDIS_SSL=false
           SECRET_KEY=test-secret-key-for-ci-only-do-not-use-in-production
+          API_TOKEN_PEPPERS=pepper1,pepper2,pepper3
           SKIP_SUPERUSER=false
           SUPERUSER_API_TOKEN=0123456789abcdef0123456789abcdef01234567
           SUPERUSER_EMAIL=admin@example.com
@@ -134,7 +135,7 @@ jobs:
 
           # Wait for NetBox to be healthy (longer timeout for migrations)
           echo "Waiting for NetBox to be healthy..."
-          timeout 300 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting for NetBox..."; sleep 15; done'
+          timeout 600 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting for NetBox..."; sleep 15; done'
 
           # Start worker and housekeeping
           NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d netbox-worker netbox-housekeeping
