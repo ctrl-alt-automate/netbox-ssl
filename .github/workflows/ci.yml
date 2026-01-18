@@ -64,61 +64,58 @@ jobs:
         run: |
           mkdir -p env development/configuration
 
-          # Create NetBox environment file
-          cat > env/netbox.env << 'ENVEOF'
-          CORS_ORIGIN_ALLOW_ALL=True
-          DB_HOST=postgres
-          DB_NAME=netbox
-          DB_PASSWORD=netbox
-          DB_USER=netbox
-          DB_WAIT_DEBUG=1
-          GRAPHQL_ENABLED=true
-          HOUSEKEEPING_INTERVAL=86400
-          MEDIA_ROOT=/opt/netbox/netbox/media
-          METRICS_ENABLED=false
-          REDIS_CACHE_DATABASE=1
-          REDIS_CACHE_HOST=redis-cache
-          REDIS_CACHE_INSECURE_SKIP_TLS_VERIFY=false
-          REDIS_CACHE_PASSWORD=netbox
-          REDIS_CACHE_SSL=false
-          REDIS_DATABASE=0
-          REDIS_HOST=redis
-          REDIS_INSECURE_SKIP_TLS_VERIFY=false
-          REDIS_PASSWORD=netbox
-          REDIS_SSL=false
-          SECRET_KEY=test-secret-key-for-ci-only-do-not-use-in-production
-          API_TOKEN_PEPPERS=pepper1,pepper2,pepper3
-          SKIP_SUPERUSER=false
-          SUPERUSER_API_TOKEN=0123456789abcdef0123456789abcdef01234567
-          SUPERUSER_EMAIL=admin@example.com
-          SUPERUSER_NAME=admin
-          SUPERUSER_PASSWORD=admin
-          ENVEOF
-          sed -i 's/^[[:space:]]*//' env/netbox.env
+          # Create NetBox environment file (no leading spaces)
+          cat > env/netbox.env << 'EOF'
+CORS_ORIGIN_ALLOW_ALL=True
+DB_HOST=postgres
+DB_NAME=netbox
+DB_PASSWORD=netbox
+DB_USER=netbox
+DB_WAIT_DEBUG=1
+GRAPHQL_ENABLED=true
+HOUSEKEEPING_INTERVAL=86400
+MEDIA_ROOT=/opt/netbox/netbox/media
+METRICS_ENABLED=false
+REDIS_CACHE_DATABASE=1
+REDIS_CACHE_HOST=redis-cache
+REDIS_CACHE_INSECURE_SKIP_TLS_VERIFY=false
+REDIS_CACHE_PASSWORD=netbox
+REDIS_CACHE_SSL=false
+REDIS_DATABASE=0
+REDIS_HOST=redis
+REDIS_INSECURE_SKIP_TLS_VERIFY=false
+REDIS_PASSWORD=netbox
+REDIS_SSL=false
+SECRET_KEY=test-secret-key-for-ci-only-do-not-use-in-production
+API_TOKEN_PEPPERS=mvcRS686OpI1lU_oQdp27BClrdGmFuKW6QZqf2Xc4u0
+SKIP_SUPERUSER=false
+SUPERUSER_API_TOKEN=0123456789abcdef0123456789abcdef01234567
+SUPERUSER_EMAIL=admin@example.com
+SUPERUSER_NAME=admin
+SUPERUSER_PASSWORD=admin
+EOF
 
           # Create PostgreSQL environment file
-          cat > env/postgres.env << 'ENVEOF'
-          POSTGRES_DB=netbox
-          POSTGRES_PASSWORD=netbox
-          POSTGRES_USER=netbox
-          ENVEOF
-          sed -i 's/^[[:space:]]*//' env/postgres.env
+          cat > env/postgres.env << 'EOF'
+POSTGRES_DB=netbox
+POSTGRES_PASSWORD=netbox
+POSTGRES_USER=netbox
+EOF
 
           # Create Redis environment files
           echo "REDIS_PASSWORD=netbox" > env/redis.env
           echo "REDIS_PASSWORD=netbox" > env/redis-cache.env
 
           # Create plugins configuration
-          cat > development/configuration/plugins.py << 'PYEOF'
-          PLUGINS = ["netbox_ssl"]
-          PLUGINS_CONFIG = {
-              "netbox_ssl": {
-                  "expiry_warning_days": 30,
-                  "expiry_critical_days": 14,
-              },
-          }
-          PYEOF
-          sed -i 's/^[[:space:]]*//' development/configuration/plugins.py
+          cat > development/configuration/plugins.py << 'EOF'
+PLUGINS = ["netbox_ssl"]
+PLUGINS_CONFIG = {
+    "netbox_ssl": {
+        "expiry_warning_days": 30,
+        "expiry_critical_days": 14,
+    },
+}
+EOF
 
       - name: Start NetBox
         run: |
