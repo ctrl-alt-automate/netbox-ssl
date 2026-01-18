@@ -25,8 +25,11 @@ class CertificateAssignmentForm(NetBoxModelForm):
     """
     Form for creating/editing certificate assignments.
 
-    Supports assignment to Services, Devices, and VirtualMachines.
-    Service is the recommended (most granular) assignment type.
+    Simplified two-step workflow:
+    1. Select Device or VM (services are automatically shown)
+    2. Select Service for port-level assignment, or leave empty for device/VM-level
+
+    Assignment type is automatically determined based on selection.
     """
 
     certificate = DynamicModelChoiceField(
@@ -34,34 +37,23 @@ class CertificateAssignmentForm(NetBoxModelForm):
         label=_("Certificate"),
     )
 
-    # Target type selector
-    assigned_object_type = ContentTypeChoiceField(
-        queryset=ContentType.objects.filter(
-            model__in=["service", "device", "virtualmachine"]
-        ),
-        label=_("Assignment Type"),
-        help_text=_("Select the type of object to assign this certificate to."),
-    )
-
-    # Device selection (for filtering services or direct assignment)
-    # Filtered by tenant when certificate has a tenant assigned
+    # Device selection - services are automatically filtered
     device = DynamicModelChoiceField(
         queryset=Device.objects.all(),
         required=False,
         label=_("Device"),
-        help_text=_("Select a device (filtered by certificate tenant if applicable)"),
+        help_text=_("Select a device to see its services"),
         query_params={
             "tenant_id": "$tenant",
         },
     )
 
-    # VM selection (for filtering services or direct assignment)
-    # Filtered by tenant when certificate has a tenant assigned
+    # VM selection - services are automatically filtered
     virtual_machine = DynamicModelChoiceField(
         queryset=VirtualMachine.objects.all(),
         required=False,
         label=_("Virtual Machine"),
-        help_text=_("Select a VM (filtered by certificate tenant if applicable)"),
+        help_text=_("Select a VM to see its services"),
         query_params={
             "tenant_id": "$tenant",
         },
@@ -72,13 +64,12 @@ class CertificateAssignmentForm(NetBoxModelForm):
         queryset=Service.objects.all(),
         required=False,
         label=_("Service"),
-        help_text=_("Select a service (recommended for port-level granularity)"),
+        help_text=_("Select a service for port-level assignment (recommended), or leave empty for device/VM-level"),
         query_params={
             "device_id": "$device",
             "virtual_machine_id": "$virtual_machine",
         },
     )
-
 
     fieldsets = (
         FieldSet(
@@ -86,7 +77,6 @@ class CertificateAssignmentForm(NetBoxModelForm):
             name=_("Certificate"),
         ),
         FieldSet(
-            "assigned_object_type",
             "device",
             "virtual_machine",
             "service",
@@ -107,7 +97,6 @@ class CertificateAssignmentForm(NetBoxModelForm):
         model = CertificateAssignment
         fields = [
             "certificate",
-            "assigned_object_type",
             "is_primary",
             "notes",
             "tags",
@@ -136,42 +125,36 @@ class CertificateAssignmentForm(NetBoxModelForm):
                 self.fields["virtual_machine"].initial = obj
 
     def clean(self):
-        """Validate and set the assigned object based on selections."""
+        """Validate and automatically determine assignment type based on selections."""
         cleaned_data = super().clean()
 
-        object_type = cleaned_data.get("assigned_object_type")
-        if not object_type:
-            raise forms.ValidationError(_("Please select an assignment type."))
+        service = cleaned_data.get("service")
+        device = cleaned_data.get("device")
+        vm = cleaned_data.get("virtual_machine")
 
-        model_name = object_type.model
-
-        # Determine the assigned object based on type
-        if model_name == "service":
-            service = cleaned_data.get("service")
-            if not service:
-                raise forms.ValidationError(
-                    _("Please select a service for service-level assignment.")
-                )
+        # Determine assignment type automatically based on what's selected
+        if service:
+            # Service-level assignment (most specific, recommended)
+            content_type = ContentType.objects.get_for_model(Service)
             self.instance.assigned_object_id = service.pk
-            self.instance.assigned_object_type = object_type
+            self.instance.assigned_object_type = content_type
 
-        elif model_name == "device":
-            device = cleaned_data.get("device")
-            if not device:
-                raise forms.ValidationError(
-                    _("Please select a device for device-level assignment.")
-                )
+        elif device:
+            # Device-level assignment
+            content_type = ContentType.objects.get_for_model(Device)
             self.instance.assigned_object_id = device.pk
-            self.instance.assigned_object_type = object_type
+            self.instance.assigned_object_type = content_type
 
-        elif model_name == "virtualmachine":
-            vm = cleaned_data.get("virtual_machine")
-            if not vm:
-                raise forms.ValidationError(
-                    _("Please select a virtual machine for VM-level assignment.")
-                )
+        elif vm:
+            # VM-level assignment
+            content_type = ContentType.objects.get_for_model(VirtualMachine)
             self.instance.assigned_object_id = vm.pk
-            self.instance.assigned_object_type = object_type
+            self.instance.assigned_object_type = content_type
+
+        else:
+            raise forms.ValidationError(
+                _("Please select a Device, Virtual Machine, or Service to assign the certificate to.")
+            )
 
         return cleaned_data
 

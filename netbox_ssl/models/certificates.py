@@ -160,7 +160,9 @@ class Certificate(NetBoxModel):
         ]
 
     def __str__(self):
-        return f"{self.common_name} ({self.serial_number[:16]}...)"
+        if self.valid_to:
+            return f"{self.common_name} (expires: {self.valid_to.strftime('%Y-%m-%d')})"
+        return self.common_name
 
     def get_absolute_url(self):
         return reverse("plugins:netbox_ssl:certificate", args=[self.pk])

@@ -16,7 +16,9 @@ class CertificateTable(NetBoxTable):
     common_name = tables.Column(
         linkify=True,
     )
-    status = columns.ChoiceFieldColumn()
+    status = tables.Column(
+        verbose_name="Status",
+    )
     issuer = tables.Column(
         verbose_name="Issuer",
     )
@@ -74,10 +76,34 @@ class CertificateTable(NetBoxTable):
             "tenant",
         )
 
+    def render_status(self, value, record):
+        """Render status with color coding."""
+        status_colors = {
+            "active": "success",      # Green
+            "expired": "danger",      # Red
+            "replaced": "secondary",  # Gray
+            "revoked": "danger",      # Red
+            "pending": "warning",     # Yellow
+        }
+        color = status_colors.get(record.status, "secondary")
+        label = record.get_status_display()
+        return format_html(
+            '<span class="badge text-bg-{}">{}</span>',
+            color,
+            label,
+        )
+
     def render_days_remaining(self, value, record):
         """Render days remaining with color coding."""
         if value is None:
             return "—"
+
+        # Replaced certificates get gray badge
+        if record.status == "replaced":
+            return format_html(
+                '<span class="badge text-bg-secondary">{} days</span>',
+                value,
+            )
 
         if value < 0:
             return format_html(
