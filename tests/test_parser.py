@@ -18,6 +18,7 @@ if str(_project_root) not in sys.path:
 # Mock netbox.plugins if not available (for local testing without NetBox)
 if "netbox" not in sys.modules:
     from unittest.mock import MagicMock
+
     sys.modules["netbox"] = MagicMock()
     sys.modules["netbox.plugins"] = MagicMock()
 

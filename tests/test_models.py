@@ -25,13 +25,13 @@ import os
 # 2. Running in Docker with NetBox: use real Django setup
 
 # Try to detect if we're in a NetBox environment by checking for settings
-_in_netbox_env = os.path.exists('/opt/netbox/netbox/netbox/settings.py') or \
-                 'DJANGO_SETTINGS_MODULE' in os.environ
+_in_netbox_env = os.path.exists("/opt/netbox/netbox/netbox/settings.py") or "DJANGO_SETTINGS_MODULE" in os.environ
 
 if _in_netbox_env:
     # Running in Docker with NetBox: set up Django first
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'netbox.settings')
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "netbox.settings")
     import django
+
     try:
         django.setup()
     except RuntimeError:
@@ -48,13 +48,14 @@ else:
     # Configure minimal Django settings
     import django
     from django.conf import settings
+
     if not settings.configured:
         settings.configure(
             USE_TZ=True,
-            TIME_ZONE='UTC',
+            TIME_ZONE="UTC",
             DATABASES={},
             INSTALLED_APPS=[],
-            DEFAULT_AUTO_FIELD='django.db.models.BigAutoField',
+            DEFAULT_AUTO_FIELD="django.db.models.BigAutoField",
         )
     NETBOX_AVAILABLE = False
 
@@ -70,8 +71,7 @@ if NETBOX_AVAILABLE:
 
 # Skip marker for tests that require NetBox
 requires_netbox = pytest.mark.skipif(
-    not NETBOX_AVAILABLE,
-    reason="NetBox not available - run these tests inside Docker container"
+    not NETBOX_AVAILABLE, reason="NetBox not available - run these tests inside Docker container"
 )
 
 
@@ -249,11 +249,11 @@ class TestCertificateStatusChoices:
         """Test that all expected status choices are defined."""
         from netbox_ssl.models.certificates import CertificateStatusChoices
 
-        assert hasattr(CertificateStatusChoices, 'STATUS_ACTIVE')
-        assert hasattr(CertificateStatusChoices, 'STATUS_EXPIRED')
-        assert hasattr(CertificateStatusChoices, 'STATUS_REPLACED')
-        assert hasattr(CertificateStatusChoices, 'STATUS_REVOKED')
-        assert hasattr(CertificateStatusChoices, 'STATUS_PENDING')
+        assert hasattr(CertificateStatusChoices, "STATUS_ACTIVE")
+        assert hasattr(CertificateStatusChoices, "STATUS_EXPIRED")
+        assert hasattr(CertificateStatusChoices, "STATUS_REPLACED")
+        assert hasattr(CertificateStatusChoices, "STATUS_REVOKED")
+        assert hasattr(CertificateStatusChoices, "STATUS_PENDING")
 
     @requires_netbox
     @pytest.mark.unit
@@ -275,9 +275,9 @@ class TestCertificateAlgorithmChoices:
         """Test that all expected algorithm choices are defined."""
         from netbox_ssl.models.certificates import CertificateAlgorithmChoices
 
-        assert hasattr(CertificateAlgorithmChoices, 'ALGORITHM_RSA')
-        assert hasattr(CertificateAlgorithmChoices, 'ALGORITHM_ECDSA')
-        assert hasattr(CertificateAlgorithmChoices, 'ALGORITHM_ED25519')
+        assert hasattr(CertificateAlgorithmChoices, "ALGORITHM_RSA")
+        assert hasattr(CertificateAlgorithmChoices, "ALGORITHM_ECDSA")
+        assert hasattr(CertificateAlgorithmChoices, "ALGORITHM_ED25519")
 
     @requires_netbox
     @pytest.mark.unit
@@ -355,7 +355,7 @@ class TestJanusRenewalWorkflow:
         from netbox_ssl.models import Certificate
 
         # Verify the replaced_by field exists for tracking renewal chains
-        assert hasattr(Certificate, 'replaced_by')
+        assert hasattr(Certificate, "replaced_by")
 
 
 class TestMultiTenancyValidation:
@@ -369,12 +369,12 @@ class TestMultiTenancyValidation:
         import inspect
 
         # Verify clean method exists
-        assert hasattr(CertificateAssignment, 'clean')
+        assert hasattr(CertificateAssignment, "clean")
 
         # Verify clean method contains tenant validation logic
         source = inspect.getsource(CertificateAssignment.clean)
-        assert 'tenant' in source.lower()
-        assert 'ValidationError' in source
+        assert "tenant" in source.lower()
+        assert "ValidationError" in source
 
     @requires_netbox
     @pytest.mark.unit
@@ -382,7 +382,7 @@ class TestMultiTenancyValidation:
         """Test that Certificate model has tenant field."""
         from netbox_ssl.models import Certificate
 
-        assert hasattr(Certificate, 'tenant')
+        assert hasattr(Certificate, "tenant")
 
     @requires_netbox
     @pytest.mark.unit
@@ -413,8 +413,10 @@ class TestMultiTenancyValidation:
         assignment.certificate_id = 1  # Set a fake ID
 
         # Patch the properties to return our mocks
-        with patch.object(CertificateAssignment, 'certificate', new_callable=lambda: property(lambda s: mock_cert)):
-            with patch.object(CertificateAssignment, 'assigned_object', new_callable=lambda: property(lambda s: mock_device)):
+        with patch.object(CertificateAssignment, "certificate", new_callable=lambda: property(lambda s: mock_cert)):
+            with patch.object(
+                CertificateAssignment, "assigned_object", new_callable=lambda: property(lambda s: mock_device)
+            ):
                 # Test that clean raises ValidationError
                 with pytest.raises(ValidationError) as exc_info:
                     assignment.clean()
@@ -435,11 +437,11 @@ class TestAssignmentModel:
 
         # Verify the model can handle service assignments
         # Check the limit_choices_to on assigned_object_type
-        field = CertificateAssignment._meta.get_field('assigned_object_type')
+        field = CertificateAssignment._meta.get_field("assigned_object_type")
         limit_choices = field.get_limit_choices_to()
 
-        assert 'model__in' in limit_choices
-        assert 'service' in limit_choices['model__in']
+        assert "model__in" in limit_choices
+        assert "service" in limit_choices["model__in"]
 
     @requires_netbox
     @pytest.mark.unit
@@ -447,10 +449,10 @@ class TestAssignmentModel:
         """Test that assignments support Device as target type."""
         from netbox_ssl.models import CertificateAssignment
 
-        field = CertificateAssignment._meta.get_field('assigned_object_type')
+        field = CertificateAssignment._meta.get_field("assigned_object_type")
         limit_choices = field.get_limit_choices_to()
 
-        assert 'device' in limit_choices['model__in']
+        assert "device" in limit_choices["model__in"]
 
     @requires_netbox
     @pytest.mark.unit
@@ -458,10 +460,10 @@ class TestAssignmentModel:
         """Test that assignments support VirtualMachine as target type."""
         from netbox_ssl.models import CertificateAssignment
 
-        field = CertificateAssignment._meta.get_field('assigned_object_type')
+        field = CertificateAssignment._meta.get_field("assigned_object_type")
         limit_choices = field.get_limit_choices_to()
 
-        assert 'virtualmachine' in limit_choices['model__in']
+        assert "virtualmachine" in limit_choices["model__in"]
 
     @requires_netbox
     @pytest.mark.unit
@@ -473,7 +475,7 @@ class TestAssignmentModel:
         constraints = CertificateAssignment._meta.constraints
         constraint_names = [c.name for c in constraints]
 
-        assert 'unique_certificate_assignment' in constraint_names
+        assert "unique_certificate_assignment" in constraint_names
 
     @requires_netbox
     @pytest.mark.unit
@@ -481,7 +483,7 @@ class TestAssignmentModel:
         """Test that assignment has is_primary field for primary cert marking."""
         from netbox_ssl.models import CertificateAssignment
 
-        field = CertificateAssignment._meta.get_field('is_primary')
+        field = CertificateAssignment._meta.get_field("is_primary")
         assert field.default is True
 
 
@@ -495,7 +497,7 @@ class TestAssignmentForm:
         from netbox_ssl.forms import CertificateAssignmentForm
 
         form = CertificateAssignmentForm()
-        assert 'device' in form.fields
+        assert "device" in form.fields
 
     @requires_netbox
     @pytest.mark.unit
@@ -504,7 +506,7 @@ class TestAssignmentForm:
         from netbox_ssl.forms import CertificateAssignmentForm
 
         form = CertificateAssignmentForm()
-        assert 'virtual_machine' in form.fields
+        assert "virtual_machine" in form.fields
 
     @requires_netbox
     @pytest.mark.unit
@@ -513,7 +515,7 @@ class TestAssignmentForm:
         from netbox_ssl.forms import CertificateAssignmentForm
 
         form = CertificateAssignmentForm()
-        assert 'service' in form.fields
+        assert "service" in form.fields
 
     @requires_netbox
     @pytest.mark.unit
@@ -524,8 +526,8 @@ class TestAssignmentForm:
 
         # Check that save method contains type determination logic
         source = inspect.getsource(CertificateAssignmentForm.save)
-        assert 'assigned_object_type' in source
-        assert 'Service' in source
+        assert "assigned_object_type" in source
+        assert "Service" in source
 
     @requires_netbox
     @pytest.mark.unit
@@ -536,7 +538,7 @@ class TestAssignmentForm:
 
         # Check that clean method contains duplicate validation
         source = inspect.getsource(CertificateAssignmentForm.clean)
-        assert 'already assigned' in source or 'existing' in source.lower()
+        assert "already assigned" in source or "existing" in source.lower()
 
     @requires_netbox
     @pytest.mark.unit
@@ -547,7 +549,7 @@ class TestAssignmentForm:
 
         # Check that clean method validates at least one target
         source = inspect.getsource(CertificateAssignmentForm.clean)
-        assert 'ValidationError' in source
+        assert "ValidationError" in source
 
 
 class TestTemplateExtensions:
@@ -584,9 +586,9 @@ class TestTemplateExtensions:
         from netbox_ssl.template_content import template_extensions
 
         extension_names = [ext.__name__ for ext in template_extensions]
-        assert 'DeviceCertificates' in extension_names
-        assert 'VirtualMachineCertificates' in extension_names
-        assert 'ServiceCertificates' in extension_names
+        assert "DeviceCertificates" in extension_names
+        assert "VirtualMachineCertificates" in extension_names
+        assert "ServiceCertificates" in extension_names
 
     @requires_netbox
     @pytest.mark.unit
@@ -597,8 +599,8 @@ class TestTemplateExtensions:
 
         # Check that right_page method queries services on the device
         source = inspect.getsource(DeviceCertificates.right_page)
-        assert 'service' in source.lower()
-        assert 'parent_object' in source
+        assert "service" in source.lower()
+        assert "parent_object" in source
 
     @requires_netbox
     @pytest.mark.unit
@@ -609,8 +611,8 @@ class TestTemplateExtensions:
 
         # Check that right_page method queries services on the VM
         source = inspect.getsource(VirtualMachineCertificates.right_page)
-        assert 'service' in source.lower()
-        assert 'parent_object' in source
+        assert "service" in source.lower()
+        assert "parent_object" in source
 
 
 class TestAssignmentTableRendering:
@@ -625,8 +627,8 @@ class TestAssignmentTableRendering:
 
         # Check that render_assigned_object shows parent
         source = inspect.getsource(CertificateAssignmentTable.render_assigned_object)
-        assert 'parent' in source
-        assert 'service' in source.lower()
+        assert "parent" in source
+        assert "service" in source.lower()
 
     @requires_netbox
     @pytest.mark.unit
@@ -636,4 +638,4 @@ class TestAssignmentTableRendering:
         import inspect
 
         source = inspect.getsource(CertificateAssignmentTable.render_assigned_object)
-        assert 'format_html' in source
+        assert "format_html" in source

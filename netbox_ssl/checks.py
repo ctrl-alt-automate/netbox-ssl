@@ -7,7 +7,7 @@ Run with: python manage.py check --tag netbox_ssl
 Or as part of all checks: python manage.py check
 """
 
-from django.core.checks import Error, Warning, Info, register, Tags
+from django.core.checks import Error, Info, Tags, Warning, register
 
 
 @register(Tags.models)
@@ -20,14 +20,14 @@ def check_certificate_model(app_configs, **kwargs):
 
         # Check that all required fields exist
         required_fields = [
-            'common_name',
-            'serial_number',
-            'fingerprint_sha256',
-            'issuer',
-            'valid_from',
-            'valid_to',
-            'algorithm',
-            'status',
+            "common_name",
+            "serial_number",
+            "fingerprint_sha256",
+            "issuer",
+            "valid_from",
+            "valid_to",
+            "algorithm",
+            "status",
         ]
 
         for field_name in required_fields:
@@ -43,9 +43,9 @@ def check_certificate_model(app_configs, **kwargs):
 
         # Check that required methods exist
         required_methods = [
-            'days_remaining',
-            'is_expired',
-            'get_absolute_url',
+            "days_remaining",
+            "is_expired",
+            "get_absolute_url",
         ]
 
         for method_name in required_methods:
@@ -81,9 +81,9 @@ def check_assignment_model(app_configs, **kwargs):
 
         # Check for GenericForeignKey support
         required_fields = [
-            'certificate',
-            'assigned_object_type',
-            'assigned_object_id',
+            "certificate",
+            "assigned_object_type",
+            "assigned_object_id",
         ]
 
         for field_name in required_fields:
@@ -115,14 +115,14 @@ def check_url_configuration(app_configs, **kwargs):
     errors = []
 
     try:
-        from django.urls import reverse, NoReverseMatch
+        from django.urls import NoReverseMatch, reverse
 
         # Check plugin URLs
         required_urls = [
-            ('plugins:netbox_ssl:certificate_list', 'Certificate list'),
-            ('plugins:netbox_ssl:certificate_add', 'Certificate add'),
-            ('plugins:netbox_ssl:certificate_import', 'Certificate import'),
-            ('plugins:netbox_ssl:certificateassignment_list', 'Assignment list'),
+            ("plugins:netbox_ssl:certificate_list", "Certificate list"),
+            ("plugins:netbox_ssl:certificate_add", "Certificate add"),
+            ("plugins:netbox_ssl:certificate_import", "Certificate import"),
+            ("plugins:netbox_ssl:certificateassignment_list", "Assignment list"),
         ]
 
         for url_name, description in required_urls:
@@ -155,15 +155,15 @@ def check_templates(app_configs, **kwargs):
     errors = []
 
     try:
-        from django.template.loader import get_template
         from django.template import TemplateDoesNotExist
+        from django.template.loader import get_template
 
         required_templates = [
-            'netbox_ssl/certificate.html',
-            'netbox_ssl/certificate_list.html',
-            'netbox_ssl/certificate_import.html',
-            'netbox_ssl/certificateassignment.html',
-            'netbox_ssl/certificateassignment_list.html',
+            "netbox_ssl/certificate.html",
+            "netbox_ssl/certificate_list.html",
+            "netbox_ssl/certificate_import.html",
+            "netbox_ssl/certificateassignment.html",
+            "netbox_ssl/certificateassignment_list.html",
         ]
 
         for template_name in required_templates:
@@ -228,8 +228,8 @@ def check_dependencies(app_configs, **kwargs):
 
     # Check cryptography library
     try:
-        import cryptography
-        from cryptography import x509
+        import cryptography  # noqa: F401
+        from cryptography import x509  # noqa: F401
     except ImportError:
         errors.append(
             Error(
@@ -241,8 +241,8 @@ def check_dependencies(app_configs, **kwargs):
 
     # Check that we can parse certificates
     try:
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.asymmetric import rsa, ec
+        from cryptography.hazmat.primitives import hashes  # noqa: F401
+        from cryptography.hazmat.primitives.asymmetric import ec, rsa  # noqa: F401
     except ImportError as e:
         errors.append(
             Error(
@@ -267,8 +267,8 @@ def check_database_tables(app_configs, **kwargs):
         tables = connection.introspection.table_names()
 
         expected_tables = [
-            'netbox_ssl_certificate',
-            'netbox_ssl_certificateassignment',
+            "netbox_ssl_certificate",
+            "netbox_ssl_certificateassignment",
         ]
 
         for table in expected_tables:
@@ -296,6 +296,7 @@ def check_database_tables(app_configs, **kwargs):
 # Custom check tags
 class NetBoxSSLTags:
     """Custom check tags for the plugin."""
+
     netbox_ssl = "netbox_ssl"
 
 
@@ -320,11 +321,12 @@ def check_plugin_ready(app_configs, **kwargs):
         )
 
         # Check for expiring certificates
-        from django.utils import timezone
         from datetime import timedelta
 
+        from django.utils import timezone
+
         expiring_soon = Certificate.objects.filter(
-            status='active',
+            status="active",
             valid_to__lte=timezone.now() + timedelta(days=30),
             valid_to__gt=timezone.now(),
         ).count()
@@ -340,7 +342,7 @@ def check_plugin_ready(app_configs, **kwargs):
 
         # Check for expired certificates
         expired = Certificate.objects.filter(
-            status='active',
+            status="active",
             valid_to__lt=timezone.now(),
         ).count()
 

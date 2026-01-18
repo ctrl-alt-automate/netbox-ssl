@@ -4,9 +4,9 @@ REST API views for NetBox SSL plugin.
 
 from netbox.api.viewsets import NetBoxModelViewSet
 
+from ..filtersets import CertificateAssignmentFilterSet, CertificateFilterSet
 from ..models import Certificate, CertificateAssignment
-from ..filtersets import CertificateFilterSet, CertificateAssignmentFilterSet
-from .serializers import CertificateSerializer, CertificateAssignmentSerializer
+from .serializers import CertificateAssignmentSerializer, CertificateSerializer
 
 
 class CertificateViewSet(NetBoxModelViewSet):

@@ -2,15 +2,14 @@
 GraphQL types for NetBox SSL plugin.
 """
 
-from typing import Annotated, List, Optional
+from typing import Annotated
 
 import strawberry
 import strawberry_django
-
 from netbox.graphql.types import NetBoxObjectType
 
-from ..models import Certificate, CertificateAssignment
 from .. import filtersets
+from ..models import Certificate, CertificateAssignment
 
 
 @strawberry_django.type(
@@ -28,15 +27,15 @@ class CertificateType(NetBoxObjectType):
     issuer_chain: str
     valid_from: str
     valid_to: str
-    sans: List[str]
-    key_size: Optional[int]
+    sans: list[str]
+    key_size: int | None
     algorithm: str
     status: str
     private_key_location: str
     pem_content: str
 
     @strawberry_django.field
-    def days_remaining(self) -> Optional[int]:
+    def days_remaining(self) -> int | None:
         return self.days_remaining
 
     @strawberry_django.field

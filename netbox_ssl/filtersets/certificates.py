@@ -4,11 +4,10 @@ FilterSet for Certificate model.
 
 import django_filters
 from django.db.models import Q
-
 from netbox.filtersets import NetBoxModelFilterSet
 from tenancy.models import Tenant
 
-from ..models import Certificate, CertificateStatusChoices, CertificateAlgorithmChoices
+from ..models import Certificate, CertificateAlgorithmChoices, CertificateStatusChoices
 
 
 class CertificateFilterSet(NetBoxModelFilterSet):
@@ -115,6 +114,7 @@ class CertificateFilterSet(NetBoxModelFilterSet):
     def filter_expiring_soon(self, queryset, name, value):
         """Filter certificates expiring within 30 days."""
         from datetime import timedelta
+
         from django.utils import timezone
 
         if value:

@@ -25,17 +25,13 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "id",
-                    models.BigAutoField(
-                        auto_created=True, primary_key=True, serialize=False
-                    ),
+                    models.BigAutoField(auto_created=True, primary_key=True, serialize=False),
                 ),
                 ("created", models.DateTimeField(auto_now_add=True, null=True)),
                 ("last_updated", models.DateTimeField(auto_now=True, null=True)),
                 (
                     "custom_field_data",
-                    models.JSONField(
-                        blank=True, default=dict, encoder=utilities.json.CustomFieldJSONEncoder
-                    ),
+                    models.JSONField(blank=True, default=dict, encoder=utilities.json.CustomFieldJSONEncoder),
                 ),
                 ("comments", models.TextField(blank=True, null=True)),
                 (
@@ -143,9 +139,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "tags",
-                    taggit.managers.TaggableManager(
-                        through="extras.TaggedItem", to="extras.Tag"
-                    ),
+                    taggit.managers.TaggableManager(through="extras.TaggedItem", to="extras.Tag"),
                 ),
                 (
                     "tenant",
@@ -165,26 +159,20 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name="certificate",
-            constraint=models.UniqueConstraint(
-                fields=("serial_number", "issuer"), name="unique_serial_issuer"
-            ),
+            constraint=models.UniqueConstraint(fields=("serial_number", "issuer"), name="unique_serial_issuer"),
         ),
         migrations.CreateModel(
             name="CertificateAssignment",
             fields=[
                 (
                     "id",
-                    models.BigAutoField(
-                        auto_created=True, primary_key=True, serialize=False
-                    ),
+                    models.BigAutoField(auto_created=True, primary_key=True, serialize=False),
                 ),
                 ("created", models.DateTimeField(auto_now_add=True, null=True)),
                 ("last_updated", models.DateTimeField(auto_now=True, null=True)),
                 (
                     "custom_field_data",
-                    models.JSONField(
-                        blank=True, default=dict, encoder=utilities.json.CustomFieldJSONEncoder
-                    ),
+                    models.JSONField(blank=True, default=dict, encoder=utilities.json.CustomFieldJSONEncoder),
                 ),
                 (
                     "assigned_object_id",
@@ -199,9 +187,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "notes",
-                    models.TextField(
-                        blank=True, help_text="Additional notes about this assignment"
-                    ),
+                    models.TextField(blank=True, help_text="Additional notes about this assignment"),
                 ),
                 (
                     "assigned_object_type",
@@ -223,9 +209,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "tags",
-                    taggit.managers.TaggableManager(
-                        through="extras.TaggedItem", to="extras.Tag"
-                    ),
+                    taggit.managers.TaggableManager(through="extras.TaggedItem", to="extras.Tag"),
                 ),
             ],
             options={

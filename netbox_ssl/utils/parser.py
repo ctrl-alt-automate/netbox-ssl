@@ -8,10 +8,9 @@ IMPORTANT: Private keys are rejected for security reasons.
 import re
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
 from cryptography.x509.oid import ExtensionOID, NameOID
 
@@ -39,7 +38,7 @@ class ParsedCertificate:
     valid_from: datetime
     valid_to: datetime
     sans: list[str]
-    key_size: Optional[int]
+    key_size: int | None
     algorithm: str
     pem_content: str
     issuer_chain: str = ""
@@ -69,10 +68,7 @@ class CertificateParser:
     @classmethod
     def contains_private_key(cls, pem_text: str) -> bool:
         """Check if the input contains any private key material."""
-        for pattern in cls.PRIVATE_KEY_PATTERNS:
-            if re.search(pattern, pem_text, re.IGNORECASE):
-                return True
-        return False
+        return any(re.search(pattern, pem_text, re.IGNORECASE) for pattern in cls.PRIVATE_KEY_PATTERNS)
 
     @classmethod
     def extract_certificates(cls, pem_text: str) -> list[str]:
@@ -106,8 +102,7 @@ class CertificateParser:
         cert_blocks = cls.extract_certificates(pem_text)
         if not cert_blocks:
             raise CertificateParseError(
-                "No valid certificate found in input. Please provide a "
-                "certificate in PEM format."
+                "No valid certificate found in input. Please provide a certificate in PEM format."
             )
 
         # Parse the leaf certificate (first one)
@@ -115,7 +110,7 @@ class CertificateParser:
         try:
             cert = x509.load_pem_x509_certificate(leaf_pem.encode("utf-8"))
         except Exception as e:
-            raise CertificateParseError(f"Failed to parse certificate: {e}")
+            raise CertificateParseError(f"Failed to parse certificate: {e}") from e
 
         # Extract chain (remaining certificates)
         chain_pem = "\n".join(cert_blocks[1:]) if len(cert_blocks) > 1 else ""
@@ -138,9 +133,7 @@ class CertificateParser:
         # Format serial number as hex
         serial_hex = format(cert.serial_number, "x").upper()
         # Add colons for readability
-        serial_formatted = ":".join(
-            serial_hex[i : i + 2] for i in range(0, len(serial_hex), 2)
-        )
+        serial_formatted = ":".join(serial_hex[i : i + 2] for i in range(0, len(serial_hex), 2))
 
         return ParsedCertificate(
             common_name=common_name,
@@ -185,9 +178,7 @@ class CertificateParser:
         """Extract Subject Alternative Names."""
         sans = []
         try:
-            ext = cert.extensions.get_extension_for_oid(
-                ExtensionOID.SUBJECT_ALTERNATIVE_NAME
-            )
+            ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
             for name in ext.value:
                 if isinstance(name, x509.DNSName):
                     sans.append(f"DNS:{name.value}")
@@ -206,7 +197,7 @@ class CertificateParser:
         return sans
 
     @classmethod
-    def _extract_key_info(cls, cert: x509.Certificate) -> tuple[Optional[int], str]:
+    def _extract_key_info(cls, cert: x509.Certificate) -> tuple[int | None, str]:
         """Extract key size and algorithm."""
         public_key = cert.public_key()
 
@@ -226,7 +217,7 @@ class CertificateParser:
         return ":".join(f"{b:02X}" for b in fingerprint_bytes)
 
     @classmethod
-    def find_renewal_candidate(cls, common_name: str, certificate_model) -> Optional[object]:
+    def find_renewal_candidate(cls, common_name: str, certificate_model) -> object | None:
         """
         Find an existing certificate that this might be renewing.
 

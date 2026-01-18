@@ -1,4 +1,4 @@
-from .parser import CertificateParser, CertificateParseError, PrivateKeyDetectedError
+from .parser import CertificateParseError, CertificateParser, PrivateKeyDetectedError
 
 __all__ = [
     "CertificateParser",

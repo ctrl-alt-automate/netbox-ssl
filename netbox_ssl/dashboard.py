@@ -52,13 +52,14 @@ class CertificateExpiryWidget(DashboardWidget):
             valid_to__lt=now,
         ).order_by("-valid_to")[:5]
 
-        orphan_certs = Certificate.objects.filter(
-            status="active",
-        ).annotate(
-            assignment_count=Count("assignments")
-        ).filter(
-            assignment_count=0
-        ).order_by("valid_to")[:5]
+        orphan_certs = (
+            Certificate.objects.filter(
+                status="active",
+            )
+            .annotate(assignment_count=Count("assignments"))
+            .filter(assignment_count=0)
+            .order_by("valid_to")[:5]
+        )
 
         # Get counts for badges
         critical_count = Certificate.objects.filter(
@@ -78,13 +79,14 @@ class CertificateExpiryWidget(DashboardWidget):
             valid_to__lt=now,
         ).count()
 
-        orphan_count = Certificate.objects.filter(
-            status="active",
-        ).annotate(
-            assignment_count=Count("assignments")
-        ).filter(
-            assignment_count=0
-        ).count()
+        orphan_count = (
+            Certificate.objects.filter(
+                status="active",
+            )
+            .annotate(assignment_count=Count("assignments"))
+            .filter(assignment_count=0)
+            .count()
+        )
 
         return render_to_string(
             "netbox_ssl/widgets/certificate_expiry.html",

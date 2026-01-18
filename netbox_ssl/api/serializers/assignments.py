@@ -2,10 +2,9 @@
 REST API serializers for CertificateAssignment model.
 """
 
-from rest_framework import serializers
-
-from netbox.api.serializers import NetBoxModelSerializer
 from netbox.api.fields import ContentTypeField
+from netbox.api.serializers import NetBoxModelSerializer
+from rest_framework import serializers
 
 from ...models import CertificateAssignment
 from .certificates import CertificateSerializer
@@ -56,6 +55,8 @@ class CertificateAssignmentSerializer(NetBoxModelSerializer):
             return {
                 "id": obj.assigned_object_id,
                 "name": str(obj.assigned_object),
-                "url": obj.assigned_object.get_absolute_url() if hasattr(obj.assigned_object, "get_absolute_url") else None,
+                "url": obj.assigned_object.get_absolute_url()
+                if hasattr(obj.assigned_object, "get_absolute_url")
+                else None,
             }
         return None

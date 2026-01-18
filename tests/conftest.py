@@ -8,11 +8,13 @@ from datetime import datetime, timedelta
 # Try to import Django - not needed for browser tests
 try:
     from django.utils import timezone
+
     DJANGO_AVAILABLE = True
 except ImportError:
     DJANGO_AVAILABLE = False
     # Provide a fallback for non-Django tests
     from datetime import timezone as dt_timezone
+
     class timezone:
         @staticmethod
         def now():
@@ -57,7 +59,7 @@ def certificate_data():
         "common_name": "test.example.com",
         "serial_number": "01:23:45:67:89:AB:CD:EF",
         "fingerprint_sha256": "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:"
-                             "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+        "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
         "issuer": "CN=Test CA, O=Test Organization, C=NL",
         "valid_from": now - timedelta(days=30),
         "valid_to": now + timedelta(days=335),
@@ -73,14 +75,16 @@ def expired_certificate_data(certificate_data):
     """Return certificate data for an expired certificate."""
     now = timezone.now()
     data = certificate_data.copy()
-    data.update({
-        "common_name": "expired.example.com",
-        "fingerprint_sha256": "11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:"
-                             "11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00",
-        "valid_from": now - timedelta(days=400),
-        "valid_to": now - timedelta(days=35),
-        "status": "expired",
-    })
+    data.update(
+        {
+            "common_name": "expired.example.com",
+            "fingerprint_sha256": "11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:"
+            "11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00",
+            "valid_from": now - timedelta(days=400),
+            "valid_to": now - timedelta(days=35),
+            "status": "expired",
+        }
+    )
     return data
 
 
@@ -89,13 +93,15 @@ def expiring_soon_certificate_data(certificate_data):
     """Return certificate data for a certificate expiring within 14 days."""
     now = timezone.now()
     data = certificate_data.copy()
-    data.update({
-        "common_name": "expiring-soon.example.com",
-        "fingerprint_sha256": "22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:"
-                             "22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11",
-        "valid_from": now - timedelta(days=351),
-        "valid_to": now + timedelta(days=10),
-    })
+    data.update(
+        {
+            "common_name": "expiring-soon.example.com",
+            "fingerprint_sha256": "22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:"
+            "22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11",
+            "valid_from": now - timedelta(days=351),
+            "valid_to": now + timedelta(days=10),
+        }
+    )
     return data
 
 

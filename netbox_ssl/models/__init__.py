@@ -1,5 +1,5 @@
-from .certificates import Certificate, CertificateStatusChoices, CertificateAlgorithmChoices
 from .assignments import CertificateAssignment
+from .certificates import Certificate, CertificateAlgorithmChoices, CertificateStatusChoices
 
 __all__ = [
     "Certificate",

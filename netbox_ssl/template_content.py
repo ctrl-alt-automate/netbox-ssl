@@ -6,7 +6,6 @@ related NetBox objects.
 """
 
 from django.contrib.contenttypes.models import ContentType
-
 from netbox.plugins import PluginTemplateExtension
 
 from .models import CertificateAssignment
@@ -65,8 +64,8 @@ class VirtualMachineCertificates(PluginTemplateExtension):
     models = ["virtualization.virtualmachine"]
 
     def right_page(self):
-        from virtualization.models import VirtualMachine
         from ipam.models import Service
+        from virtualization.models import VirtualMachine
 
         vm = self.context.get("object")
         if not vm:

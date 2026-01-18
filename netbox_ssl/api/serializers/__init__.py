@@ -1,5 +1,5 @@
-from .certificates import CertificateSerializer
 from .assignments import CertificateAssignmentSerializer
+from .certificates import CertificateSerializer
 
 __all__ = [
     "CertificateSerializer",

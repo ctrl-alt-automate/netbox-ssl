@@ -5,7 +5,7 @@ Views for CertificateAssignment model.
 from netbox.views import generic
 
 from ..filtersets import CertificateAssignmentFilterSet
-from ..forms import CertificateAssignmentForm, CertificateAssignmentFilterForm
+from ..forms import CertificateAssignmentFilterForm, CertificateAssignmentForm
 from ..models import CertificateAssignment
 from ..tables import CertificateAssignmentTable
 

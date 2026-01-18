@@ -11,7 +11,6 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
-
 from netbox.models import NetBoxModel
 from utilities.choices import ChoiceSet
 
@@ -216,7 +215,6 @@ class Certificate(NetBoxModel):
 
     def clean(self):
         """Validate the certificate data."""
-        from django.core.exceptions import ValidationError
 
         # Auto-update status based on expiry
         if self.is_expired and self.status == CertificateStatusChoices.STATUS_ACTIVE:

@@ -31,12 +31,10 @@ print("=" * 60)
 print("\n[1/6] Creating Tenants...")
 
 tenant_prod, _ = Tenant.objects.get_or_create(
-    name="Production",
-    defaults={"slug": "production", "description": "Production environment"}
+    name="Production", defaults={"slug": "production", "description": "Production environment"}
 )
 tenant_dev, _ = Tenant.objects.get_or_create(
-    name="Development",
-    defaults={"slug": "development", "description": "Development environment"}
+    name="Development", defaults={"slug": "development", "description": "Development environment"}
 )
 print(f"  ✓ Tenant: {tenant_prod.name}")
 print(f"  ✓ Tenant: {tenant_dev.name}")
@@ -46,10 +44,7 @@ print(f"  ✓ Tenant: {tenant_dev.name}")
 # ============================================================
 print("\n[2/6] Creating Site...")
 
-site, _ = Site.objects.get_or_create(
-    name="Amsterdam DC1",
-    defaults={"slug": "ams-dc1", "status": "active"}
-)
+site, _ = Site.objects.get_or_create(name="Amsterdam DC1", defaults={"slug": "ams-dc1", "status": "active"})
 print(f"  ✓ Site: {site.name}")
 
 # ============================================================
@@ -58,32 +53,22 @@ print(f"  ✓ Site: {site.name}")
 print("\n[3/6] Creating Device infrastructure...")
 
 # Manufacturer
-manufacturer, _ = Manufacturer.objects.get_or_create(
-    name="Dell",
-    defaults={"slug": "dell"}
-)
+manufacturer, _ = Manufacturer.objects.get_or_create(name="Dell", defaults={"slug": "dell"})
 print(f"  ✓ Manufacturer: {manufacturer.name}")
 
 # Device Type
 device_type, _ = DeviceType.objects.get_or_create(
-    manufacturer=manufacturer,
-    model="PowerEdge R640",
-    defaults={"slug": "poweredge-r640"}
+    manufacturer=manufacturer, model="PowerEdge R640", defaults={"slug": "poweredge-r640"}
 )
 print(f"  ✓ Device Type: {device_type.model}")
 
 # Device Role
-role_web, _ = DeviceRole.objects.get_or_create(
-    name="Web Server",
-    defaults={"slug": "web-server", "color": "4caf50"}
-)
+role_web, _ = DeviceRole.objects.get_or_create(name="Web Server", defaults={"slug": "web-server", "color": "4caf50"})
 role_db, _ = DeviceRole.objects.get_or_create(
-    name="Database Server",
-    defaults={"slug": "database-server", "color": "2196f3"}
+    name="Database Server", defaults={"slug": "database-server", "color": "2196f3"}
 )
 role_lb, _ = DeviceRole.objects.get_or_create(
-    name="Load Balancer",
-    defaults={"slug": "load-balancer", "color": "ff9800"}
+    name="Load Balancer", defaults={"slug": "load-balancer", "color": "ff9800"}
 )
 print(f"  ✓ Device Role: {role_web.name}")
 print(f"  ✓ Device Role: {role_db.name}")
@@ -113,7 +98,7 @@ for data in devices_data:
             "site": site,
             "tenant": data["tenant"],
             "status": "active",
-        }
+        },
     )
     devices[data["name"]] = device
     status = "created" if created else "exists"
@@ -125,16 +110,10 @@ for data in devices_data:
 print("\n[5/6] Creating Virtual Machines...")
 
 # Cluster Type
-cluster_type, _ = ClusterType.objects.get_or_create(
-    name="VMware vSphere",
-    defaults={"slug": "vmware-vsphere"}
-)
+cluster_type, _ = ClusterType.objects.get_or_create(name="VMware vSphere", defaults={"slug": "vmware-vsphere"})
 
 # Cluster (Note: site field removed in NetBox 4.5)
-cluster, _ = Cluster.objects.get_or_create(
-    name="vSphere Cluster 01",
-    defaults={"type": cluster_type}
-)
+cluster, _ = Cluster.objects.get_or_create(name="vSphere Cluster 01", defaults={"type": cluster_type})
 print(f"  ✓ Cluster: {cluster.name}")
 
 vms_data = [
@@ -153,7 +132,7 @@ for data in vms_data:
             "cluster": cluster,
             "tenant": data["tenant"],
             "status": "active",
-        }
+        },
     )
     vms[data["name"]] = vm
     status = "created" if created else "exists"

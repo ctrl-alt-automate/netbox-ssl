@@ -6,13 +6,12 @@ Includes the Smart Paste import form for PEM certificate parsing.
 
 from django import forms
 from django.utils.translation import gettext_lazy as _
-
-from netbox.forms import NetBoxModelForm, NetBoxModelFilterSetForm, NetBoxModelBulkEditForm
+from netbox.forms import NetBoxModelBulkEditForm, NetBoxModelFilterSetForm, NetBoxModelForm
 from tenancy.models import Tenant
 from utilities.forms.fields import CommentField, DynamicModelChoiceField, TagFilterField
 from utilities.forms.rendering import FieldSet
 
-from ..models import Certificate, CertificateStatusChoices, CertificateAlgorithmChoices
+from ..models import Certificate, CertificateAlgorithmChoices, CertificateStatusChoices
 
 
 class CertificateForm(NetBoxModelForm):
@@ -141,22 +140,24 @@ class CertificateImportForm(forms.Form):
 
     def clean_pem_content(self):
         """Validate PEM content and check for private keys."""
-        from ..utils import CertificateParser, PrivateKeyDetectedError, CertificateParseError
+        from ..utils import CertificateParseError, CertificateParser
 
         pem_content = self.cleaned_data["pem_content"]
 
         # Check for private keys
         if CertificateParser.contains_private_key(pem_content):
             raise forms.ValidationError(
-                _("Private key detected! For security reasons, private keys "
-                  "cannot be stored. Please remove the private key and try again.")
+                _(
+                    "Private key detected! For security reasons, private keys "
+                    "cannot be stored. Please remove the private key and try again."
+                )
             )
 
         # Validate certificate can be parsed
         try:
             CertificateParser.parse(pem_content)
         except CertificateParseError as e:
-            raise forms.ValidationError(str(e))
+            raise forms.ValidationError(str(e)) from e
 
         return pem_content
 

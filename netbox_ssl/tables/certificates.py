@@ -4,7 +4,6 @@ Table definitions for Certificate model.
 
 import django_tables2 as tables
 from django.utils.html import format_html
-
 from netbox.tables import NetBoxTable, columns
 
 from ..models import Certificate
@@ -79,11 +78,11 @@ class CertificateTable(NetBoxTable):
     def render_status(self, value, record):
         """Render status with color coding."""
         status_colors = {
-            "active": "success",      # Green
-            "expired": "danger",      # Red
+            "active": "success",  # Green
+            "expired": "danger",  # Red
             "replaced": "secondary",  # Gray
-            "revoked": "danger",      # Red
-            "pending": "warning",     # Yellow
+            "revoked": "danger",  # Red
+            "pending": "warning",  # Yellow
         }
         color = status_colors.get(record.status, "secondary")
         label = record.get_status_display()

@@ -27,14 +27,14 @@ from pathlib import Path
 
 # Colors for terminal output
 class Colors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
+    HEADER = "\033[95m"
+    OKBLUE = "\033[94m"
+    OKCYAN = "\033[96m"
+    OKGREEN = "\033[92m"
+    WARNING = "\033[93m"
+    FAIL = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
 
 
 def print_header(text):
@@ -122,6 +122,7 @@ def run_browser_tests():
     # Check if Playwright is available
     try:
         import playwright
+
         print_success("Playwright is installed")
     except ImportError:
         print_warning("Playwright not installed, skipping browser tests")
@@ -129,10 +130,13 @@ def run_browser_tests():
         return True  # Don't fail if not installed
 
     cmd = [
-        "python", "-m", "pytest",
+        "python",
+        "-m",
+        "pytest",
         "tests/test_browser.py",
         "-v",
-        "-m", "browser",
+        "-m",
+        "browser",
         "--tb=short",
     ]
 
@@ -160,9 +164,14 @@ def run_django_checks():
 
     # Try to run checks via docker exec if container is running
     docker_cmd = [
-        "docker", "exec", "netbox-ssl-netbox-1",
-        "python", "/opt/netbox/netbox/manage.py", "check",
-        "--tag", "netbox_ssl",
+        "docker",
+        "exec",
+        "netbox-ssl-netbox-1",
+        "python",
+        "/opt/netbox/netbox/manage.py",
+        "check",
+        "--tag",
+        "netbox_ssl",
     ]
 
     result = run_command(docker_cmd, "Django system checks (via Docker)")
@@ -180,8 +189,12 @@ def run_all_checks():
     print_header("Running All Django Checks")
 
     docker_cmd = [
-        "docker", "exec", "netbox-ssl-netbox-1",
-        "python", "/opt/netbox/netbox/manage.py", "check",
+        "docker",
+        "exec",
+        "netbox-ssl-netbox-1",
+        "python",
+        "/opt/netbox/netbox/manage.py",
+        "check",
     ]
 
     return run_command(docker_cmd, "All Django checks (via Docker)")
@@ -193,6 +206,7 @@ def check_netbox_running():
 
     try:
         import requests
+
         netbox_url = os.environ.get("NETBOX_URL", "http://localhost:8000")
         resp = requests.get(f"{netbox_url}/login/", timeout=5)
         if resp.status_code == 200:
@@ -219,7 +233,7 @@ Examples:
     %(prog)s --checks             Django system checks only
     %(prog)s --coverage           Include coverage report
     %(prog)s --unit --coverage    Unit tests with coverage
-        """
+        """,
     )
 
     parser.add_argument("--unit", action="store_true", help="Run unit tests")
@@ -234,10 +248,7 @@ Examples:
     args = parser.parse_args()
 
     # If no specific test type selected, run all
-    run_all = not any([
-        args.unit, args.parser, args.browser, args.smoke,
-        args.checks, args.all_checks, args.quick
-    ])
+    run_all = not any([args.unit, args.parser, args.browser, args.smoke, args.checks, args.all_checks, args.quick])
 
     results = []
 

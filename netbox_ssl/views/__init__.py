@@ -1,19 +1,19 @@
-from .certificates import (
-    CertificateListView,
-    CertificateView,
-    CertificateEditView,
-    CertificateDeleteView,
-    CertificateBulkEditView,
-    CertificateBulkDeleteView,
-    CertificateImportView,
-    CertificateRenewView,
-)
 from .assignments import (
+    CertificateAssignmentBulkDeleteView,
+    CertificateAssignmentDeleteView,
+    CertificateAssignmentEditView,
     CertificateAssignmentListView,
     CertificateAssignmentView,
-    CertificateAssignmentEditView,
-    CertificateAssignmentDeleteView,
-    CertificateAssignmentBulkDeleteView,
+)
+from .certificates import (
+    CertificateBulkDeleteView,
+    CertificateBulkEditView,
+    CertificateDeleteView,
+    CertificateEditView,
+    CertificateImportView,
+    CertificateListView,
+    CertificateRenewView,
+    CertificateView,
 )
 
 __all__ = [

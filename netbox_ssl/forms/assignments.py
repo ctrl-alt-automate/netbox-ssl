@@ -6,17 +6,15 @@ Implements the two-step assignment workflow:
 2. Select Service (filtered by selected device/VM)
 """
 
+from dcim.models import Device
 from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
-
-from dcim.models import Device
 from ipam.models import Service
-from virtualization.models import VirtualMachine
-
-from netbox.forms import NetBoxModelForm, NetBoxModelFilterSetForm
-from utilities.forms.fields import DynamicModelChoiceField, ContentTypeChoiceField
+from netbox.forms import NetBoxModelFilterSetForm, NetBoxModelForm
+from utilities.forms.fields import ContentTypeChoiceField, DynamicModelChoiceField
 from utilities.forms.rendering import FieldSet
+from virtualization.models import VirtualMachine
 
 from ..models import Certificate, CertificateAssignment
 
@@ -231,9 +229,7 @@ class CertificateAssignmentFilterForm(NetBoxModelFilterSetForm):
         label=_("Certificate"),
     )
     assigned_object_type_id = ContentTypeChoiceField(
-        queryset=ContentType.objects.filter(
-            model__in=["service", "device", "virtualmachine"]
-        ),
+        queryset=ContentType.objects.filter(model__in=["service", "device", "virtualmachine"]),
         required=False,
         label=_("Object Type"),
     )

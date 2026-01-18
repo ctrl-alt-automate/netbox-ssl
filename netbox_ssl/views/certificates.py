@@ -10,19 +10,18 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
-
 from netbox.views import generic
 
 from ..filtersets import CertificateFilterSet
 from ..forms import (
-    CertificateForm,
-    CertificateFilterForm,
     CertificateBulkEditForm,
+    CertificateFilterForm,
+    CertificateForm,
     CertificateImportForm,
 )
 from ..models import Certificate, CertificateStatusChoices
 from ..tables import CertificateTable
-from ..utils import CertificateParser, CertificateParseError, PrivateKeyDetectedError
+from ..utils import CertificateParseError, CertificateParser, PrivateKeyDetectedError
 
 
 class CertificateListView(generic.ObjectListView):
@@ -99,18 +98,26 @@ class CertificateImportView(View):
     def get(self, request):
         """Display the import form."""
         form = CertificateImportForm()
-        return render(request, self.template_name, {
-            "form": form,
-        })
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": form,
+            },
+        )
 
     def post(self, request):
         """Process the import form."""
         form = CertificateImportForm(request.POST)
 
         if not form.is_valid():
-            return render(request, self.template_name, {
-                "form": form,
-            })
+            return render(
+                request,
+                self.template_name,
+                {
+                    "form": form,
+                },
+            )
 
         pem_content = form.cleaned_data["pem_content"]
         private_key_location = form.cleaned_data.get("private_key_location", "")
@@ -129,12 +136,15 @@ class CertificateImportView(View):
             if existing:
                 messages.error(
                     request,
-                    _(f"Certificate already exists: {existing.common_name} "
-                      f"(Serial: {existing.serial_number[:16]}...)")
+                    _(f"Certificate already exists: {existing.common_name} (Serial: {existing.serial_number[:16]}...)"),
                 )
-                return render(request, self.template_name, {
-                    "form": form,
-                })
+                return render(
+                    request,
+                    self.template_name,
+                    {
+                        "form": form,
+                    },
+                )
 
             # Check for potential renewal candidate
             renewal_candidate = CertificateParser.find_renewal_candidate(
@@ -161,9 +171,7 @@ class CertificateImportView(View):
                 }
                 request.session["renewal_candidate_id"] = renewal_candidate.pk
 
-                return redirect(
-                    reverse("plugins:netbox_ssl:certificate_renew")
-                )
+                return redirect(reverse("plugins:netbox_ssl:certificate_renew"))
 
             # Create the certificate
             certificate = Certificate.objects.create(
@@ -183,22 +191,27 @@ class CertificateImportView(View):
                 status=CertificateStatusChoices.STATUS_ACTIVE,
             )
 
-            messages.success(
-                request,
-                _(f"Certificate imported successfully: {certificate.common_name}")
-            )
+            messages.success(request, _(f"Certificate imported successfully: {certificate.common_name}"))
             return redirect(certificate.get_absolute_url())
 
         except PrivateKeyDetectedError as e:
             messages.error(request, str(e))
-            return render(request, self.template_name, {
-                "form": form,
-            })
+            return render(
+                request,
+                self.template_name,
+                {
+                    "form": form,
+                },
+            )
         except CertificateParseError as e:
             messages.error(request, str(e))
-            return render(request, self.template_name, {
-                "form": form,
-            })
+            return render(
+                request,
+                self.template_name,
+                {
+                    "form": form,
+                },
+            )
 
 
 class CertificateRenewView(View):
@@ -223,10 +236,14 @@ class CertificateRenewView(View):
 
         old_certificate = get_object_or_404(Certificate, pk=renewal_candidate_id)
 
-        return render(request, self.template_name, {
-            "pending_certificate": pending_data,
-            "old_certificate": old_certificate,
-        })
+        return render(
+            request,
+            self.template_name,
+            {
+                "pending_certificate": pending_data,
+                "old_certificate": old_certificate,
+            },
+        )
 
     def post(self, request):
         """Process the renewal decision."""
@@ -242,10 +259,12 @@ class CertificateRenewView(View):
         tenant = None
         if pending_data.get("tenant_id"):
             from tenancy.models import Tenant
+
             tenant = Tenant.objects.filter(pk=pending_data["tenant_id"]).first()
 
         # Parse dates back from ISO format
         from datetime import datetime
+
         valid_from = datetime.fromisoformat(pending_data["valid_from"])
         valid_to = datetime.fromisoformat(pending_data["valid_to"])
 
@@ -274,6 +293,7 @@ class CertificateRenewView(View):
 
                 # Copy all assignments from old to new
                 from ..models import CertificateAssignment
+
                 for assignment in old_certificate.assignments.all():
                     CertificateAssignment.objects.create(
                         certificate=new_certificate,
@@ -294,8 +314,10 @@ class CertificateRenewView(View):
 
             messages.success(
                 request,
-                _(f"Certificate renewed successfully. {old_certificate.assignments.count()} "
-                  f"assignment(s) transferred. Old certificate archived.")
+                _(
+                    f"Certificate renewed successfully. {old_certificate.assignments.count()} "
+                    f"assignment(s) transferred. Old certificate archived."
+                ),
             )
             return redirect(new_certificate.get_absolute_url())
 
@@ -323,8 +345,5 @@ class CertificateRenewView(View):
             if "renewal_candidate_id" in request.session:
                 del request.session["renewal_candidate_id"]
 
-            messages.success(
-                request,
-                _(f"Certificate imported successfully: {certificate.common_name}")
-            )
+            messages.success(request, _(f"Certificate imported successfully: {certificate.common_name}"))
             return redirect(certificate.get_absolute_url())

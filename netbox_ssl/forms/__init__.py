@@ -1,12 +1,12 @@
-from .certificates import (
-    CertificateForm,
-    CertificateFilterForm,
-    CertificateBulkEditForm,
-    CertificateImportForm,
-)
 from .assignments import (
-    CertificateAssignmentForm,
     CertificateAssignmentFilterForm,
+    CertificateAssignmentForm,
+)
+from .certificates import (
+    CertificateBulkEditForm,
+    CertificateFilterForm,
+    CertificateForm,
+    CertificateImportForm,
 )
 
 __all__ = [

@@ -14,6 +14,7 @@ import re
 # Check if playwright is available
 try:
     from playwright.sync_api import sync_playwright, expect
+
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
@@ -144,7 +145,9 @@ class TestCertificateImportPage:
         page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/certificates/import/")
 
         # Should have a form with POST method (the main import form, not search)
-        expect(page.locator("form.form[method='post'], form[method='post']:not([action*='search'])").first).to_be_visible()
+        expect(
+            page.locator("form.form[method='post'], form[method='post']:not([action*='search'])").first
+        ).to_be_visible()
 
         # Should not have server errors
         assert "Server Error" not in page.content()
@@ -172,7 +175,9 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSktest
 
         # Submit the form - use the submit button inside the main form, not the search form
         # Look for submit button with specific text or inside the import form
-        submit_btn = page.locator("form.form button[type='submit'], form[method='post']:not([action*='search']) button[type='submit']").first
+        submit_btn = page.locator(
+            "form.form button[type='submit'], form[method='post']:not([action*='search']) button[type='submit']"
+        ).first
         submit_btn.click()
 
         # Should show an error about private keys
@@ -235,8 +240,9 @@ class TestNavigationMenu:
         body_content = page.locator("body").inner_text()
 
         # Should have some reference to certificates or SSL in the navigation/menu
-        assert "Certificate" in body_content or "SSL" in body_content or "certificate" in body_content.lower(), \
+        assert "Certificate" in body_content or "SSL" in body_content or "certificate" in body_content.lower(), (
             "SSL/Certificate menu not found in page content"
+        )
 
 
 class TestErrorHandling:
@@ -321,9 +327,12 @@ class TestJanusRenewalUI:
         # Should have private_key_location field
         content = page.content()
         # Check for the field (could be input or label)
-        assert "private" in content.lower() or "location" in content.lower() or \
-               page.locator("input[name='private_key_location']").count() > 0 or \
-               page.locator("#id_private_key_location").count() > 0
+        assert (
+            "private" in content.lower()
+            or "location" in content.lower()
+            or page.locator("input[name='private_key_location']").count() > 0
+            or page.locator("#id_private_key_location").count() > 0
+        )
 
     def test_import_page_has_tenant_field(self, page):
         """Test that import page has tenant selection field."""

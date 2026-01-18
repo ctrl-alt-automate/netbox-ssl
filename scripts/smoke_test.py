@@ -187,12 +187,14 @@ class NetBoxSmokeTest:
                     cert_id = results[0].get("id")
                     if cert_id:
                         # Test certificate detail page
-                        self.URLS_TO_TEST.extend([
-                            ("GET", f"/plugins/ssl/certificates/{cert_id}/"),
-                            ("GET", f"/plugins/ssl/certificates/{cert_id}/edit/"),
-                            ("GET", f"/plugins/ssl/certificates/{cert_id}/changelog/"),
-                            ("GET", f"/api/plugins/ssl/certificates/{cert_id}/"),
-                        ])
+                        self.URLS_TO_TEST.extend(
+                            [
+                                ("GET", f"/plugins/ssl/certificates/{cert_id}/"),
+                                ("GET", f"/plugins/ssl/certificates/{cert_id}/edit/"),
+                                ("GET", f"/plugins/ssl/certificates/{cert_id}/changelog/"),
+                                ("GET", f"/api/plugins/ssl/certificates/{cert_id}/"),
+                            ]
+                        )
         except Exception as e:
             print(f"⚠️  Could not fetch certificates for dynamic tests: {e}")
 
@@ -206,10 +208,12 @@ class NetBoxSmokeTest:
                 if results:
                     assignment_id = results[0].get("id")
                     if assignment_id:
-                        self.URLS_TO_TEST.extend([
-                            ("GET", f"/plugins/ssl/assignments/{assignment_id}/"),
-                            ("GET", f"/plugins/ssl/assignments/{assignment_id}/edit/"),
-                        ])
+                        self.URLS_TO_TEST.extend(
+                            [
+                                ("GET", f"/plugins/ssl/assignments/{assignment_id}/"),
+                                ("GET", f"/plugins/ssl/assignments/{assignment_id}/edit/"),
+                            ]
+                        )
         except Exception as e:
             print(f"⚠️  Could not fetch assignments for dynamic tests: {e}")
 

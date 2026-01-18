@@ -2,9 +2,8 @@
 REST API serializers for Certificate model.
 """
 
-from rest_framework import serializers
-
 from netbox.api.serializers import NetBoxModelSerializer
+from rest_framework import serializers
 from tenancy.api.serializers import TenantSerializer
 
 from ...models import Certificate
