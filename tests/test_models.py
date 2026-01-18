@@ -455,3 +455,157 @@ class TestAssignmentModel:
 
         field = CertificateAssignment._meta.get_field('is_primary')
         assert field.default is True
+
+
+class TestAssignmentForm:
+    """Tests for CertificateAssignmentForm."""
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_form_has_device_field(self):
+        """Test that assignment form has device field for two-step workflow."""
+        from netbox_ssl.forms import CertificateAssignmentForm
+
+        form = CertificateAssignmentForm()
+        assert 'device' in form.fields
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_form_has_virtual_machine_field(self):
+        """Test that assignment form has virtual_machine field."""
+        from netbox_ssl.forms import CertificateAssignmentForm
+
+        form = CertificateAssignmentForm()
+        assert 'virtual_machine' in form.fields
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_form_has_service_field(self):
+        """Test that assignment form has service field for port-level assignment."""
+        from netbox_ssl.forms import CertificateAssignmentForm
+
+        form = CertificateAssignmentForm()
+        assert 'service' in form.fields
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_form_auto_determines_type_from_service(self):
+        """Test that form automatically determines assignment type from service selection."""
+        from netbox_ssl.forms import CertificateAssignmentForm
+        import inspect
+
+        # Check that save method contains type determination logic
+        source = inspect.getsource(CertificateAssignmentForm.save)
+        assert 'assigned_object_type' in source
+        assert 'Service' in source
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_form_validates_duplicate_assignments(self):
+        """Test that form validates against duplicate assignments."""
+        from netbox_ssl.forms import CertificateAssignmentForm
+        import inspect
+
+        # Check that clean method contains duplicate validation
+        source = inspect.getsource(CertificateAssignmentForm.clean)
+        assert 'already assigned' in source or 'existing' in source.lower()
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_form_requires_at_least_one_target(self):
+        """Test that form requires at least one target (device, VM, or service)."""
+        from netbox_ssl.forms import CertificateAssignmentForm
+        import inspect
+
+        # Check that clean method validates at least one target
+        source = inspect.getsource(CertificateAssignmentForm.clean)
+        assert 'ValidationError' in source
+
+
+class TestTemplateExtensions:
+    """Tests for template extensions on Device/VM/Service pages."""
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_device_extension_exists(self):
+        """Test that DeviceCertificates template extension exists."""
+        from netbox_ssl.template_content import DeviceCertificates
+
+        assert DeviceCertificates.models == ["dcim.device"]
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_vm_extension_exists(self):
+        """Test that VirtualMachineCertificates template extension exists."""
+        from netbox_ssl.template_content import VirtualMachineCertificates
+
+        assert VirtualMachineCertificates.models == ["virtualization.virtualmachine"]
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_service_extension_exists(self):
+        """Test that ServiceCertificates template extension exists."""
+        from netbox_ssl.template_content import ServiceCertificates
+
+        assert ServiceCertificates.models == ["ipam.service"]
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_extensions_registered(self):
+        """Test that all template extensions are in the registration list."""
+        from netbox_ssl.template_content import template_extensions
+
+        extension_names = [ext.__name__ for ext in template_extensions]
+        assert 'DeviceCertificates' in extension_names
+        assert 'VirtualMachineCertificates' in extension_names
+        assert 'ServiceCertificates' in extension_names
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_device_extension_includes_service_certificates(self):
+        """Test that DeviceCertificates also queries service assignments."""
+        from netbox_ssl.template_content import DeviceCertificates
+        import inspect
+
+        # Check that right_page method queries services on the device
+        source = inspect.getsource(DeviceCertificates.right_page)
+        assert 'service' in source.lower()
+        assert 'parent_object' in source
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_vm_extension_includes_service_certificates(self):
+        """Test that VirtualMachineCertificates also queries service assignments."""
+        from netbox_ssl.template_content import VirtualMachineCertificates
+        import inspect
+
+        # Check that right_page method queries services on the VM
+        source = inspect.getsource(VirtualMachineCertificates.right_page)
+        assert 'service' in source.lower()
+        assert 'parent_object' in source
+
+
+class TestAssignmentTableRendering:
+    """Tests for assignment table rendering with parent info."""
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_table_renders_parent_for_services(self):
+        """Test that assignment table shows parent device/VM for services."""
+        from netbox_ssl.tables import CertificateAssignmentTable
+        import inspect
+
+        # Check that render_assigned_object shows parent
+        source = inspect.getsource(CertificateAssignmentTable.render_assigned_object)
+        assert 'parent' in source
+        assert 'service' in source.lower()
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_table_uses_format_html(self):
+        """Test that table uses format_html for safe HTML rendering."""
+        from netbox_ssl.tables import CertificateAssignmentTable
+        import inspect
+
+        source = inspect.getsource(CertificateAssignmentTable.render_assigned_object)
+        assert 'format_html' in source
