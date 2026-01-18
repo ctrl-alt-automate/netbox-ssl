@@ -115,48 +115,95 @@ class CertificateAssignmentForm(NetBoxModelForm):
 
             if model_name == "service":
                 self.fields["service"].initial = obj
-                if obj.device:
-                    self.fields["device"].initial = obj.device
-                elif obj.virtual_machine:
-                    self.fields["virtual_machine"].initial = obj.virtual_machine
+                # NetBox 4.5: Service uses GenericForeignKey 'parent' instead of device/virtual_machine
+                if hasattr(obj, "parent") and obj.parent:
+                    parent = obj.parent
+                    if hasattr(parent, "_meta"):
+                        if parent._meta.model_name == "device":
+                            self.fields["device"].initial = parent
+                        elif parent._meta.model_name == "virtualmachine":
+                            self.fields["virtual_machine"].initial = parent
             elif model_name == "device":
                 self.fields["device"].initial = obj
             elif model_name == "virtualmachine":
                 self.fields["virtual_machine"].initial = obj
 
     def clean(self):
-        """Validate and automatically determine assignment type based on selections."""
-        cleaned_data = super().clean()
+        """Validate that at least one target is selected and check for duplicates."""
+        super().clean()
 
-        service = cleaned_data.get("service")
-        device = cleaned_data.get("device")
-        vm = cleaned_data.get("virtual_machine")
+        # Use self.cleaned_data directly (NetBoxModelForm.clean() returns None)
+        service = self.cleaned_data.get("service")
+        device = self.cleaned_data.get("device")
+        vm = self.cleaned_data.get("virtual_machine")
+        certificate = self.cleaned_data.get("certificate")
 
-        # Determine assignment type automatically based on what's selected
-        if service:
-            # Service-level assignment (most specific, recommended)
-            content_type = ContentType.objects.get_for_model(Service)
-            self.instance.assigned_object_id = service.pk
-            self.instance.assigned_object_type = content_type
-
-        elif device:
-            # Device-level assignment
-            content_type = ContentType.objects.get_for_model(Device)
-            self.instance.assigned_object_id = device.pk
-            self.instance.assigned_object_type = content_type
-
-        elif vm:
-            # VM-level assignment
-            content_type = ContentType.objects.get_for_model(VirtualMachine)
-            self.instance.assigned_object_id = vm.pk
-            self.instance.assigned_object_type = content_type
-
-        else:
+        # Validate that at least one target is selected
+        if not service and not device and not vm:
             raise forms.ValidationError(
                 _("Please select a Device, Virtual Machine, or Service to assign the certificate to.")
             )
 
-        return cleaned_data
+        # Check for duplicate assignment
+        if certificate:
+            # Determine what we're assigning to
+            if service:
+                content_type = ContentType.objects.get_for_model(Service)
+                object_id = service.pk
+                target_name = str(service)
+            elif device:
+                content_type = ContentType.objects.get_for_model(Device)
+                object_id = device.pk
+                target_name = str(device)
+            elif vm:
+                content_type = ContentType.objects.get_for_model(VirtualMachine)
+                object_id = vm.pk
+                target_name = str(vm)
+
+            # Check if this assignment already exists
+            existing = CertificateAssignment.objects.filter(
+                certificate=certificate,
+                assigned_object_type=content_type,
+                assigned_object_id=object_id,
+            )
+            # Exclude current instance if editing
+            if self.instance.pk:
+                existing = existing.exclude(pk=self.instance.pk)
+
+            if existing.exists():
+                raise forms.ValidationError(
+                    _("This certificate is already assigned to %(target)s.") % {"target": target_name}
+                )
+
+        return self.cleaned_data
+
+    def save(self, commit=True):
+        """Save the assignment with the correct assigned object."""
+        instance = super().save(commit=False)
+
+        service = self.cleaned_data.get("service")
+        device = self.cleaned_data.get("device")
+        vm = self.cleaned_data.get("virtual_machine")
+
+        # Determine assignment type automatically based on what's selected
+        if service:
+            # Service-level assignment (most specific, recommended)
+            instance.assigned_object_type = ContentType.objects.get_for_model(Service)
+            instance.assigned_object_id = service.pk
+        elif device:
+            # Device-level assignment
+            instance.assigned_object_type = ContentType.objects.get_for_model(Device)
+            instance.assigned_object_id = device.pk
+        elif vm:
+            # VM-level assignment
+            instance.assigned_object_type = ContentType.objects.get_for_model(VirtualMachine)
+            instance.assigned_object_id = vm.pk
+
+        if commit:
+            instance.save()
+            self.save_m2m()
+
+        return instance
 
 
 class CertificateAssignmentFilterForm(NetBoxModelFilterSetForm):
