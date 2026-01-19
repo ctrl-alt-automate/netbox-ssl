@@ -4,247 +4,146 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![NetBox](https://img.shields.io/badge/NetBox-4.4%20%7C%204.5-blue.svg)](https://github.com/netbox-community/netbox)
 
-**Project Janus** - A NetBox plugin for TLS/SSL certificate management.
+<p align="center">
+  <img src="docs/images/certificate-list.png" alt="NetBox SSL Certificate List" width="800">
+</p>
 
-> *Janus, the Roman god of beginnings and endings, doorways and passages.*
-> This plugin focuses on certificate lifecycle (renewal) and binding to services (ports/doorways).
+**Project Janus** — Your Single Source of Truth for TLS/SSL certificate management in NetBox.
 
-## Overview
+> *Named after Janus, the Roman god of doorways and transitions — because every certificate guards a doorway, and every renewal is a transition.*
 
-NetBox SSL provides a "Single Source of Truth" for TLS/SSL certificates in your infrastructure. The philosophy is **Passive Administration** - the plugin serves as an inventory and monitoring system, not an active deployment tool.
+## ✨ Why NetBox SSL?
 
-### Key Features
+Managing SSL certificates across your infrastructure shouldn't be a scavenger hunt. NetBox SSL brings **visibility** and **control** to your certificate lifecycle:
 
-- **Smart Paste Import** - Paste PEM certificates, automatic X.509 parsing
-- **Janus Renewal Workflow** - Replace & Archive with automatic assignment transfer
-- **Certificate Assignments** - Link certificates to Services, Devices, and VMs
-- **Expiry Dashboard** - Widget with Critical/Warning/Info categorization
-- **Multi-Tenancy** - Optional tenant isolation for certificates
-- **Full API** - REST API and GraphQL support
+- 🔍 **See everything at a glance** — Know which certificates are expiring, where they're deployed, and who owns them
+- 🔄 **Painless renewals** — The Janus workflow transfers all assignments automatically when you renew
+- 🔒 **Security first** — Private keys are never stored, only location hints for your secret management system
+- 🎯 **Deep integration** — Certificates link directly to NetBox Services, Devices, and VMs
 
-### Security
-
-- **No private key storage** - Private keys are never stored in the database
-- **Private key rejection** - PEM input containing private keys is rejected
-- **Key location hints** - Optional field for documenting key storage location (e.g., Vault path)
-
-## Compatibility
-
-| NetBox Version | Plugin Version | Status |
-|----------------|----------------|--------|
-| 4.5.x          | 0.1.x          | Primary |
-| 4.4.x          | 0.1.x          | Supported |
-| 4.3.x and older| -              | Unsupported |
-
-## Installation
-
-### Via pip
+## 🚀 Quick Start
 
 ```bash
 pip install netbox-ssl
 ```
 
-### Via source
-
-```bash
-cd /opt/netbox/netbox
-git clone https://github.com/ctrl-alt-automate/netbox-ssl.git
-pip install ./netbox-ssl
-```
-
-### Configuration
-
-Add to `configuration.py`:
+Add to your `configuration.py`:
 
 ```python
-PLUGINS = [
-    "netbox_ssl",
-]
-
-PLUGINS_CONFIG = {
-    "netbox_ssl": {
-        "expiry_warning_days": 30,  # Days for warning status
-        "expiry_critical_days": 14,  # Days for critical status
-    },
-}
+PLUGINS = ["netbox_ssl"]
 ```
 
-Run migrations:
+Run migrations and restart NetBox:
 
 ```bash
-cd /opt/netbox/netbox
 python manage.py migrate netbox_ssl
+sudo systemctl restart netbox netbox-rq
 ```
 
-## Usage
+**That's it!** Navigate to *Plugins > SSL Certificates* in your NetBox.
 
-### Importing Certificates
+📖 **Full documentation:** [GitHub Wiki](https://github.com/ctrl-alt-automate/netbox-ssl/wiki)
 
-1. Navigate to **SSL Certificates > Certificates > Import**
-2. Paste your certificate in PEM format
-3. Optionally add the certificate chain (intermediates + root)
-4. Specify an optional private key location hint
-5. Click **Import Certificate**
+## 📸 Screenshots
 
-The plugin will:
-- Reject any private key material for security
-- Parse all X.509 attributes automatically
-- Check for duplicates (serial + issuer)
-- Detect potential renewals (same CN)
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/images/certificate-detail.png" alt="Certificate Detail" width="400"><br>
+      <em>Certificate details with validity and assignments</em>
+    </td>
+    <td align="center">
+      <img src="docs/images/certificate-import.png" alt="Smart Import" width="400"><br>
+      <em>Smart Paste import with automatic X.509 parsing</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/images/dashboard-widget.png" alt="Dashboard Widget" width="400"><br>
+      <em>Dashboard widget showing certificate health</em>
+    </td>
+    <td align="center">
+      <img src="docs/images/assignments-list.png" alt="Assignments" width="400"><br>
+      <em>Track which certificates are assigned where</em>
+    </td>
+  </tr>
+</table>
+
+## 🎯 Key Features
+
+### Smart Paste Import
+Just paste your PEM certificate — the plugin extracts everything automatically: Common Name, SANs, validity dates, issuer chain, fingerprints, and more.
 
 ### Janus Renewal Workflow
+When you import a renewed certificate (same CN as an existing one), the plugin offers to:
+- **Transfer all assignments** from the old certificate
+- **Archive the old certificate** with "Replaced" status
+- **Link them together** for audit trail
 
-When importing a certificate with a CN matching an existing certificate:
+### Certificate Assignments
+Link certificates to the objects that use them:
+- **Services** (recommended) — Port-level granularity (e.g., HTTPS on port 443)
+- **Devices** — Physical servers and appliances
+- **Virtual Machines** — VMs in your virtualization clusters
 
-1. The plugin detects the potential renewal
-2. Shows a comparison between old and new certificate
-3. Offers two options:
-   - **Renew & Transfer**: Creates new cert, copies all assignments, archives old cert
-   - **Create as New**: Creates a separate certificate entry
+### Expiry Dashboard Widget
+Add the widget to your NetBox dashboard to see:
+- 🔴 **Critical** — Expiring within 14 days
+- 🟠 **Warning** — Expiring within 30 days
+- ⚫ **Orphan** — Certificates without assignments
 
-### Assigning Certificates
+### Security by Design
+- **No private key storage** — Private keys never touch the database
+- **Private key rejection** — PEM input with private keys is blocked
+- **Key location hints** — Document where keys are stored (e.g., `vault:secret/certs/example.com`)
 
-Certificates can be assigned to:
-- **Services** (recommended) - Port-level granularity
-- **Devices** - Device-level assignment
-- **Virtual Machines** - VM-level assignment
+## 📊 Compatibility
 
-Service-level assignment is recommended as it allows different certificates per port on the same device.
+| NetBox Version | Plugin Version | Status |
+|:--------------:|:--------------:|:------:|
+| 4.5.x          | 0.1.x          | ✅ Primary |
+| 4.4.x          | 0.1.x          | ✅ Supported |
+| 4.3.x and older| —              | ❌ Unsupported |
 
-### Dashboard Widget
+## 📚 Documentation
 
-The dashboard widget shows:
-- **Expired** certificates (red)
-- **Critical** certificates expiring within 14 days (red)
-- **Warning** certificates expiring within 30 days (orange)
-- **Orphan** certificates without assignments (gray)
+Full documentation is available in the [GitHub Wiki](https://github.com/ctrl-alt-automate/netbox-ssl/wiki):
 
-## Development
+- **[Installation](https://github.com/ctrl-alt-automate/netbox-ssl/wiki/Installation)** — Get up and running
+- **[Configuration](https://github.com/ctrl-alt-automate/netbox-ssl/wiki/Configuration)** — Customize expiry thresholds and more
+- **[Usage Guide](https://github.com/ctrl-alt-automate/netbox-ssl/wiki/Usage)** — Learn the workflows
+- **[API Reference](https://github.com/ctrl-alt-automate/netbox-ssl/wiki/API)** — REST API and GraphQL
+- **[Data Models](https://github.com/ctrl-alt-automate/netbox-ssl/wiki/Data-Models)** — Database schema details
+- **[Development](https://github.com/ctrl-alt-automate/netbox-ssl/wiki/Development)** — Contributing guide
 
-### Prerequisites
-
-- Python 3.10+
-- Docker & Docker Compose
-- (Optional) Nix with direnv
-
-### Quick Start
+## 🛠️ Development
 
 ```bash
-# Clone the repository
+# Clone and start development environment
 git clone https://github.com/ctrl-alt-automate/netbox-ssl.git
 cd netbox-ssl
+docker compose up -d
 
-# Start development environment
-docker-compose up -d
-
-# View logs
-docker-compose logs -f netbox
-
-# Access NetBox
-open http://localhost:8000
+# Access NetBox at http://localhost:8000
 # Login: admin / admin
 ```
 
-### Testing with Different NetBox Versions
+See the [Development Guide](https://github.com/ctrl-alt-automate/netbox-ssl/wiki/Development) for more details.
 
-```bash
-# NetBox 4.5 (default)
-docker-compose up -d
+## 🤝 Contributing
 
-# NetBox 4.4
-NETBOX_VERSION=v4.4-latest docker-compose up -d
-```
-
-### Running Tests
-
-```bash
-# Unit tests (no NetBox required)
-python -m pytest tests/test_parser.py tests/test_models.py -v -p no:django
-
-# Integration tests in Docker container
-docker-compose exec netbox bash -c "curl -sS https://bootstrap.pypa.io/get-pip.py | /opt/netbox/venv/bin/python"
-docker-compose exec netbox /opt/netbox/venv/bin/pip install pytest
-docker cp tests/. $(docker-compose ps -q netbox):/tmp/plugin_tests/
-docker-compose exec netbox /opt/netbox/venv/bin/python -m pytest /tmp/plugin_tests/ -v
-
-# Django system checks
-docker-compose exec netbox python manage.py check --tag netbox_ssl
-```
-
-## Data Models
-
-### Certificate
-
-| Field | Type | Description |
-|-------|------|-------------|
-| common_name | String | Primary CN |
-| serial_number | String | CA serial number (hex) |
-| fingerprint_sha256 | String | SHA256 fingerprint |
-| issuer | String | Issuer DN |
-| issuer_chain | Text | Chain of trust (PEM) |
-| valid_from | DateTime | Start date |
-| valid_to | DateTime | Expiration date |
-| sans | Array | Subject Alternative Names |
-| key_size | Integer | Key size in bits |
-| algorithm | Choice | RSA, ECDSA, Ed25519 |
-| status | Choice | Active, Expired, Replaced, Revoked |
-| private_key_location | String | Hint for key location |
-| tenant | FK | Optional tenant |
-
-### CertificateAssignment
-
-| Field | Type | Description |
-|-------|------|-------------|
-| certificate | FK | The certificate |
-| assigned_object | GFK | Service, Device, or VM |
-| is_primary | Boolean | Primary certificate flag |
-| notes | Text | Assignment notes |
-
-## API
-
-### REST API
-
-```bash
-# List certificates
-curl -H "Authorization: Token $TOKEN" http://localhost:8000/api/plugins/ssl/certificates/
-
-# Get certificate
-curl -H "Authorization: Token $TOKEN" http://localhost:8000/api/plugins/ssl/certificates/1/
-
-# Filter by status
-curl -H "Authorization: Token $TOKEN" "http://localhost:8000/api/plugins/ssl/certificates/?status=active"
-
-# Filter expiring soon
-curl -H "Authorization: Token $TOKEN" "http://localhost:8000/api/plugins/ssl/certificates/?expiring_soon=true"
-```
-
-### GraphQL
-
-```graphql
-{
-  certificate_list {
-    id
-    common_name
-    valid_to
-    days_remaining
-    expiry_status
-  }
-}
-```
-
-## Contributing
+Contributions are welcome! Please:
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests
-5. Submit a pull request
+2. Create a feature branch from `dev`
+3. Make your changes with tests
+4. Submit a pull request
 
-## License
+## 📄 License
 
 Apache License 2.0
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
-- NetBox community for the excellent plugin framework
-- The `cryptography` library for X.509 parsing
+- The [NetBox](https://github.com/netbox-community/netbox) community for the excellent plugin framework
+- The [`cryptography`](https://cryptography.io/) library for robust X.509 parsing

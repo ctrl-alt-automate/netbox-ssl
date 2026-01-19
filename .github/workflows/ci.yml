@@ -120,6 +120,11 @@ jobs:
 
       - name: Start NetBox
         run: |
+          # Debug: show env file contents
+          echo "=== netbox.env contents ==="
+          cat env/netbox.env
+          echo "==========================="
+
           # Start database and cache services first
           NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d postgres redis redis-cache
 
