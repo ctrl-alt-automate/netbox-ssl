@@ -40,9 +40,7 @@ class CertificateViewSet(NetBoxModelViewSet):
         certificate = serializer.save()
 
         # Return the created certificate using the standard serializer
-        output_serializer = CertificateSerializer(
-            certificate, context={"request": request}
-        )
+        output_serializer = CertificateSerializer(certificate, context={"request": request})
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
 
