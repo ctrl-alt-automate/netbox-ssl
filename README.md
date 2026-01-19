@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/logo.png" alt="NetBox SSL Logo" width="200">
+  <img src="docs/images/logo.png" alt="NetBox SSL Logo" width="250">
 </p>
 
 <h1 align="center">NetBox SSL Plugin</h1>
