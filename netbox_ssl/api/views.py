@@ -2,11 +2,10 @@
 REST API views for NetBox SSL plugin.
 """
 
+from netbox.api.viewsets import NetBoxModelViewSet
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-
-from netbox.api.viewsets import NetBoxModelViewSet
 
 from ..filtersets import CertificateAssignmentFilterSet, CertificateFilterSet
 from ..models import Certificate, CertificateAssignment

@@ -7,7 +7,7 @@ from rest_framework import serializers
 from tenancy.api.serializers import TenantSerializer
 
 from ...models import Certificate, CertificateStatusChoices
-from ...utils import CertificateParseError, CertificateParser, PrivateKeyDetectedError
+from ...utils import CertificateParseError, CertificateParser
 
 
 class CertificateSerializer(NetBoxModelSerializer):
