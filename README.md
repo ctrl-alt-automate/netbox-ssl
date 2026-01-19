@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="docs/images/logo.png" alt="NetBox SSL Logo" width="300">
-</p>
-
 <h1 align="center">NetBox SSL Plugin</h1>
 
 <p align="center">

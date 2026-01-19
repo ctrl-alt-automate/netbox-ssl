@@ -1,10 +1,6 @@
 # NetBox SSL Plugin
 
 <p align="center">
-  <img src="images/logo.png" alt="NetBox SSL Logo" width="300">
-</p>
-
-<p align="center">
   <strong>Project Janus</strong> — Your Single Source of Truth for TLS/SSL certificate management
 </p>
 
