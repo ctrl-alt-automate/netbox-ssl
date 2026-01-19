@@ -53,7 +53,7 @@ jobs:
     name: Integration Tests (NetBox ${{ matrix.netbox_version }})
     runs-on: ubuntu-latest
     needs: [lint, unit-tests]
-    continue-on-error: true  # Allow workflow to pass even if integration tests fail
+    timeout-minutes: 30  # Allow enough time for NetBox startup and migrations
     strategy:
       fail-fast: false
       matrix:
@@ -131,9 +131,9 @@ jobs:
           echo "Starting NetBox..."
           NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d netbox
 
-          # Wait for NetBox to be healthy (longer timeout for migrations)
+          # Wait for NetBox to be healthy (allow time for migrations)
           echo "Waiting for NetBox to be healthy..."
-          timeout 600 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting for NetBox..."; sleep 15; done'
+          timeout 900 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting for NetBox..."; sleep 15; done'
 
           # Start worker and housekeeping
           NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d netbox-worker netbox-housekeeping
