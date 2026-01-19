@@ -1,0 +1,78 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.1.0] - 2025-01-19
+
+Initial release of NetBox SSL Plugin.
+
+### Added
+
+- **Certificate Model** with full X.509 metadata support:
+  - Common Name, Serial Number, SHA256 Fingerprint
+  - Issuer and Issuer Chain (full certificate chain storage)
+  - Validity period (valid_from, valid_to)
+  - Subject Alternative Names (SANs)
+  - Key algorithm (RSA, ECDSA, Ed25519) and key size
+  - Status tracking (Active, Expired, Replaced, Revoked)
+  - Private key location hint (breadcrumb, no actual key storage)
+  - Tenant assignment for multi-tenancy support
+
+- **Certificate Assignment Model** for linking certificates to NetBox objects:
+  - GenericForeignKey support for Device, Virtual Machine, and Service
+  - Primary certificate flag
+  - Assignment notes
+
+- **Smart Paste Import** for PEM certificates:
+  - Automatic parsing of certificate metadata using Python `cryptography` library
+  - Certificate chain extraction (leaf + intermediates)
+  - **Security**: Private key detection and rejection
+  - Duplicate detection based on fingerprint
+
+- **User Interface**:
+  - Certificate list view with filtering and search
+  - Certificate detail view with all metadata
+  - Certificate add/edit forms
+  - Certificate import form (Smart Paste)
+  - Assignment list and detail views
+  - Navigation menu integration
+
+- **Dashboard Widget**:
+  - Certificate expiry status overview
+  - Categories: Expired, Critical (<14 days), Warning (<30 days), Orphan (no assignments)
+  - Configurable thresholds via plugin settings
+
+- **Template Extensions**:
+  - Certificate panel on Device detail pages
+  - Certificate panel on Virtual Machine detail pages
+  - Certificate panel on Service detail pages
+
+- **REST API**:
+  - Full CRUD endpoints for Certificates
+  - Full CRUD endpoints for Certificate Assignments
+  - Filtering and search support
+
+- **GraphQL Support**:
+  - Certificate and CertificateAssignment types
+  - Query support with filtering
+
+- **Django System Checks**:
+  - Model validation checks
+  - URL configuration checks
+  - Template existence checks
+  - Security configuration checks
+  - Database table checks
+  - Plugin health check (`manage.py check --tag netbox_ssl`)
+
+### Compatibility
+
+- NetBox 4.4.0 - 4.5.x
+- Python 3.10+
+
+[Unreleased]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/ctrl-alt-automate/netbox-ssl/releases/tag/v0.1.0
