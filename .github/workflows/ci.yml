@@ -147,11 +147,12 @@ jobs:
           cat development/configuration/plugins.py
           echo "==========================="
 
-          # Start all services at once - let docker compose handle dependencies
-          echo "Starting all services..."
-          NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d
+          # Start only the core services for testing (skip worker/housekeeping to avoid healthcheck delays)
+          # The worker and housekeeping services depend on netbox being healthy, but migrations take time
+          echo "Starting core services..."
+          NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d postgres redis redis-cache netbox
 
-          # Wait for NetBox to be healthy (allow time for startup and migrations)
+          # Wait for NetBox to be healthy using our own loop (more patient than docker-compose healthcheck)
           echo "Waiting for NetBox to be healthy..."
           timeout 900 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting for NetBox..."; sleep 15; done'
           echo "NetBox is ready!"
