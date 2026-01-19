@@ -65,35 +65,66 @@ jobs:
         run: |
           mkdir -p env development/configuration
 
-          # Create NetBox environment file (base settings without API_TOKEN_PEPPERS)
-          printf '%s\n' \
-            'CORS_ORIGIN_ALLOW_ALL=True' \
-            'DB_HOST=postgres' \
-            'DB_NAME=netbox' \
-            'DB_PASSWORD=netbox' \
-            'DB_USER=netbox' \
-            'DB_WAIT_DEBUG=1' \
-            'GRAPHQL_ENABLED=true' \
-            'HOUSEKEEPING_INTERVAL=86400' \
-            'MEDIA_ROOT=/opt/netbox/netbox/media' \
-            'METRICS_ENABLED=false' \
-            'REDIS_CACHE_DATABASE=1' \
-            'REDIS_CACHE_HOST=redis-cache' \
-            'REDIS_CACHE_INSECURE_SKIP_TLS_VERIFY=false' \
-            'REDIS_CACHE_PASSWORD=netbox' \
-            'REDIS_CACHE_SSL=false' \
-            'REDIS_DATABASE=0' \
-            'REDIS_HOST=redis' \
-            'REDIS_INSECURE_SKIP_TLS_VERIFY=false' \
-            'REDIS_PASSWORD=netbox' \
-            'REDIS_SSL=false' \
-            'SECRET_KEY=test-secret-key-for-ci-only-do-not-use-in-production' \
-            'SKIP_SUPERUSER=false' \
-            'SUPERUSER_API_TOKEN=0123456789abcdef0123456789abcdef01234567' \
-            'SUPERUSER_EMAIL=admin@example.com' \
-            'SUPERUSER_NAME=admin' \
-            'SUPERUSER_PASSWORD=admin' \
-            > env/netbox.env
+          # Create NetBox environment file (version-specific settings)
+          # v4.5 doesn't accept SUPERUSER_API_TOKEN via env (new v2 token system with different format)
+          if [[ "${{ matrix.netbox_version }}" == "v4.5" ]]; then
+            printf '%s\n' \
+              'CORS_ORIGIN_ALLOW_ALL=True' \
+              'DB_HOST=postgres' \
+              'DB_NAME=netbox' \
+              'DB_PASSWORD=netbox' \
+              'DB_USER=netbox' \
+              'DB_WAIT_DEBUG=1' \
+              'GRAPHQL_ENABLED=true' \
+              'HOUSEKEEPING_INTERVAL=86400' \
+              'MEDIA_ROOT=/opt/netbox/netbox/media' \
+              'METRICS_ENABLED=false' \
+              'REDIS_CACHE_DATABASE=1' \
+              'REDIS_CACHE_HOST=redis-cache' \
+              'REDIS_CACHE_INSECURE_SKIP_TLS_VERIFY=false' \
+              'REDIS_CACHE_PASSWORD=netbox' \
+              'REDIS_CACHE_SSL=false' \
+              'REDIS_DATABASE=0' \
+              'REDIS_HOST=redis' \
+              'REDIS_INSECURE_SKIP_TLS_VERIFY=false' \
+              'REDIS_PASSWORD=netbox' \
+              'REDIS_SSL=false' \
+              'SECRET_KEY=test-secret-key-for-ci-only-do-not-use-in-production' \
+              'SKIP_SUPERUSER=false' \
+              'SUPERUSER_EMAIL=admin@example.com' \
+              'SUPERUSER_NAME=admin' \
+              'SUPERUSER_PASSWORD=admin' \
+              > env/netbox.env
+          else
+            printf '%s\n' \
+              'CORS_ORIGIN_ALLOW_ALL=True' \
+              'DB_HOST=postgres' \
+              'DB_NAME=netbox' \
+              'DB_PASSWORD=netbox' \
+              'DB_USER=netbox' \
+              'DB_WAIT_DEBUG=1' \
+              'GRAPHQL_ENABLED=true' \
+              'HOUSEKEEPING_INTERVAL=86400' \
+              'MEDIA_ROOT=/opt/netbox/netbox/media' \
+              'METRICS_ENABLED=false' \
+              'REDIS_CACHE_DATABASE=1' \
+              'REDIS_CACHE_HOST=redis-cache' \
+              'REDIS_CACHE_INSECURE_SKIP_TLS_VERIFY=false' \
+              'REDIS_CACHE_PASSWORD=netbox' \
+              'REDIS_CACHE_SSL=false' \
+              'REDIS_DATABASE=0' \
+              'REDIS_HOST=redis' \
+              'REDIS_INSECURE_SKIP_TLS_VERIFY=false' \
+              'REDIS_PASSWORD=netbox' \
+              'REDIS_SSL=false' \
+              'SECRET_KEY=test-secret-key-for-ci-only-do-not-use-in-production' \
+              'SKIP_SUPERUSER=false' \
+              'SUPERUSER_API_TOKEN=0123456789abcdef0123456789abcdef01234567' \
+              'SUPERUSER_EMAIL=admin@example.com' \
+              'SUPERUSER_NAME=admin' \
+              'SUPERUSER_PASSWORD=admin' \
+              > env/netbox.env
+          fi
 
           # Create PostgreSQL environment file
           printf '%s\n' \
