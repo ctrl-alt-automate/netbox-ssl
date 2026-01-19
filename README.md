@@ -1,16 +1,28 @@
-# NetBox SSL Plugin
+<p align="center">
+  <img src="docs/images/logo.png" alt="NetBox SSL Logo" width="200">
+</p>
 
-[![CI](https://github.com/ctrl-alt-automate/netbox-ssl/actions/workflows/ci.yml/badge.svg)](https://github.com/ctrl-alt-automate/netbox-ssl/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![NetBox](https://img.shields.io/badge/NetBox-4.4%20%7C%204.5-blue.svg)](https://github.com/netbox-community/netbox)
+<h1 align="center">NetBox SSL Plugin</h1>
+
+<p align="center">
+  <strong>Project Janus</strong> — Your Single Source of Truth for TLS/SSL certificate management in NetBox
+</p>
+
+<p align="center">
+  <a href="https://github.com/ctrl-alt-automate/netbox-ssl/actions/workflows/ci.yml"><img src="https://github.com/ctrl-alt-automate/netbox-ssl/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
+  <a href="https://github.com/netbox-community/netbox"><img src="https://img.shields.io/badge/NetBox-4.4%20%7C%204.5-blue.svg" alt="NetBox"></a>
+</p>
+
+<p align="center">
+  <em>Named after Janus, the Roman god of doorways and transitions — because every certificate guards a doorway, and every renewal is a transition.</em>
+</p>
+
+---
 
 <p align="center">
   <img src="docs/images/certificate-list.png" alt="NetBox SSL Certificate List" width="800">
 </p>
-
-**Project Janus** — Your Single Source of Truth for TLS/SSL certificate management in NetBox.
-
-> *Named after Janus, the Roman god of doorways and transitions — because every certificate guards a doorway, and every renewal is a transition.*
 
 ## ✨ Why NetBox SSL?
 
