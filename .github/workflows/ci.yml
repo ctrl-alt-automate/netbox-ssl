@@ -65,7 +65,7 @@ jobs:
         run: |
           mkdir -p env development/configuration
 
-          # Create NetBox environment file
+          # Create NetBox environment file (base settings without API_TOKEN_PEPPERS)
           printf '%s\n' \
             'CORS_ORIGIN_ALLOW_ALL=True' \
             'DB_HOST=postgres' \
@@ -88,7 +88,6 @@ jobs:
             'REDIS_PASSWORD=netbox' \
             'REDIS_SSL=false' \
             'SECRET_KEY=test-secret-key-for-ci-only-do-not-use-in-production' \
-            'API_TOKEN_PEPPERS=["mvcRS686OpI1lU_oQdp27BClrdGmFuKW6QZqf2Xc4u0"]' \
             'SKIP_SUPERUSER=false' \
             'SUPERUSER_API_TOKEN=0123456789abcdef0123456789abcdef01234567' \
             'SUPERUSER_EMAIL=admin@example.com' \
@@ -107,19 +106,36 @@ jobs:
           echo "REDIS_PASSWORD=netbox" > env/redis.env
           echo "REDIS_PASSWORD=netbox" > env/redis-cache.env
 
-          # Create plugins configuration
-          printf '%s\n' \
-            'PLUGINS = ["netbox_ssl"]' \
-            'PLUGINS_CONFIG = {' \
-            '    "netbox_ssl": {' \
-            '        "expiry_warning_days": 30,' \
-            '        "expiry_critical_days": 14,' \
-            '    },' \
-            '}' \
-            '' \
-            '# API Token Peppers for v2 tokens' \
-            'API_TOKEN_PEPPERS = ["mvcRS686OpI1lU_oQdp27BClrdGmFuKW6QZqf2Xc4u0"]' \
-            > development/configuration/plugins.py
+          # Create plugins configuration with version-specific settings
+          # API_TOKEN_PEPPERS is only required in v4.5+ (new v2 token system)
+          if [[ "${{ matrix.netbox_version }}" == "v4.5" ]]; then
+            # NetBox 4.5: API_TOKEN_PEPPERS must be a dictionary with numeric keys
+            printf '%s\n' \
+              'PLUGINS = ["netbox_ssl"]' \
+              'PLUGINS_CONFIG = {' \
+              '    "netbox_ssl": {' \
+              '        "expiry_warning_days": 30,' \
+              '        "expiry_critical_days": 14,' \
+              '    },' \
+              '}' \
+              '' \
+              '# API Token Peppers for v2 tokens (v4.5+ requires dictionary format)' \
+              'API_TOKEN_PEPPERS = {' \
+              '    1: "mvcRS686OpI1lU_oQdp27BClrdGmFuKW6QZqf2Xc4u0",' \
+              '}' \
+              > development/configuration/plugins.py
+          else
+            # NetBox 4.4: No API_TOKEN_PEPPERS needed (v2 tokens not supported)
+            printf '%s\n' \
+              'PLUGINS = ["netbox_ssl"]' \
+              'PLUGINS_CONFIG = {' \
+              '    "netbox_ssl": {' \
+              '        "expiry_warning_days": 30,' \
+              '        "expiry_critical_days": 14,' \
+              '    },' \
+              '}' \
+              > development/configuration/plugins.py
+          fi
 
       - name: Start NetBox
         run: |
