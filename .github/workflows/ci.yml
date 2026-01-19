@@ -110,6 +110,7 @@ jobs:
           # API_TOKEN_PEPPERS is only required in v4.5+ (new v2 token system)
           if [[ "${{ matrix.netbox_version }}" == "v4.5" ]]; then
             # NetBox 4.5: API_TOKEN_PEPPERS must be a dictionary with numeric keys
+            # Pepper must be at least 50 characters
             printf '%s\n' \
               'PLUGINS = ["netbox_ssl"]' \
               'PLUGINS_CONFIG = {' \
@@ -119,9 +120,9 @@ jobs:
               '    },' \
               '}' \
               '' \
-              '# API Token Peppers for v2 tokens (v4.5+ requires dictionary format)' \
+              '# API Token Peppers for v2 tokens (v4.5+ requires dictionary, min 50 chars)' \
               'API_TOKEN_PEPPERS = {' \
-              '    1: "mvcRS686OpI1lU_oQdp27BClrdGmFuKW6QZqf2Xc4u0",' \
+              '    1: "Eb_30LtX2Rz01aSiZ29i8IwRyrbyy-maTokgIzAzADCt78gtlu5jd6EY1wGlX7RJ4XvpjRdLsyc4jnwj",' \
               '}' \
               > development/configuration/plugins.py
           else
