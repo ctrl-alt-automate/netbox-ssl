@@ -68,6 +68,8 @@ jobs:
           # Create NetBox environment file (version-specific settings)
           # v4.5 doesn't accept SUPERUSER_API_TOKEN via env (new v2 token system with different format)
           if [[ "${{ matrix.netbox_version }}" == "v4.5" ]]; then
+            # v4.5: Skip automatic superuser creation due to incompatibility with new v2 token system
+            # We'll create the superuser manually after startup without API token
             printf '%s\n' \
               'CORS_ORIGIN_ALLOW_ALL=True' \
               'DB_HOST=postgres' \
@@ -90,10 +92,7 @@ jobs:
               'REDIS_PASSWORD=netbox' \
               'REDIS_SSL=false' \
               'SECRET_KEY=test-secret-key-for-ci-only-do-not-use-in-production' \
-              'SKIP_SUPERUSER=false' \
-              'SUPERUSER_EMAIL=admin@example.com' \
-              'SUPERUSER_NAME=admin' \
-              'SUPERUSER_PASSWORD=admin' \
+              'SKIP_SUPERUSER=true' \
               > env/netbox.env
           else
             printf '%s\n' \
@@ -189,6 +188,20 @@ jobs:
           echo "NetBox is ready!"
         env:
           NETBOX_VERSION: ${{ matrix.netbox_version }}
+
+      - name: Create superuser for v4.5
+        if: matrix.netbox_version == 'v4.5'
+        run: |
+          # Create superuser manually for v4.5 (automatic creation is disabled due to v2 token incompatibility)
+          docker compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "
+          from django.contrib.auth import get_user_model
+          User = get_user_model()
+          if not User.objects.filter(username='admin').exists():
+              User.objects.create_superuser('admin', 'admin@example.com', 'admin')
+              print('Superuser created')
+          else:
+              print('Superuser already exists')
+          "
 
       - name: Install pytest in NetBox container
         run: |
