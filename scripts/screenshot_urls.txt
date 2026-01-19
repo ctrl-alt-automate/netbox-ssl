@@ -1,0 +1,8 @@
+# Screenshots to capture for documentation
+# Format: filename|url|description
+
+certificate-list.png|/plugins/ssl/certificates/|Certificate list view with status badges and days remaining
+certificate-detail.png|/plugins/ssl/certificates/3/|Certificate detail page showing all fields and assignments
+certificate-import.png|/plugins/ssl/certificates/import/|Smart Paste import form with PEM example
+assignments-list.png|/plugins/ssl/assignments/|Certificate assignments overview
+dashboard-widget.png|/|Dashboard with SSL Certificate Status widget (scroll down)
