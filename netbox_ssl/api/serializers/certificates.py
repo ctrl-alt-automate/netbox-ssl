@@ -5,6 +5,7 @@ REST API serializers for Certificate model.
 from netbox.api.serializers import NetBoxModelSerializer
 from rest_framework import serializers
 from tenancy.api.serializers import TenantSerializer
+from tenancy.models import Tenant
 
 from ...models import Certificate, CertificateStatusChoices
 from ...utils import CertificateParseError, CertificateParser
@@ -84,17 +85,11 @@ class CertificateImportSerializer(serializers.Serializer):
         help_text="Optional hint for where the private key is stored.",
     )
     tenant = serializers.PrimaryKeyRelatedField(
-        queryset=None,
+        queryset=Tenant.objects.all(),
         required=False,
         allow_null=True,
         help_text="Optional tenant assignment.",
     )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        from tenancy.models import Tenant
-
-        self.fields["tenant"].queryset = Tenant.objects.all()
 
     def validate_pem_content(self, value):
         """Validate PEM content and check for private keys."""
