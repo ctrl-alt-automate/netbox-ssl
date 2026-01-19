@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/logo.png" alt="NetBox SSL Logo" width="250">
+  <img src="docs/images/logo.png" alt="NetBox SSL Logo" width="300">
 </p>
 
 <h1 align="center">NetBox SSL Plugin</h1>
@@ -9,6 +9,8 @@
 </p>
 
 <p align="center">
+  <a href="https://pypi.org/project/netbox-ssl/"><img src="https://img.shields.io/pypi/v/netbox-ssl.svg" alt="PyPI"></a>
+  <a href="https://pypi.org/project/netbox-ssl/"><img src="https://img.shields.io/pypi/pyversions/netbox-ssl.svg" alt="Python"></a>
   <a href="https://github.com/ctrl-alt-automate/netbox-ssl/actions/workflows/ci.yml"><img src="https://github.com/ctrl-alt-automate/netbox-ssl/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://github.com/netbox-community/netbox"><img src="https://img.shields.io/badge/NetBox-4.4%20%7C%204.5-blue.svg" alt="NetBox"></a>
@@ -54,7 +56,27 @@ sudo systemctl restart netbox netbox-rq
 
 **That's it!** Navigate to *Plugins > SSL Certificates* in your NetBox.
 
-📖 **Full documentation:** [GitHub Wiki](https://github.com/ctrl-alt-automate/netbox-ssl/wiki)
+📖 **Full documentation:** [docs/](docs/index.md)
+
+## ⚙️ Configuration
+
+Customize the plugin via `PLUGINS_CONFIG` in your `configuration.py`:
+
+```python
+PLUGINS_CONFIG = {
+    "netbox_ssl": {
+        "expiry_warning_days": 30,   # Days before expiry → Warning status
+        "expiry_critical_days": 14,  # Days before expiry → Critical status
+    },
+}
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `expiry_warning_days` | Integer | 30 | Certificates expiring within this many days show warning status |
+| `expiry_critical_days` | Integer | 14 | Certificates expiring within this many days show critical status |
+
+See [Configuration](docs/configuration.md) for more options including custom fields, permissions, and webhooks.
 
 ## 📸 Screenshots
 
@@ -119,14 +141,14 @@ Add the widget to your NetBox dashboard to see:
 
 ## 📚 Documentation
 
-Full documentation is available in the [GitHub Wiki](https://github.com/ctrl-alt-automate/netbox-ssl/wiki):
+Full documentation is available in the [docs/](docs/index.md) folder:
 
-- **[Installation](https://github.com/ctrl-alt-automate/netbox-ssl/wiki/Installation)** — Get up and running
-- **[Configuration](https://github.com/ctrl-alt-automate/netbox-ssl/wiki/Configuration)** — Customize expiry thresholds and more
-- **[Usage Guide](https://github.com/ctrl-alt-automate/netbox-ssl/wiki/Usage)** — Learn the workflows
-- **[API Reference](https://github.com/ctrl-alt-automate/netbox-ssl/wiki/API)** — REST API and GraphQL
-- **[Data Models](https://github.com/ctrl-alt-automate/netbox-ssl/wiki/Data-Models)** — Database schema details
-- **[Development](https://github.com/ctrl-alt-automate/netbox-ssl/wiki/Development)** — Contributing guide
+- **[Installation](docs/installation.md)** — Get up and running
+- **[Configuration](docs/configuration.md)** — Customize expiry thresholds and more
+- **[Usage Guide](docs/usage.md)** — Learn the workflows
+- **[API Reference](docs/api.md)** — REST API and GraphQL
+- **[Data Models](docs/data-models.md)** — Database schema details
+- **[Contributing](CONTRIBUTING.md)** — Contribution guidelines
 
 ## 🛠️ Development
 
@@ -140,7 +162,7 @@ docker compose up -d
 # Login: admin / admin
 ```
 
-See the [Development Guide](https://github.com/ctrl-alt-automate/netbox-ssl/wiki/Development) for more details.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 
 ## 🤝 Contributing
 
