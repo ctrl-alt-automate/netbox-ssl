@@ -123,29 +123,21 @@ jobs:
 
       - name: Start NetBox
         run: |
-          # Debug: show env file contents
+          # Debug: show configuration files
           echo "=== netbox.env contents ==="
           cat env/netbox.env
+          echo "=== plugins.py contents ==="
+          cat development/configuration/plugins.py
           echo "==========================="
 
-          # Start database and cache services first
-          NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d postgres redis redis-cache
+          # Start all services at once - let docker compose handle dependencies
+          echo "Starting all services..."
+          NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d
 
-          # Wait for database to be ready
-          echo "Waiting for PostgreSQL..."
-          timeout 60 bash -c 'until docker compose exec -T postgres pg_isready -q; do sleep 2; done'
-
-          # Start NetBox (will run migrations)
-          echo "Starting NetBox..."
-          NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d netbox
-
-          # Wait for NetBox to be healthy (allow time for migrations)
+          # Wait for NetBox to be healthy (allow time for startup and migrations)
           echo "Waiting for NetBox to be healthy..."
           timeout 900 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting for NetBox..."; sleep 15; done'
-
-          # Start worker and housekeeping
-          NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d netbox-worker netbox-housekeeping
-          echo "All services started!"
+          echo "NetBox is ready!"
         env:
           NETBOX_VERSION: ${{ matrix.netbox_version }}
 
