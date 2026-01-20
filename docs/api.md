@@ -37,6 +37,8 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `DELETE` | `/certificates/{id}/` | Delete certificate |
 | `POST` | `/certificates/import/` | Import from PEM |
 | `POST` | `/certificates/bulk-import/` | Bulk import from PEM |
+| `POST` | `/certificates/{id}/compliance-check/` | Run compliance check |
+| `POST` | `/certificates/bulk-compliance-check/` | Bulk compliance check |
 
 ### Certificate Authorities
 
@@ -70,6 +72,23 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `PATCH` | `/csrs/{id}/` | Partial update |
 | `DELETE` | `/csrs/{id}/` | Delete CSR |
 | `POST` | `/csrs/import/` | Import from PEM |
+
+### Compliance Policies
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/compliance-policies/` | List all policies |
+| `POST` | `/compliance-policies/` | Create policy |
+| `GET` | `/compliance-policies/{id}/` | Get policy details |
+| `PUT` | `/compliance-policies/{id}/` | Update policy |
+| `DELETE` | `/compliance-policies/{id}/` | Delete policy |
+
+### Compliance Checks
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/compliance-checks/` | List all check results |
+| `GET` | `/compliance-checks/{id}/` | Get check result details |
 
 ---
 
@@ -317,6 +336,199 @@ if response.status_code == 201:
     print(f"Imported {result['created_count']} certificates")
 else:
     print(f"Error: {response.json()}")
+```
+
+---
+
+## Compliance Reporting
+
+Run compliance checks on certificates against defined policies to ensure they meet organizational security requirements.
+
+### Single Certificate Compliance Check
+
+`POST /api/plugins/netbox-ssl/certificates/{id}/compliance-check/`
+
+Run all enabled compliance policies against a single certificate.
+
+#### Example Request
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{}' \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/1/compliance-check/
+```
+
+#### With Specific Policies
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"policy_ids": [1, 2, 3]}' \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/1/compliance-check/
+```
+
+#### Success Response
+
+```json
+{
+  "certificate_id": 1,
+  "certificate_name": "example.com",
+  "total_checks": 5,
+  "passed": 4,
+  "failed": 1,
+  "compliance_score": 80.0,
+  "checks": [
+    {
+      "id": 10,
+      "policy": {"id": 1, "name": "Min Key Size 2048", "policy_type": "min_key_size"},
+      "result": "pass",
+      "message": "Key size 4096 bits meets minimum requirement of 2048 bits",
+      "checked_value": "4096 bits",
+      "expected_value": ">= 2048 bits"
+    },
+    {
+      "id": 11,
+      "policy": {"id": 2, "name": "Expiry Warning 30 Days", "policy_type": "expiry_warning"},
+      "result": "fail",
+      "message": "Certificate expires in 15 days (threshold: 30)",
+      "checked_value": "15 days",
+      "expected_value": "> 30 days"
+    }
+  ]
+}
+```
+
+### Bulk Compliance Check
+
+`POST /api/plugins/netbox-ssl/certificates/bulk-compliance-check/`
+
+Run compliance checks on multiple certificates.
+
+#### Example Request
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "certificate_ids": [1, 2, 3, 4, 5],
+       "policy_ids": [1, 2]
+     }' \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-compliance-check/
+```
+
+#### Success Response
+
+```json
+{
+  "total_certificates": 5,
+  "processed": 5,
+  "missing_ids": [],
+  "overall_passed": 8,
+  "overall_failed": 2,
+  "overall_score": 80.0,
+  "reports": [
+    {
+      "certificate_id": 1,
+      "certificate_name": "example.com",
+      "total_checks": 2,
+      "passed": 2,
+      "failed": 0,
+      "compliance_score": 100.0
+    },
+    {
+      "certificate_id": 2,
+      "certificate_name": "api.example.com",
+      "total_checks": 2,
+      "passed": 1,
+      "failed": 1,
+      "compliance_score": 50.0
+    }
+  ]
+}
+```
+
+### Creating Compliance Policies
+
+`POST /api/plugins/netbox-ssl/compliance-policies/`
+
+#### Policy Examples
+
+```bash
+# Minimum key size policy
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "Min Key Size 2048",
+       "description": "Require at least 2048-bit keys for all certificates",
+       "policy_type": "min_key_size",
+       "severity": "critical",
+       "enabled": true,
+       "parameters": {"min_bits": 2048}
+     }' \
+     http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/
+
+# Expiry warning policy
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "Expiry Warning 30 Days",
+       "description": "Warn when certificates expire within 30 days",
+       "policy_type": "expiry_warning",
+       "severity": "warning",
+       "enabled": true,
+       "parameters": {"warning_days": 30}
+     }' \
+     http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/
+
+# Forbidden algorithm policy
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "No DSA Algorithm",
+       "description": "DSA algorithm is not allowed",
+       "policy_type": "algorithm_forbidden",
+       "severity": "critical",
+       "enabled": true,
+       "parameters": {"algorithms": ["dsa"]}
+     }' \
+     http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/
+
+# Wildcard forbidden policy
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "No Wildcards",
+       "description": "Wildcard certificates are not allowed",
+       "policy_type": "wildcard_forbidden",
+       "severity": "warning",
+       "enabled": true,
+       "parameters": {}
+     }' \
+     http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/
+```
+
+### Compliance Filters
+
+```bash
+# List all compliance checks that failed
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/compliance-checks/?result=fail"
+
+# List critical severity policy violations
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/compliance-checks/?severity=critical&result=fail"
+
+# List all enabled policies
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/?enabled=true"
 ```
 
 ---

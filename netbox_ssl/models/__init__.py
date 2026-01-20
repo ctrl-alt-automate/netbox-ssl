@@ -5,6 +5,13 @@ from .certificate_authorities import (
     CertificateAuthority,
 )
 from .certificates import Certificate, CertificateAlgorithmChoices, CertificateStatusChoices
+from .compliance import (
+    ComplianceCheck,
+    CompliancePolicy,
+    CompliancePolicyTypeChoices,
+    ComplianceResultChoices,
+    ComplianceSeverityChoices,
+)
 from .csr import CertificateSigningRequest, CSRStatusChoices
 
 __all__ = [
@@ -17,4 +24,9 @@ __all__ = [
     "DEFAULT_CERTIFICATE_AUTHORITIES",
     "CertificateSigningRequest",
     "CSRStatusChoices",
+    "CompliancePolicy",
+    "ComplianceCheck",
+    "CompliancePolicyTypeChoices",
+    "ComplianceSeverityChoices",
+    "ComplianceResultChoices",
 ]

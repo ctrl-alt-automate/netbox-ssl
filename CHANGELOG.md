@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Compliance Reporting** ([#14](https://github.com/ctrl-alt-automate/netbox-ssl/issues/14)):
+  - New CompliancePolicy model for defining compliance rules
+  - New ComplianceCheck model for storing check results
+  - 10 built-in policy types:
+    - `min_key_size` - Minimum key size requirement
+    - `max_validity_days` - Maximum certificate validity period
+    - `algorithm_allowed` - Allowed algorithms whitelist
+    - `algorithm_forbidden` - Forbidden algorithms blacklist
+    - `expiry_warning` - Expiry warning threshold
+    - `chain_required` - Certificate chain requirement
+    - `san_required` - SAN requirement
+    - `wildcard_forbidden` - Wildcard certificate prohibition
+    - `issuer_allowed` - Allowed issuers whitelist
+    - `issuer_forbidden` - Forbidden issuers blacklist
+  - Severity levels: critical, warning, info
+  - Compliance score calculation (percentage of passing checks)
+  - Tenant-scoped policies support
+  - REST API endpoints:
+    - `POST /certificates/{id}/compliance-check/` - Single certificate check
+    - `POST /certificates/bulk-compliance-check/` - Bulk compliance check
+    - CRUD endpoints for CompliancePolicy and ComplianceCheck
+  - ComplianceChecker utility for running policy evaluations
+  - Full documentation for compliance reporting in data-models.md and api.md
+
 - **Certificate Authority Tracking** ([#13](https://github.com/ctrl-alt-automate/netbox-ssl/issues/13)):
   - New `CertificateAuthority` model for tracking CAs
   - CA types: Public, Internal/Private, ACME/Let's Encrypt
