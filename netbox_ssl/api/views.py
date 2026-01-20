@@ -171,8 +171,10 @@ class CertificateViewSet(NetBoxModelViewSet):
             try:
                 ids = [int(i) for i in ids]
                 certificates = Certificate.objects.filter(pk__in=ids)
-            except (ValueError, TypeError):
-                raise serializers.ValidationError({"ids": "Invalid certificate IDs. Must be a list of integers."})
+            except (ValueError, TypeError) as e:
+                raise serializers.ValidationError(
+                    {"ids": "Invalid certificate IDs. Must be a list of integers."}
+                ) from e
         else:
             # Apply filters from query parameters
             certificates = self.filter_queryset(self.get_queryset())
@@ -205,9 +207,9 @@ class CertificateViewSet(NetBoxModelViewSet):
                 include_chain=include_chain,
             )
         except ImportError as e:
-            raise serializers.ValidationError({"detail": str(e)})
+            raise serializers.ValidationError({"detail": str(e)}) from e
         except Exception as e:
-            raise serializers.ValidationError({"detail": f"Export failed: {str(e)}"})
+            raise serializers.ValidationError({"detail": f"Export failed: {str(e)}"}) from e
 
         # Get content type and extension
         content_type = CertificateExporter.get_content_type(export_format)
@@ -249,7 +251,7 @@ class CertificateViewSet(NetBoxModelViewSet):
                 include_chain=include_chain,
             )
         except ImportError as e:
-            raise serializers.ValidationError({"detail": str(e)})
+            raise serializers.ValidationError({"detail": str(e)}) from e
 
         content_type = CertificateExporter.get_content_type(export_format)
         extension = CertificateExporter.get_file_extension(export_format)

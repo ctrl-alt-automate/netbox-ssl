@@ -8,8 +8,7 @@ formats including CSV, JSON, YAML, and PEM.
 import csv
 import io
 import json
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     import yaml
@@ -79,8 +78,8 @@ class CertificateExporter:
 
     @classmethod
     def certificate_to_dict(
-        cls, certificate, fields: Optional[List[str]] = None, include_pem: bool = False
-    ) -> Dict[str, Any]:
+        cls, certificate, fields: list[str] | None = None, include_pem: bool = False
+    ) -> dict[str, Any]:
         """
         Convert a certificate to a dictionary.
 
@@ -132,7 +131,7 @@ class CertificateExporter:
     def export_to_csv(
         cls,
         certificates,
-        fields: Optional[List[str]] = None,
+        fields: list[str] | None = None,
         include_header: bool = True,
     ) -> str:
         """
@@ -167,7 +166,7 @@ class CertificateExporter:
     def export_to_json(
         cls,
         certificates,
-        fields: Optional[List[str]] = None,
+        fields: list[str] | None = None,
         include_pem: bool = False,
         pretty: bool = True,
     ) -> str:
@@ -197,7 +196,7 @@ class CertificateExporter:
     def export_to_yaml(
         cls,
         certificates,
-        fields: Optional[List[str]] = None,
+        fields: list[str] | None = None,
         include_pem: bool = False,
     ) -> str:
         """
@@ -268,7 +267,7 @@ class CertificateExporter:
         cls,
         certificates,
         format: str,
-        fields: Optional[List[str]] = None,
+        fields: list[str] | None = None,
         include_pem: bool = False,
         **kwargs,
     ) -> str:
