@@ -35,6 +35,8 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `PUT` | `/certificates/{id}/` | Full update |
 | `PATCH` | `/certificates/{id}/` | Partial update |
 | `DELETE` | `/certificates/{id}/` | Delete certificate |
+| `POST` | `/certificates/import/` | Import from PEM |
+| `POST` | `/certificates/bulk-import/` | Bulk import from PEM |
 
 ### Assignments
 
@@ -122,6 +124,146 @@ curl -X POST \
        "notes": "Production HTTPS endpoint"
      }' \
      http://localhost:8000/api/plugins/netbox-ssl/assignments/
+```
+
+---
+
+## Bulk Import
+
+Import multiple certificates in a single request for efficient migrations and automation.
+
+### Endpoint
+
+`POST /api/plugins/netbox-ssl/certificates/bulk-import/`
+
+### Features
+
+- **Atomic transactions**: All certificates succeed or all fail
+- **Batch size limit**: Maximum 100 certificates per request (configurable)
+- **Validation first**: All certificates validated before any are created
+- **Detailed errors**: Failed certificate index and specific error messages
+
+### Configuration
+
+The batch size limit can be configured in your NetBox `configuration.py`:
+
+```python
+PLUGINS_CONFIG = {
+    "netbox_ssl": {
+        "bulk_import_max_batch_size": 100,  # Default: 100, max certificates per request
+    }
+}
+```
+
+### Request Format
+
+```json
+[
+  {
+    "pem_content": "-----BEGIN CERTIFICATE-----\nMIID...",
+    "private_key_location": "Vault: /secret/prod/web1",
+    "tenant": 1
+  },
+  {
+    "pem_content": "-----BEGIN CERTIFICATE-----\nMIIE...",
+    "tenant": 2
+  }
+]
+```
+
+### Example Request
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '[
+       {
+         "pem_content": "-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----",
+         "private_key_location": "Vault: /secret/prod/web1"
+       },
+       {
+         "pem_content": "-----BEGIN CERTIFICATE-----\nMIIE...\n-----END CERTIFICATE-----",
+         "private_key_location": "Vault: /secret/prod/web2"
+       }
+     ]' \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-import/
+```
+
+### Success Response (201 Created)
+
+```json
+{
+  "created_count": 2,
+  "certificates": [
+    {
+      "id": 10,
+      "common_name": "www.example.com",
+      "serial_number": "01:23:45:67:89",
+      "status": "active",
+      "valid_to": "2025-01-20T00:00:00Z"
+    },
+    {
+      "id": 11,
+      "common_name": "api.example.com",
+      "serial_number": "01:23:45:67:90",
+      "status": "active",
+      "valid_to": "2025-06-15T00:00:00Z"
+    }
+  ]
+}
+```
+
+### Error Response (400 Bad Request)
+
+```json
+{
+  "detail": "Validation failed for one or more certificates.",
+  "failed_certificates": [
+    {
+      "index": 2,
+      "errors": {
+        "pem_content": ["Invalid PEM format or unable to parse certificate."]
+      }
+    },
+    {
+      "index": 5,
+      "errors": {
+        "pem_content": ["Certificate already exists: www.example.com (ID: 3)"]
+      }
+    }
+  ]
+}
+```
+
+### Python Example
+
+```python
+import requests
+from pathlib import Path
+
+# Load certificates from files
+cert_files = Path("/path/to/certs").glob("*.pem")
+certificates = []
+
+for cert_file in cert_files:
+    certificates.append({
+        "pem_content": cert_file.read_text(),
+        "private_key_location": f"Vault: /secret/certs/{cert_file.stem}"
+    })
+
+# Bulk import (batch of 100 max)
+response = requests.post(
+    "http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-import/",
+    headers={"Authorization": "Token YOUR_TOKEN"},
+    json=certificates[:100]
+)
+
+if response.status_code == 201:
+    result = response.json()
+    print(f"Imported {result['created_count']} certificates")
+else:
+    print(f"Error: {response.json()}")
 ```
 
 ---

@@ -4,10 +4,10 @@ Unit tests for the certificate parser utility.
 These tests verify PEM parsing, private key detection, and X.509 extraction.
 """
 
-import pytest
 import sys
-from datetime import datetime
 from pathlib import Path
+
+import pytest
 
 # Allow importing parser module directly without loading the full netbox_ssl package
 # This enables running tests locally without NetBox installed
@@ -23,12 +23,11 @@ if "netbox" not in sys.modules:
     sys.modules["netbox.plugins"] = MagicMock()
 
 from netbox_ssl.utils.parser import (
-    CertificateParser,
     CertificateParseError,
-    PrivateKeyDetectedError,
+    CertificateParser,
     ParsedCertificate,
+    PrivateKeyDetectedError,
 )
-
 
 # Test certificate data - a self-signed test certificate
 TEST_CERTIFICATE_PEM = """-----BEGIN CERTIFICATE-----

@@ -2,8 +2,9 @@
 Pytest configuration and fixtures for NetBox SSL plugin tests.
 """
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 
 # Try to import Django - not needed for browser tests
 try:

@@ -5,11 +5,12 @@ These tests verify the Certificate and CertificateAssignment models
 work correctly without requiring a full NetBox environment.
 """
 
-import pytest
 import sys
-from datetime import datetime, timedelta, date
-from unittest.mock import Mock, patch, MagicMock
+from datetime import date, timedelta
 from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Allow importing modules directly without loading the full netbox_ssl package
 _project_root = Path(__file__).parent.parent
@@ -296,8 +297,9 @@ class TestJanusRenewalWorkflow:
     @pytest.mark.unit
     def test_find_renewal_candidate_detects_same_cn(self):
         """Test that find_renewal_candidate finds certificates with matching CN."""
-        from netbox_ssl.utils.parser import CertificateParser
         from unittest.mock import MagicMock
+
+        from netbox_ssl.utils.parser import CertificateParser
 
         # Create a mock Certificate model class
         mock_model = MagicMock()
@@ -323,8 +325,9 @@ class TestJanusRenewalWorkflow:
     @pytest.mark.unit
     def test_find_renewal_candidate_returns_none_for_new_cn(self):
         """Test that find_renewal_candidate returns None for new CNs."""
-        from netbox_ssl.utils.parser import CertificateParser
         from unittest.mock import MagicMock
+
+        from netbox_ssl.utils.parser import CertificateParser
 
         # Create a mock Certificate model class
         mock_model = MagicMock()
@@ -365,8 +368,9 @@ class TestMultiTenancyValidation:
     @pytest.mark.unit
     def test_assignment_model_has_tenant_validation(self):
         """Test that CertificateAssignment has tenant boundary validation."""
-        from netbox_ssl.models import CertificateAssignment
         import inspect
+
+        from netbox_ssl.models import CertificateAssignment
 
         # Verify clean method exists
         assert hasattr(CertificateAssignment, "clean")
@@ -388,8 +392,9 @@ class TestMultiTenancyValidation:
     @pytest.mark.unit
     def test_tenant_boundary_error_message(self):
         """Test that cross-tenant assignment produces clear error message."""
-        from netbox_ssl.models import CertificateAssignment
         from django.core.exceptions import ValidationError
+
+        from netbox_ssl.models import CertificateAssignment
 
         # Create mock tenants
         mock_tenant_a = MagicMock()
@@ -521,8 +526,9 @@ class TestAssignmentForm:
     @pytest.mark.unit
     def test_form_auto_determines_type_from_service(self):
         """Test that form automatically determines assignment type from service selection."""
-        from netbox_ssl.forms import CertificateAssignmentForm
         import inspect
+
+        from netbox_ssl.forms import CertificateAssignmentForm
 
         # Check that save method contains type determination logic
         source = inspect.getsource(CertificateAssignmentForm.save)
@@ -533,8 +539,9 @@ class TestAssignmentForm:
     @pytest.mark.unit
     def test_form_validates_duplicate_assignments(self):
         """Test that form validates against duplicate assignments."""
-        from netbox_ssl.forms import CertificateAssignmentForm
         import inspect
+
+        from netbox_ssl.forms import CertificateAssignmentForm
 
         # Check that clean method contains duplicate validation
         source = inspect.getsource(CertificateAssignmentForm.clean)
@@ -544,8 +551,9 @@ class TestAssignmentForm:
     @pytest.mark.unit
     def test_form_requires_at_least_one_target(self):
         """Test that form requires at least one target (device, VM, or service)."""
-        from netbox_ssl.forms import CertificateAssignmentForm
         import inspect
+
+        from netbox_ssl.forms import CertificateAssignmentForm
 
         # Check that clean method validates at least one target
         source = inspect.getsource(CertificateAssignmentForm.clean)
@@ -594,8 +602,9 @@ class TestTemplateExtensions:
     @pytest.mark.unit
     def test_device_extension_includes_service_certificates(self):
         """Test that DeviceCertificates also queries service assignments."""
-        from netbox_ssl.template_content import DeviceCertificates
         import inspect
+
+        from netbox_ssl.template_content import DeviceCertificates
 
         # Check that right_page method queries services on the device
         source = inspect.getsource(DeviceCertificates.right_page)
@@ -606,8 +615,9 @@ class TestTemplateExtensions:
     @pytest.mark.unit
     def test_vm_extension_includes_service_certificates(self):
         """Test that VirtualMachineCertificates also queries service assignments."""
-        from netbox_ssl.template_content import VirtualMachineCertificates
         import inspect
+
+        from netbox_ssl.template_content import VirtualMachineCertificates
 
         # Check that right_page method queries services on the VM
         source = inspect.getsource(VirtualMachineCertificates.right_page)
@@ -622,8 +632,9 @@ class TestAssignmentTableRendering:
     @pytest.mark.unit
     def test_table_renders_parent_for_services(self):
         """Test that assignment table shows parent device/VM for services."""
-        from netbox_ssl.tables import CertificateAssignmentTable
         import inspect
+
+        from netbox_ssl.tables import CertificateAssignmentTable
 
         # Check that render_assigned_object shows parent
         source = inspect.getsource(CertificateAssignmentTable.render_assigned_object)
@@ -634,8 +645,9 @@ class TestAssignmentTableRendering:
     @pytest.mark.unit
     def test_table_uses_format_html(self):
         """Test that table uses format_html for safe HTML rendering."""
-        from netbox_ssl.tables import CertificateAssignmentTable
         import inspect
+
+        from netbox_ssl.tables import CertificateAssignmentTable
 
         source = inspect.getsource(CertificateAssignmentTable.render_assigned_object)
         assert "format_html" in source

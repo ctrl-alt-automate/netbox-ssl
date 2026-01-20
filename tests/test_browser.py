@@ -8,12 +8,12 @@ Run with: pytest tests/test_browser.py -m browser
 """
 
 import os
+
 import pytest
-import re
 
 # Check if playwright is available
 try:
-    from playwright.sync_api import sync_playwright, expect
+    from playwright.sync_api import expect, sync_playwright
 
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:

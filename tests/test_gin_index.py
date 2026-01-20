@@ -7,8 +7,9 @@ Tests cover:
 - Migration dependencies
 """
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 def get_project_root():
@@ -37,19 +38,13 @@ _project_root = get_project_root()
 
 def migration_file_available():
     """Check if the migration file is available for testing."""
-    migration_path = (
-        _project_root
-        / "netbox_ssl"
-        / "migrations"
-        / "0002_certificate_sans_gin_index.py"
-    )
+    migration_path = _project_root / "netbox_ssl" / "migrations" / "0002_certificate_sans_gin_index.py"
     return migration_path.exists()
 
 
 # Skip file-based tests if migration files aren't available (CI environment)
 skip_if_no_migration = pytest.mark.skipif(
-    not migration_file_available(),
-    reason="Migration file not available in this environment"
+    not migration_file_available(), reason="Migration file not available in this environment"
 )
 
 
@@ -60,24 +55,14 @@ class TestGinIndexMigration:
     @skip_if_no_migration
     def test_migration_file_exists(self):
         """Test that the migration file exists."""
-        migration_path = (
-            _project_root
-            / "netbox_ssl"
-            / "migrations"
-            / "0002_certificate_sans_gin_index.py"
-        )
+        migration_path = _project_root / "netbox_ssl" / "migrations" / "0002_certificate_sans_gin_index.py"
         assert migration_path.exists(), f"Migration file not found at {migration_path}"
 
     @pytest.mark.unit
     @skip_if_no_migration
     def test_migration_has_docstring(self):
         """Test that the migration has a descriptive docstring."""
-        migration_path = (
-            _project_root
-            / "netbox_ssl"
-            / "migrations"
-            / "0002_certificate_sans_gin_index.py"
-        )
+        migration_path = _project_root / "netbox_ssl" / "migrations" / "0002_certificate_sans_gin_index.py"
         content = migration_path.read_text()
 
         # Should have a docstring explaining the migration
@@ -89,12 +74,7 @@ class TestGinIndexMigration:
     @skip_if_no_migration
     def test_migration_imports_gin_index(self):
         """Test that the migration imports GinIndex."""
-        migration_path = (
-            _project_root
-            / "netbox_ssl"
-            / "migrations"
-            / "0002_certificate_sans_gin_index.py"
-        )
+        migration_path = _project_root / "netbox_ssl" / "migrations" / "0002_certificate_sans_gin_index.py"
         content = migration_path.read_text()
 
         assert "from django.contrib.postgres.indexes import GinIndex" in content
@@ -103,12 +83,7 @@ class TestGinIndexMigration:
     @skip_if_no_migration
     def test_migration_imports_add_index_concurrently(self):
         """Test that the migration imports AddIndexConcurrently."""
-        migration_path = (
-            _project_root
-            / "netbox_ssl"
-            / "migrations"
-            / "0002_certificate_sans_gin_index.py"
-        )
+        migration_path = _project_root / "netbox_ssl" / "migrations" / "0002_certificate_sans_gin_index.py"
         content = migration_path.read_text()
 
         assert "from django.contrib.postgres.operations import AddIndexConcurrently" in content
@@ -117,12 +92,7 @@ class TestGinIndexMigration:
     @skip_if_no_migration
     def test_migration_has_correct_dependency(self):
         """Test that the migration depends on 0001_initial."""
-        migration_path = (
-            _project_root
-            / "netbox_ssl"
-            / "migrations"
-            / "0002_certificate_sans_gin_index.py"
-        )
+        migration_path = _project_root / "netbox_ssl" / "migrations" / "0002_certificate_sans_gin_index.py"
         content = migration_path.read_text()
 
         # Check dependency on initial migration
@@ -133,12 +103,7 @@ class TestGinIndexMigration:
     @skip_if_no_migration
     def test_migration_uses_add_index_concurrently_operation(self):
         """Test that the migration uses AddIndexConcurrently operation."""
-        migration_path = (
-            _project_root
-            / "netbox_ssl"
-            / "migrations"
-            / "0002_certificate_sans_gin_index.py"
-        )
+        migration_path = _project_root / "netbox_ssl" / "migrations" / "0002_certificate_sans_gin_index.py"
         content = migration_path.read_text()
 
         assert "AddIndexConcurrently(" in content
@@ -147,12 +112,7 @@ class TestGinIndexMigration:
     @skip_if_no_migration
     def test_migration_is_non_atomic(self):
         """Test that the migration is non-atomic (required for concurrent index)."""
-        migration_path = (
-            _project_root
-            / "netbox_ssl"
-            / "migrations"
-            / "0002_certificate_sans_gin_index.py"
-        )
+        migration_path = _project_root / "netbox_ssl" / "migrations" / "0002_certificate_sans_gin_index.py"
         content = migration_path.read_text()
 
         assert "atomic = False" in content
@@ -161,12 +121,7 @@ class TestGinIndexMigration:
     @skip_if_no_migration
     def test_migration_targets_certificate_model(self):
         """Test that the migration targets the certificate model."""
-        migration_path = (
-            _project_root
-            / "netbox_ssl"
-            / "migrations"
-            / "0002_certificate_sans_gin_index.py"
-        )
+        migration_path = _project_root / "netbox_ssl" / "migrations" / "0002_certificate_sans_gin_index.py"
         content = migration_path.read_text()
 
         assert 'model_name="certificate"' in content or "model_name='certificate'" in content
@@ -175,12 +130,7 @@ class TestGinIndexMigration:
     @skip_if_no_migration
     def test_migration_targets_sans_field(self):
         """Test that the index targets the sans field."""
-        migration_path = (
-            _project_root
-            / "netbox_ssl"
-            / "migrations"
-            / "0002_certificate_sans_gin_index.py"
-        )
+        migration_path = _project_root / "netbox_ssl" / "migrations" / "0002_certificate_sans_gin_index.py"
         content = migration_path.read_text()
 
         assert '"sans"' in content or "'sans'" in content
@@ -190,17 +140,11 @@ class TestGinIndexMigration:
     @skip_if_no_migration
     def test_migration_has_explicit_index_name(self):
         """Test that the index has an explicit name."""
-        migration_path = (
-            _project_root
-            / "netbox_ssl"
-            / "migrations"
-            / "0002_certificate_sans_gin_index.py"
-        )
+        migration_path = _project_root / "netbox_ssl" / "migrations" / "0002_certificate_sans_gin_index.py"
         content = migration_path.read_text()
 
         # Index should have explicit name
-        assert 'name="netbox_ssl_cert_sans_gin"' in content or \
-               "name='netbox_ssl_cert_sans_gin'" in content
+        assert 'name="netbox_ssl_cert_sans_gin"' in content or "name='netbox_ssl_cert_sans_gin'" in content
 
 
 class TestGinIndexNamingConvention:
@@ -321,12 +265,7 @@ class TestMigrationSafety:
     @skip_if_no_migration
     def test_migration_is_single_operation(self):
         """Test that the migration contains exactly one operation."""
-        migration_path = (
-            _project_root
-            / "netbox_ssl"
-            / "migrations"
-            / "0002_certificate_sans_gin_index.py"
-        )
+        migration_path = _project_root / "netbox_ssl" / "migrations" / "0002_certificate_sans_gin_index.py"
         content = migration_path.read_text()
 
         # Count operations - should be exactly one AddIndexConcurrently
@@ -337,12 +276,7 @@ class TestMigrationSafety:
     @skip_if_no_migration
     def test_migration_uses_gin_index_class(self):
         """Test that the migration uses the GinIndex class."""
-        migration_path = (
-            _project_root
-            / "netbox_ssl"
-            / "migrations"
-            / "0002_certificate_sans_gin_index.py"
-        )
+        migration_path = _project_root / "netbox_ssl" / "migrations" / "0002_certificate_sans_gin_index.py"
         content = migration_path.read_text()
 
         # Should use GinIndex specifically, not a generic index
