@@ -9,13 +9,13 @@ Tests cover:
 """
 
 import pytest
-from pathlib import Path
 
 
 def parser_available():
     """Check if the CertificateParser can be imported."""
     try:
         from netbox_ssl.utils.parser import CertificateParser
+
         return True
     except (ImportError, ModuleNotFoundError):
         return False
@@ -23,8 +23,7 @@ def parser_available():
 
 # Skip all parser-dependent tests if parser isn't available
 skip_if_no_parser = pytest.mark.skipif(
-    not parser_available(),
-    reason="CertificateParser not available in this environment"
+    not parser_available(), reason="CertificateParser not available in this environment"
 )
 
 # Sample PEM certificate for testing
@@ -126,7 +125,7 @@ MIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQI
     @skip_if_no_parser
     def test_pem_content_rejects_invalid_certificate(self):
         """Test that invalid PEM content raises error."""
-        from netbox_ssl.utils.parser import CertificateParser, CertificateParseError
+        from netbox_ssl.utils.parser import CertificateParseError, CertificateParser
 
         with pytest.raises(CertificateParseError):
             CertificateParser.parse("not a valid certificate")
@@ -135,7 +134,7 @@ MIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQI
     @skip_if_no_parser
     def test_pem_content_rejects_empty_input(self):
         """Test that empty input raises error."""
-        from netbox_ssl.utils.parser import CertificateParser, CertificateParseError
+        from netbox_ssl.utils.parser import CertificateParseError, CertificateParser
 
         with pytest.raises(CertificateParseError):
             CertificateParser.parse("")
@@ -144,7 +143,7 @@ MIIFDjBABgkqhkiG9w0BBQ0wMzAbBgkqhkiG9w0BBQwwDgQI
     @skip_if_no_parser
     def test_pem_content_rejects_whitespace_only(self):
         """Test that whitespace-only input raises error."""
-        from netbox_ssl.utils.parser import CertificateParser, CertificateParseError
+        from netbox_ssl.utils.parser import CertificateParseError, CertificateParser
 
         with pytest.raises(CertificateParseError):
             CertificateParser.parse("   \n\t  ")

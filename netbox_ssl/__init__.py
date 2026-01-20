@@ -26,6 +26,7 @@ class NetBoxSSLConfig(PluginConfig):
     default_settings = {
         "expiry_warning_days": 30,
         "expiry_critical_days": 14,
+        "bulk_import_max_batch_size": 100,
     }
 
     def ready(self):

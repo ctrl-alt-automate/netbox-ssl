@@ -139,9 +139,21 @@ Import multiple certificates in a single request for efficient migrations and au
 ### Features
 
 - **Atomic transactions**: All certificates succeed or all fail
-- **Batch size limit**: Maximum 100 certificates per request
+- **Batch size limit**: Maximum 100 certificates per request (configurable)
 - **Validation first**: All certificates validated before any are created
 - **Detailed errors**: Failed certificate index and specific error messages
+
+### Configuration
+
+The batch size limit can be configured in your NetBox `configuration.py`:
+
+```python
+PLUGINS_CONFIG = {
+    "netbox_ssl": {
+        "bulk_import_max_batch_size": 100,  # Default: 100, max certificates per request
+    }
+}
+```
 
 ### Request Format
 

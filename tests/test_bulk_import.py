@@ -374,3 +374,277 @@ class TestBulkImportPerformance:
         # - Large enough to provide significant batching benefit
         # - Completes in reasonable time
         assert 50 <= max_batch_size <= 200
+
+
+# =============================================================================
+# Integration Tests - These test the actual API endpoint
+# =============================================================================
+
+
+def django_api_available():
+    """Check if Django REST framework test client is available."""
+    try:
+        from django.contrib.auth import get_user_model  # noqa: F401
+        from rest_framework.test import APIClient  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
+skip_if_no_django_api = pytest.mark.skipif(not django_api_available(), reason="Django REST Framework not available")
+
+
+@pytest.fixture
+def api_client():
+    """Create an authenticated API client for testing."""
+    from django.contrib.auth import get_user_model
+    from rest_framework.test import APIClient
+
+    User = get_user_model()
+
+    # Get or create admin user
+    user, _ = User.objects.get_or_create(
+        username="test_bulk_import_user",
+        defaults={"is_superuser": True, "is_staff": True},
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=user)
+    return client
+
+
+@pytest.fixture
+def cleanup_certificates():
+    """Fixture to clean up certificates after tests."""
+    yield
+    # Cleanup after test
+    try:
+        from netbox_ssl.models import Certificate
+
+        Certificate.objects.filter(common_name__contains="example.com").delete()
+    except Exception:
+        pass
+
+
+class TestBulkImportAPIIntegration:
+    """Integration tests that actually call the bulk import API endpoint."""
+
+    @pytest.mark.integration
+    @skip_if_no_django_api
+    @skip_if_no_parser
+    def test_bulk_import_success_single_certificate(self, api_client, cleanup_certificates):
+        """Test successful bulk import of a single certificate."""
+        cert = load_test_certificate("cert_web_prod")
+        if not cert:
+            pytest.skip("Test certificate not available")
+
+        response = api_client.post(
+            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            [{"pem_content": cert}],
+            format="json",
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert "created_count" in data
+        assert data["created_count"] == 1
+        assert "certificates" in data
+        assert len(data["certificates"]) == 1
+        assert data["certificates"][0]["common_name"] == "www.example.com"
+
+    @pytest.mark.integration
+    @skip_if_no_django_api
+    @skip_if_no_parser
+    def test_bulk_import_success_multiple_certificates(self, api_client, cleanup_certificates):
+        """Test successful bulk import of multiple certificates."""
+        cert_names = ["cert_web_prod", "cert_api_gateway", "cert_wildcard_prod"]
+        certs = []
+        for name in cert_names:
+            cert = load_test_certificate(name)
+            if cert:
+                certs.append({"pem_content": cert})
+
+        if len(certs) < 3:
+            pytest.skip("Not enough test certificates available")
+
+        response = api_client.post(
+            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            certs,
+            format="json",
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["created_count"] == 3
+        assert len(data["certificates"]) == 3
+
+    @pytest.mark.integration
+    @skip_if_no_django_api
+    def test_bulk_import_rejects_empty_list(self, api_client):
+        """Test that empty list is rejected with 400 error."""
+        response = api_client.post(
+            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            [],
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "detail" in data
+        assert "empty" in data["detail"].lower() or "at least one" in data["detail"].lower()
+
+    @pytest.mark.integration
+    @skip_if_no_django_api
+    def test_bulk_import_rejects_non_list(self, api_client):
+        """Test that non-list input is rejected with 400 error."""
+        response = api_client.post(
+            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            {"pem_content": "test"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "detail" in data
+        assert "list" in data["detail"].lower()
+
+    @pytest.mark.integration
+    @skip_if_no_django_api
+    def test_bulk_import_rejects_invalid_certificate(self, api_client):
+        """Test that invalid certificates are rejected with detailed errors."""
+        response = api_client.post(
+            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            [{"pem_content": "not a valid certificate"}],
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "failed_certificates" in data
+        assert len(data["failed_certificates"]) == 1
+        assert data["failed_certificates"][0]["index"] == 0
+
+    @pytest.mark.integration
+    @skip_if_no_django_api
+    @skip_if_no_parser
+    def test_bulk_import_atomic_rollback_on_error(self, api_client, cleanup_certificates):
+        """Test that entire batch is rolled back when one certificate fails."""
+        from netbox_ssl.models import Certificate
+
+        cert = load_test_certificate("cert_web_prod")
+        if not cert:
+            pytest.skip("Test certificate not available")
+
+        # Count existing certificates before
+        count_before = Certificate.objects.count()
+
+        # Mix valid and invalid certificates
+        response = api_client.post(
+            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            [
+                {"pem_content": cert},  # valid
+                {"pem_content": "invalid cert"},  # invalid
+            ],
+            format="json",
+        )
+
+        assert response.status_code == 400
+
+        # Verify no certificates were created (atomic rollback)
+        count_after = Certificate.objects.count()
+        assert count_after == count_before, "Atomic rollback failed - certificates were created"
+
+    @pytest.mark.integration
+    @skip_if_no_django_api
+    @skip_if_no_parser
+    def test_bulk_import_with_optional_fields(self, api_client, cleanup_certificates):
+        """Test bulk import with optional fields like private_key_location."""
+        cert = load_test_certificate("cert_web_prod")
+        if not cert:
+            pytest.skip("Test certificate not available")
+
+        response = api_client.post(
+            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            [
+                {
+                    "pem_content": cert,
+                    "private_key_location": "Vault: /secret/test/cert1",
+                }
+            ],
+            format="json",
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["created_count"] == 1
+
+    @pytest.mark.integration
+    @skip_if_no_django_api
+    def test_bulk_import_batch_size_limit(self, api_client):
+        """Test that batch size is limited (default 100)."""
+        # Create 101 dummy certificates (exceeds limit)
+        certs = [{"pem_content": f"cert-{i}"} for i in range(101)]
+
+        response = api_client.post(
+            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            certs,
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "detail" in data
+        assert "100" in data["detail"] or "batch" in data["detail"].lower()
+
+    @pytest.mark.integration
+    @skip_if_no_django_api
+    @skip_if_no_parser
+    def test_bulk_import_rejects_private_key(self, api_client):
+        """Test that certificates with private keys are rejected."""
+        cert = load_test_certificate("cert_web_prod")
+        if not cert:
+            pytest.skip("Test certificate not available")
+
+        private_key = """-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7
+-----END PRIVATE KEY-----"""
+
+        mixed_content = cert + "\n" + private_key
+
+        response = api_client.post(
+            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            [{"pem_content": mixed_content}],
+            format="json",
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "failed_certificates" in data
+
+    @pytest.mark.integration
+    @skip_if_no_django_api
+    @skip_if_no_parser
+    def test_bulk_import_duplicate_detection(self, api_client, cleanup_certificates):
+        """Test that duplicate certificates in same batch are detected."""
+        cert = load_test_certificate("cert_web_prod")
+        if not cert:
+            pytest.skip("Test certificate not available")
+
+        # First import should succeed
+        response1 = api_client.post(
+            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            [{"pem_content": cert}],
+            format="json",
+        )
+        assert response1.status_code == 201
+
+        # Second import with same certificate should fail (duplicate)
+        response2 = api_client.post(
+            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            [{"pem_content": cert}],
+            format="json",
+        )
+        assert response2.status_code == 400
+        data = response2.json()
+        assert "failed_certificates" in data

@@ -2,7 +2,8 @@
 REST API views for NetBox SSL plugin.
 """
 
-from django.db import transaction
+from django.conf import settings
+from django.db import DatabaseError, IntegrityError, transaction
 from netbox.api.viewsets import NetBoxModelViewSet
 from rest_framework import serializers, status
 from rest_framework.decorators import action
@@ -72,8 +73,9 @@ class CertificateViewSet(NetBoxModelViewSet):
         if len(request.data) == 0:
             raise serializers.ValidationError({"detail": "Empty list provided. At least one certificate is required."})
 
-        # Limit batch size to prevent abuse
-        max_batch_size = 100
+        # Limit batch size to prevent abuse (configurable via PLUGINS_CONFIG)
+        plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+        max_batch_size = plugin_settings.get("bulk_import_max_batch_size", 100)
         if len(request.data) > max_batch_size:
             raise serializers.ValidationError(
                 {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
@@ -106,7 +108,11 @@ class CertificateViewSet(NetBoxModelViewSet):
                 for serializer in validated_serializers:
                     certificate = serializer.save()
                     created_certificates.append(certificate)
-        except Exception as e:
+        except IntegrityError as e:
+            raise serializers.ValidationError(
+                {"detail": f"Database integrity error during bulk import: {str(e)}"}
+            ) from e
+        except DatabaseError as e:
             raise serializers.ValidationError({"detail": f"Database error during bulk import: {str(e)}"}) from e
 
         # Return created certificates
