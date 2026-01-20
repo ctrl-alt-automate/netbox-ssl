@@ -107,9 +107,9 @@ class TestCSRParsing:
 
         assert isinstance(result, ParsedCSR)
         assert result.common_name == "www.example.com"
-        assert result.organization == "Internet Widgits Pty Ltd"
+        assert result.organization == "Test Organization"
         assert result.locality == "Amsterdam"
-        assert result.state == "Some-State"
+        assert result.state == "Noord-Holland"
         assert result.country == "NL"
         assert result.fingerprint_sha256  # Has fingerprint
         assert result.algorithm == "rsa"
