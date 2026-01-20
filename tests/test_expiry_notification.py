@@ -21,7 +21,8 @@ def script_available():
         )
 
         return True
-    except (ImportError, ModuleNotFoundError):
+    except Exception:
+        # Catches ImportError, ModuleNotFoundError, and Django ImproperlyConfigured
         return False
 
 
