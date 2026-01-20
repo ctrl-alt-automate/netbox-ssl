@@ -1,8 +1,8 @@
 from .assignments import CertificateAssignment
 from .certificate_authorities import (
+    DEFAULT_CERTIFICATE_AUTHORITIES,
     CATypeChoices,
     CertificateAuthority,
-    DEFAULT_CERTIFICATE_AUTHORITIES,
 )
 from .certificates import Certificate, CertificateAlgorithmChoices, CertificateStatusChoices
 
