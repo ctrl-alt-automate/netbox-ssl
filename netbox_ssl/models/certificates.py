@@ -195,16 +195,20 @@ class Certificate(NetBoxModel):
         """Check if the certificate expires within warning threshold."""
         if self.days_remaining is None:
             return False
-        # Default warning threshold: 30 days
-        return 0 < self.days_remaining <= 30
+        from django.conf import settings
+
+        warning_days = settings.PLUGINS_CONFIG.get("netbox_ssl", {}).get("expiry_warning_days", 30)
+        return 0 < self.days_remaining <= warning_days
 
     @property
     def is_critical(self):
         """Check if the certificate is in critical expiry state."""
         if self.days_remaining is None:
             return False
-        # Default critical threshold: 14 days
-        return 0 < self.days_remaining <= 14
+        from django.conf import settings
+
+        critical_days = settings.PLUGINS_CONFIG.get("netbox_ssl", {}).get("expiry_critical_days", 14)
+        return 0 < self.days_remaining <= critical_days
 
     @property
     def expiry_status(self):
