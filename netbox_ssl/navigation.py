@@ -43,6 +43,24 @@ menu = PluginMenu(
                 ),
             ),
         ),
+        (
+            "Management",
+            (
+                PluginMenuItem(
+                    link="plugins:netbox_ssl:certificateauthority_list",
+                    link_text="Certificate Authorities",
+                    permissions=["netbox_ssl.view_certificateauthority"],
+                    buttons=(
+                        PluginMenuButton(
+                            link="plugins:netbox_ssl:certificateauthority_add",
+                            title="Add",
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["netbox_ssl.add_certificateauthority"],
+                        ),
+                    ),
+                ),
+            ),
+        ),
     ),
     icon_class="mdi mdi-certificate",
 )

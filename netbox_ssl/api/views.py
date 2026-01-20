@@ -9,10 +9,15 @@ from rest_framework import serializers, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from ..filtersets import CertificateAssignmentFilterSet, CertificateFilterSet
-from ..models import Certificate, CertificateAssignment
+from ..filtersets import (
+    CertificateAssignmentFilterSet,
+    CertificateAuthorityFilterSet,
+    CertificateFilterSet,
+)
+from ..models import Certificate, CertificateAssignment, CertificateAuthority
 from .serializers import (
     CertificateAssignmentSerializer,
+    CertificateAuthoritySerializer,
     CertificateImportSerializer,
     CertificateSerializer,
 )
@@ -136,3 +141,14 @@ class CertificateAssignmentViewSet(NetBoxModelViewSet):
     )
     serializer_class = CertificateAssignmentSerializer
     filterset_class = CertificateAssignmentFilterSet
+
+
+class CertificateAuthorityViewSet(NetBoxModelViewSet):
+    """API viewset for CertificateAuthority model."""
+
+    queryset = CertificateAuthority.objects.prefetch_related(
+        "certificates",
+        "tags",
+    )
+    serializer_class = CertificateAuthoritySerializer
+    filterset_class = CertificateAuthorityFilterSet

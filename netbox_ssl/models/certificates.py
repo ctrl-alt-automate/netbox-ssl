@@ -144,6 +144,16 @@ class Certificate(NetBoxModel):
         help_text="Tenant this certificate belongs to",
     )
 
+    # Issuing Certificate Authority
+    issuing_ca = models.ForeignKey(
+        to="netbox_ssl.CertificateAuthority",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="certificates",
+        help_text="Certificate Authority that issued this certificate",
+    )
+
     # Raw certificate data (PEM without private key)
     pem_content = models.TextField(
         blank=True,
@@ -227,6 +237,18 @@ class Certificate(NetBoxModel):
         # Auto-update status based on expiry
         if self.is_expired and self.status == CertificateStatusChoices.STATUS_ACTIVE:
             self.status = CertificateStatusChoices.STATUS_EXPIRED
+
+        # Auto-detect issuing CA if not set
+        if not self.issuing_ca and self.issuer:
+            self.auto_detect_ca()
+
+    def auto_detect_ca(self):
+        """Try to auto-detect and set the issuing CA based on issuer string."""
+        from .certificate_authorities import CertificateAuthority
+
+        detected_ca = CertificateAuthority.auto_detect(self.issuer)
+        if detected_ca:
+            self.issuing_ca = detected_ca
 
     def get_assignments(self):
         """Get all certificate assignments."""

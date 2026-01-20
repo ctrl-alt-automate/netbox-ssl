@@ -7,7 +7,12 @@ from django.db.models import Q
 from netbox.filtersets import NetBoxModelFilterSet
 from tenancy.models import Tenant
 
-from ..models import Certificate, CertificateAlgorithmChoices, CertificateStatusChoices
+from ..models import (
+    Certificate,
+    CertificateAlgorithmChoices,
+    CertificateAuthority,
+    CertificateStatusChoices,
+)
 
 
 class CertificateFilterSet(NetBoxModelFilterSet):
@@ -61,6 +66,20 @@ class CertificateFilterSet(NetBoxModelFilterSet):
         field_name="tenant__name",
         to_field_name="name",
         label="Tenant (name)",
+    )
+    issuing_ca_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=CertificateAuthority.objects.all(),
+        label="Issuing CA",
+    )
+    issuing_ca = django_filters.ModelMultipleChoiceFilter(
+        queryset=CertificateAuthority.objects.all(),
+        field_name="issuing_ca__name",
+        to_field_name="name",
+        label="Issuing CA (name)",
+    )
+    has_issuing_ca = django_filters.BooleanFilter(
+        method="filter_has_issuing_ca",
+        label="Has Issuing CA",
     )
     san = django_filters.CharFilter(
         method="filter_san",
@@ -138,3 +157,9 @@ class CertificateFilterSet(NetBoxModelFilterSet):
         if value:
             return queryset.filter(assignments__isnull=False).distinct()
         return queryset.filter(assignments__isnull=True)
+
+    def filter_has_issuing_ca(self, queryset, name, value):
+        """Filter certificates by whether they have an issuing CA assigned."""
+        if value:
+            return queryset.filter(issuing_ca__isnull=False)
+        return queryset.filter(issuing_ca__isnull=True)

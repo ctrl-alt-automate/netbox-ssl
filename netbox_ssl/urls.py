@@ -60,6 +60,48 @@ urlpatterns = [
         name="certificate_changelog",
         kwargs={"model": models.Certificate},
     ),
+    # CertificateAuthority URLs
+    path(
+        "certificate-authorities/",
+        views.CertificateAuthorityListView.as_view(),
+        name="certificateauthority_list",
+    ),
+    path(
+        "certificate-authorities/add/",
+        views.CertificateAuthorityEditView.as_view(),
+        name="certificateauthority_add",
+    ),
+    path(
+        "certificate-authorities/edit/",
+        views.CertificateAuthorityBulkEditView.as_view(),
+        name="certificateauthority_bulk_edit",
+    ),
+    path(
+        "certificate-authorities/delete/",
+        views.CertificateAuthorityBulkDeleteView.as_view(),
+        name="certificateauthority_bulk_delete",
+    ),
+    path(
+        "certificate-authorities/<int:pk>/",
+        views.CertificateAuthorityView.as_view(),
+        name="certificateauthority",
+    ),
+    path(
+        "certificate-authorities/<int:pk>/edit/",
+        views.CertificateAuthorityEditView.as_view(),
+        name="certificateauthority_edit",
+    ),
+    path(
+        "certificate-authorities/<int:pk>/delete/",
+        views.CertificateAuthorityDeleteView.as_view(),
+        name="certificateauthority_delete",
+    ),
+    path(
+        "certificate-authorities/<int:pk>/changelog/",
+        ObjectChangeLogView.as_view(),
+        name="certificateauthority_changelog",
+        kwargs={"model": models.CertificateAuthority},
+    ),
     # CertificateAssignment URLs
     path(
         "assignments/",

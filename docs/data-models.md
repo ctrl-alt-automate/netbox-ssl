@@ -6,10 +6,19 @@ This page documents the database models used by NetBox SSL Plugin.
 
 ```
 ┌─────────────────────────────────────────┐
+│        CertificateAuthority             │
+│  • name, type (public/internal/acme)    │
+│  • issuer_pattern (for auto-detect)     │
+│  • website_url, portal_url, contact     │
+│  • is_approved                          │
+└─────────────────┬───────────────────────┘
+                  │ 1:N (issuing_ca)
+                  │
+┌─────────────────┴───────────────────────┐
 │              Certificate                │
 │  • common_name                          │
 │  • serial_number, fingerprint           │
-│  • issuer, validity dates               │
+│  • issuer, issuing_ca, validity dates   │
 │  • algorithm, key_size                  │
 │  • status, tenant                       │
 └─────────────────┬───────────────────────┘
@@ -32,6 +41,53 @@ This page documents the database models used by NetBox SSL Plugin.
 
 ---
 
+## CertificateAuthority
+
+Model for tracking Certificate Authorities (CAs) that issue certificates.
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `name` | CharField(100) | Yes | Name of the Certificate Authority (unique) |
+| `type` | CharField(20) | Yes | Type of CA (public/internal/acme) |
+| `description` | TextField | | Description of the CA |
+| `issuer_pattern` | CharField(255) | | Pattern to match in certificate issuer for auto-detection |
+| `website_url` | URLField | | CA website URL |
+| `portal_url` | URLField | | CA portal/management URL |
+| `contact_email` | EmailField | | Contact email for this CA |
+| `is_approved` | BooleanField | Yes | Whether this CA is approved for use (default: True) |
+| `tags` | ManyToMany(Tag) | | NetBox tags |
+
+### Type Choices
+
+| Value | Label | Description |
+|-------|-------|-------------|
+| `public` | Public CA | Commercial CA (DigiCert, Sectigo, etc.) |
+| `internal` | Internal/Private CA | Organization's internal CA |
+| `acme` | ACME/Let's Encrypt | ACME-based automated CA |
+
+### Auto-Detection
+
+The `issuer_pattern` field is used for automatic CA matching when importing certificates. When a certificate is imported, the plugin checks if any CA's `issuer_pattern` is contained (case-insensitive) in the certificate's issuer field.
+
+Example patterns:
+- DigiCert: `digicert`
+- Let's Encrypt: `let's encrypt`
+- Sectigo: `sectigo`
+
+### Default Certificate Authorities
+
+The plugin provides a list of common CAs that can be pre-populated:
+
+- Let's Encrypt (ACME)
+- DigiCert (Public)
+- Sectigo (Public)
+- GlobalSign (Public)
+- And more...
+
+---
+
 ## Certificate
 
 The main model for storing certificate metadata.
@@ -44,6 +100,7 @@ The main model for storing certificate metadata.
 | `serial_number` | CharField(255) | Yes | Certificate serial (hex format) |
 | `fingerprint_sha256` | CharField(95) | Yes | SHA256 fingerprint with colons |
 | `issuer` | CharField(500) | Yes | Issuer Distinguished Name |
+| `issuing_ca` | ForeignKey(CertificateAuthority) | | Link to Certificate Authority |
 | `issuer_chain` | TextField | | Intermediate + root certs (PEM) |
 | `valid_from` | DateTimeField | Yes | Certificate validity start |
 | `valid_to` | DateTimeField | Yes | Certificate validity end |
@@ -136,6 +193,7 @@ Assignments must be unique on `(certificate, assigned_object_type, assigned_obje
 
 | Model | Table Name |
 |-------|------------|
+| CertificateAuthority | `netbox_ssl_certificateauthority` |
 | Certificate | `netbox_ssl_certificate` |
 | CertificateAssignment | `netbox_ssl_certificateassignment` |
 

@@ -5,6 +5,14 @@ from .assignments import (
     CertificateAssignmentListView,
     CertificateAssignmentView,
 )
+from .certificate_authorities import (
+    CertificateAuthorityBulkDeleteView,
+    CertificateAuthorityBulkEditView,
+    CertificateAuthorityDeleteView,
+    CertificateAuthorityEditView,
+    CertificateAuthorityListView,
+    CertificateAuthorityView,
+)
 from .certificates import (
     CertificateBulkDeleteView,
     CertificateBulkEditView,
@@ -26,6 +34,13 @@ __all__ = [
     "CertificateBulkDeleteView",
     "CertificateImportView",
     "CertificateRenewView",
+    # Certificate Authority views
+    "CertificateAuthorityListView",
+    "CertificateAuthorityView",
+    "CertificateAuthorityEditView",
+    "CertificateAuthorityDeleteView",
+    "CertificateAuthorityBulkEditView",
+    "CertificateAuthorityBulkDeleteView",
     # Assignment views
     "CertificateAssignmentListView",
     "CertificateAssignmentView",

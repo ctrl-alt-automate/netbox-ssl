@@ -7,7 +7,8 @@ from rest_framework import serializers
 from tenancy.api.serializers import TenantSerializer
 from tenancy.models import Tenant
 
-from ...models import Certificate, CertificateStatusChoices
+from ...models import Certificate, CertificateAuthority, CertificateStatusChoices
+from .certificate_authorities import CertificateAuthoritySerializer
 from ...utils import CertificateParseError, CertificateParser
 
 
@@ -18,6 +19,7 @@ class CertificateSerializer(NetBoxModelSerializer):
         view_name="plugins-api:netbox_ssl-api:certificate-detail",
     )
     tenant = TenantSerializer(nested=True, required=False, allow_null=True)
+    issuing_ca = CertificateAuthoritySerializer(nested=True, required=False, allow_null=True)
     days_remaining = serializers.IntegerField(read_only=True)
     is_expired = serializers.BooleanField(read_only=True)
     is_expiring_soon = serializers.BooleanField(read_only=True)
@@ -34,6 +36,7 @@ class CertificateSerializer(NetBoxModelSerializer):
             "serial_number",
             "fingerprint_sha256",
             "issuer",
+            "issuing_ca",
             "issuer_chain",
             "valid_from",
             "valid_to",

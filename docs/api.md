@@ -38,6 +38,17 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `POST` | `/certificates/import/` | Import from PEM |
 | `POST` | `/certificates/bulk-import/` | Bulk import from PEM |
 
+### Certificate Authorities
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/certificate-authorities/` | List all CAs |
+| `POST` | `/certificate-authorities/` | Create a CA |
+| `GET` | `/certificate-authorities/{id}/` | Get CA details |
+| `PUT` | `/certificate-authorities/{id}/` | Full update |
+| `PATCH` | `/certificate-authorities/{id}/` | Partial update |
+| `DELETE` | `/certificate-authorities/{id}/` | Delete CA |
+
 ### Assignments
 
 | Method | Endpoint | Description |
@@ -61,6 +72,8 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `status` | Choice | `active` | Filter by status |
 | `tenant_id` | Integer | `1` | Filter by tenant |
 | `issuer` | String | `DigiCert` | Filter by issuer |
+| `issuing_ca_id` | Integer | `1` | Filter by issuing CA |
+| `has_issuing_ca` | Boolean | `true` | Filter by whether CA is set |
 | `valid_to__lt` | DateTime | `2024-06-01` | Expiring before date |
 | `valid_to__gt` | DateTime | `2024-01-01` | Expiring after date |
 | `tag` | String | `production` | Filter by tag slug |
@@ -349,6 +362,40 @@ query {
       id
       common_name
     }
+  }
+}
+```
+
+### Query Certificate Authorities
+
+```graphql
+query {
+  certificate_authority_list {
+    id
+    name
+    type
+    description
+    issuer_pattern
+    website_url
+    portal_url
+    contact_email
+    is_approved
+    certificate_count
+  }
+}
+```
+
+### Single Certificate Authority
+
+```graphql
+query {
+  certificate_authority(id: 1) {
+    name
+    type
+    description
+    issuer_pattern
+    is_approved
+    certificate_count
   }
 }
 ```
