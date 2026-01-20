@@ -101,23 +101,13 @@ class CertificateExporter:
             elif field == "sans":
                 data[field] = certificate.sans or []
             elif field == "valid_from":
-                data[field] = (
-                    certificate.valid_from.isoformat() if certificate.valid_from else None
-                )
+                data[field] = certificate.valid_from.isoformat() if certificate.valid_from else None
             elif field == "valid_to":
-                data[field] = (
-                    certificate.valid_to.isoformat() if certificate.valid_to else None
-                )
+                data[field] = certificate.valid_to.isoformat() if certificate.valid_to else None
             elif field == "created":
-                data[field] = (
-                    certificate.created.isoformat() if certificate.created else None
-                )
+                data[field] = certificate.created.isoformat() if certificate.created else None
             elif field == "last_updated":
-                data[field] = (
-                    certificate.last_updated.isoformat()
-                    if certificate.last_updated
-                    else None
-                )
+                data[field] = certificate.last_updated.isoformat() if certificate.last_updated else None
             elif field == "assignment_count":
                 data[field] = certificate.assignments.count()
             elif field == "days_remaining":
@@ -225,9 +215,7 @@ class CertificateExporter:
             ImportError: If PyYAML is not installed
         """
         if not YAML_AVAILABLE:
-            raise ImportError(
-                "PyYAML is required for YAML export. Install with: pip install pyyaml"
-            )
+            raise ImportError("PyYAML is required for YAML export. Install with: pip install pyyaml")
 
         fields = fields or cls.DEFAULT_FIELDS
         data = []

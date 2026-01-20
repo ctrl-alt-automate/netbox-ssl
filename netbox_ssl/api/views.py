@@ -164,9 +164,7 @@ class CertificateViewSet(NetBoxModelViewSet):
         # Validate format
         valid_formats = [c[0] for c in ExportFormatChoices.get_choices()]
         if export_format.lower() not in valid_formats:
-            raise serializers.ValidationError(
-                {"format": f"Invalid format. Choose from: {valid_formats}"}
-            )
+            raise serializers.ValidationError({"format": f"Invalid format. Choose from: {valid_formats}"})
 
         # Get certificates to export
         if ids:
@@ -174,9 +172,7 @@ class CertificateViewSet(NetBoxModelViewSet):
                 ids = [int(i) for i in ids]
                 certificates = Certificate.objects.filter(pk__in=ids)
             except (ValueError, TypeError):
-                raise serializers.ValidationError(
-                    {"ids": "Invalid certificate IDs. Must be a list of integers."}
-                )
+                raise serializers.ValidationError({"ids": "Invalid certificate IDs. Must be a list of integers."})
         else:
             # Apply filters from query parameters
             certificates = self.filter_queryset(self.get_queryset())
@@ -186,8 +182,10 @@ class CertificateViewSet(NetBoxModelViewSet):
         max_export_size = plugin_settings.get("max_export_size", 1000)
         if certificates.count() > max_export_size:
             raise serializers.ValidationError(
-                {"detail": f"Export size exceeds maximum of {max_export_size} certificates. "
-                          "Use filters or specify IDs to reduce the result set."}
+                {
+                    "detail": f"Export size exceeds maximum of {max_export_size} certificates. "
+                    "Use filters or specify IDs to reduce the result set."
+                }
             )
 
         # Parse fields if provided
@@ -209,9 +207,7 @@ class CertificateViewSet(NetBoxModelViewSet):
         except ImportError as e:
             raise serializers.ValidationError({"detail": str(e)})
         except Exception as e:
-            raise serializers.ValidationError(
-                {"detail": f"Export failed: {str(e)}"}
-            )
+            raise serializers.ValidationError({"detail": f"Export failed: {str(e)}"})
 
         # Get content type and extension
         content_type = CertificateExporter.get_content_type(export_format)
@@ -243,9 +239,7 @@ class CertificateViewSet(NetBoxModelViewSet):
         # Validate format
         valid_formats = [c[0] for c in ExportFormatChoices.get_choices()]
         if export_format.lower() not in valid_formats:
-            raise serializers.ValidationError(
-                {"format": f"Invalid format. Choose from: {valid_formats}"}
-            )
+            raise serializers.ValidationError({"format": f"Invalid format. Choose from: {valid_formats}"})
 
         try:
             content = CertificateExporter.export(

@@ -175,11 +175,13 @@ class TestCSVExport:
         writer.writeheader()
 
         for cert in certs:
-            writer.writerow({
-                "id": cert.id,
-                "common_name": cert.common_name,
-                "status": cert.status,
-            })
+            writer.writerow(
+                {
+                    "id": cert.id,
+                    "common_name": cert.common_name,
+                    "status": cert.status,
+                }
+            )
 
         csv_content = output.getvalue()
 
@@ -224,11 +226,13 @@ class TestJSONExport:
         """Test basic JSON export."""
         cert = MockCertificate()
 
-        data = [{
-            "id": cert.id,
-            "common_name": cert.common_name,
-            "sans": cert.sans,
-        }]
+        data = [
+            {
+                "id": cert.id,
+                "common_name": cert.common_name,
+                "sans": cert.sans,
+            }
+        ]
 
         json_content = json.dumps(data, indent=2)
 
@@ -475,14 +479,11 @@ class TestExportIntegrationScenarios:
         certs = [
             MockCertificate(id=1, valid_to=now + timedelta(days=10)),  # Expiring soon
             MockCertificate(id=2, valid_to=now + timedelta(days=60)),  # Not expiring soon
-            MockCertificate(id=3, valid_to=now - timedelta(days=5)),   # Already expired
+            MockCertificate(id=3, valid_to=now - timedelta(days=5)),  # Already expired
         ]
 
         threshold_days = 30
-        expiring_certs = [
-            c for c in certs
-            if c.valid_to and (c.valid_to - now).days <= threshold_days
-        ]
+        expiring_certs = [c for c in certs if c.valid_to and (c.valid_to - now).days <= threshold_days]
 
         # Should include cert 1 (10 days) and cert 3 (-5 days)
         assert len(expiring_certs) == 2
