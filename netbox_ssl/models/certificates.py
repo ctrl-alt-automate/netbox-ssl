@@ -282,7 +282,7 @@ class Certificate(NetBoxModel):
         Returns:
             ChainValidationResult with detailed validation information
         """
-        from ..utils import ChainValidator, ChainValidationStatus
+        from ..utils import ChainValidationStatus, ChainValidator
 
         if not self.pem_content:
             self.chain_status = ChainStatusChoices.STATUS_UNKNOWN

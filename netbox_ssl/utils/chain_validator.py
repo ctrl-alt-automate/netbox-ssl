@@ -11,7 +11,7 @@ from enum import Enum
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding, rsa, ec, ed25519
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519, padding, rsa
 
 
 class ChainValidationStatus(str, Enum):
