@@ -112,10 +112,7 @@ class CSRImportSerializer(serializers.Serializer):
 
         if existing:
             raise serializers.ValidationError(
-                {
-                    "pem_content": f"CSR already exists: {existing.common_name} "
-                    f"(ID: {existing.pk})"
-                }
+                {"pem_content": f"CSR already exists: {existing.common_name} (ID: {existing.pk})"}
             )
 
         return data

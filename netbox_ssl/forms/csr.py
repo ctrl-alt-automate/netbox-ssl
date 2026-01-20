@@ -106,9 +106,7 @@ class CSRImportForm(forms.Form):
             }
         ),
         label=_("CSR (PEM format)"),
-        help_text=_(
-            "Paste your Certificate Signing Request in PEM format."
-        ),
+        help_text=_("Paste your Certificate Signing Request in PEM format."),
     )
 
     requested_by = forms.CharField(

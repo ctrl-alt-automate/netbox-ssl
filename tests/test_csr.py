@@ -96,9 +96,9 @@ class TestCSRExtraction:
     @pytest.mark.unit
     def test_extract_new_csr_format(self):
         """Test extraction of 'NEW CERTIFICATE REQUEST' format."""
-        new_csr = TEST_CSR_PEM.replace(
-            "BEGIN CERTIFICATE REQUEST", "BEGIN NEW CERTIFICATE REQUEST"
-        ).replace("END CERTIFICATE REQUEST", "END NEW CERTIFICATE REQUEST")
+        new_csr = TEST_CSR_PEM.replace("BEGIN CERTIFICATE REQUEST", "BEGIN NEW CERTIFICATE REQUEST").replace(
+            "END CERTIFICATE REQUEST", "END NEW CERTIFICATE REQUEST"
+        )
         csr = CSRParser.extract_csr(new_csr)
         assert csr is not None
         assert "BEGIN NEW CERTIFICATE REQUEST" in csr
