@@ -13,13 +13,16 @@ from ..filtersets import (
     CertificateAssignmentFilterSet,
     CertificateAuthorityFilterSet,
     CertificateFilterSet,
+    CertificateSigningRequestFilterSet,
 )
-from ..models import Certificate, CertificateAssignment, CertificateAuthority
+from ..models import Certificate, CertificateAssignment, CertificateAuthority, CertificateSigningRequest
 from .serializers import (
     CertificateAssignmentSerializer,
     CertificateAuthoritySerializer,
     CertificateImportSerializer,
     CertificateSerializer,
+    CertificateSigningRequestSerializer,
+    CSRImportSerializer,
 )
 
 
@@ -152,3 +155,30 @@ class CertificateAuthorityViewSet(NetBoxModelViewSet):
     )
     serializer_class = CertificateAuthoritySerializer
     filterset_class = CertificateAuthorityFilterSet
+
+
+class CertificateSigningRequestViewSet(NetBoxModelViewSet):
+    """API viewset for CertificateSigningRequest model."""
+
+    queryset = CertificateSigningRequest.objects.prefetch_related(
+        "tenant",
+        "resulting_certificate",
+        "tags",
+    )
+    serializer_class = CertificateSigningRequestSerializer
+    filterset_class = CertificateSigningRequestFilterSet
+
+    @action(detail=False, methods=["post"], url_path="import")
+    def import_csr(self, request):
+        """
+        Import a CSR from PEM content.
+
+        Accepts raw PEM content and automatically parses all CSR attributes.
+        """
+        serializer = CSRImportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        csr = serializer.save()
+
+        # Return the created CSR using the standard serializer
+        output_serializer = CertificateSigningRequestSerializer(csr, context={"request": request})
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)

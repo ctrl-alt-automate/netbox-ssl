@@ -20,6 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Filter certificates by issuing CA
   - Navigation menu item under "Management" group
 
+- **Certificate Signing Request (CSR) Tracking** ([#12](https://github.com/ctrl-alt-automate/netbox-ssl/issues/12)):
+  - New `CertificateSigningRequest` model for tracking pending certificate requests
+  - Full subject field support: CN, O, OU, L, ST, C
+  - Subject Alternative Names (SANs) parsing from CSR extensions
+  - Key information extraction: algorithm and key size
+  - SHA256 fingerprint calculation for duplicate detection
+  - Status tracking: Pending, Approved, Rejected, Issued, Expired
+  - Link to resulting certificate when issued
+  - Smart Paste import via web UI
+  - REST API endpoints: CRUD + `/csrs/import/`
+  - GraphQL query support
+  - Multi-tenancy support
+
 ## [0.2.0] - 2025-01-20
 
 ### Added

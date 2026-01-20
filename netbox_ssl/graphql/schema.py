@@ -5,7 +5,12 @@ GraphQL schema for NetBox SSL plugin.
 import strawberry
 import strawberry_django
 
-from .types import CertificateAssignmentType, CertificateAuthorityType, CertificateType
+from .types import (
+    CertificateAssignmentType,
+    CertificateAuthorityType,
+    CertificateSigningRequestType,
+    CertificateType,
+)
 
 
 @strawberry.type(name="Query")
@@ -47,6 +52,18 @@ class NetBoxSSLQuery:
         from ..models import CertificateAuthority
 
         return CertificateAuthority.objects.all()
+
+    @strawberry_django.field
+    def certificate_signing_request(self, id: int) -> CertificateSigningRequestType:
+        from ..models import CertificateSigningRequest
+
+        return CertificateSigningRequest.objects.get(pk=id)
+
+    @strawberry_django.field
+    def certificate_signing_request_list(self) -> list[CertificateSigningRequestType]:
+        from ..models import CertificateSigningRequest
+
+        return CertificateSigningRequest.objects.all()
 
 
 schema = [NetBoxSSLQuery]
