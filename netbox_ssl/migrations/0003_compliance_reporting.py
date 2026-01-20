@@ -5,8 +5,8 @@ Adds CompliancePolicy and ComplianceCheck models for certificate compliance trac
 """
 
 import django.db.models.deletion
-from django.db import migrations, models
 import django.utils.timezone
+from django.db import migrations, models
 
 
 class Migration(migrations.Migration):

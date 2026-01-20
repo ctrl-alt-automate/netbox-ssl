@@ -6,10 +6,8 @@ certificates based on defined compliance policies.
 """
 
 from dataclasses import dataclass
-from datetime import date
-from typing import Optional
 
-from django.utils import timezone
+from django.db.models import Q
 
 
 @dataclass
@@ -369,7 +367,7 @@ class ComplianceChecker:
 
             if certificate.tenant:
                 # Include global policies (no tenant) and tenant-specific policies
-                policies = policies.filter(models.Q(tenant__isnull=True) | models.Q(tenant=certificate.tenant))
+                policies = policies.filter(Q(tenant__isnull=True) | Q(tenant=certificate.tenant))
             else:
                 # Only include global policies for certificates without tenant
                 policies = policies.filter(tenant__isnull=True)
@@ -398,10 +396,7 @@ class ComplianceChecker:
         saved_checks = []
         for policy, result in results:
             # Determine result status
-            if result.passed:
-                status = ComplianceResultChoices.RESULT_PASS
-            else:
-                status = ComplianceResultChoices.RESULT_FAIL
+            status = ComplianceResultChoices.RESULT_PASS if result.passed else ComplianceResultChoices.RESULT_FAIL
 
             # Update or create the check record
             check, created = ComplianceCheck.objects.update_or_create(

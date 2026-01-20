@@ -9,7 +9,6 @@ from tenancy.api.serializers import TenantSerializer
 from ...models import (
     ComplianceCheck,
     CompliancePolicy,
-    ComplianceResultChoices,
 )
 
 

@@ -154,10 +154,11 @@ class CertificateViewSet(NetBoxModelViewSet):
 
         # Get policies to check
         policy_ids = serializer.validated_data.get("policy_ids")
-        if policy_ids:
-            policies = CompliancePolicy.objects.filter(pk__in=policy_ids, enabled=True)
-        else:
-            policies = None  # Will use all enabled policies
+        policies = (
+            CompliancePolicy.objects.filter(pk__in=policy_ids, enabled=True)
+            if policy_ids
+            else None  # Will use all enabled policies
+        )
 
         # Run compliance checks
         results = ComplianceChecker.run_all_checks(certificate, policies)
@@ -218,10 +219,7 @@ class CertificateViewSet(NetBoxModelViewSet):
         missing_ids = set(certificate_ids) - found_ids
 
         # Get policies
-        if policy_ids:
-            policies = CompliancePolicy.objects.filter(pk__in=policy_ids, enabled=True)
-        else:
-            policies = None
+        policies = CompliancePolicy.objects.filter(pk__in=policy_ids, enabled=True) if policy_ids else None
 
         # Run checks for each certificate
         results_summary = {
