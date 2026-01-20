@@ -213,13 +213,19 @@ class CertificateViewSet(NetBoxModelViewSet):
                 {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
             )
 
-        # Get certificates
-        certificates = Certificate.objects.filter(pk__in=certificate_ids)
+        # Get certificates with tenant prefetched to avoid N+1 queries
+        certificates = Certificate.objects.filter(pk__in=certificate_ids).select_related("tenant")
         found_ids = set(certificates.values_list("pk", flat=True))
         missing_ids = set(certificate_ids) - found_ids
 
-        # Get policies
-        policies = CompliancePolicy.objects.filter(pk__in=policy_ids, enabled=True) if policy_ids else None
+        # Get base policies queryset - fetch once, filter by tenant per certificate in run_all_checks
+        if policy_ids:
+            base_policies = CompliancePolicy.objects.filter(pk__in=policy_ids, enabled=True)
+        else:
+            base_policies = CompliancePolicy.objects.filter(enabled=True)
+
+        # Prefetch all policies to avoid N+1 queries
+        policies_list = list(base_policies)
 
         # Run checks for each certificate
         results_summary = {
@@ -232,7 +238,13 @@ class CertificateViewSet(NetBoxModelViewSet):
         }
 
         for certificate in certificates:
-            results = ComplianceChecker.run_all_checks(certificate, policies)
+            # Filter policies by tenant in Python to avoid N+1 queries
+            if certificate.tenant:
+                cert_policies = [p for p in policies_list if p.tenant is None or p.tenant_id == certificate.tenant_id]
+            else:
+                cert_policies = [p for p in policies_list if p.tenant is None]
+
+            results = ComplianceChecker.run_all_checks(certificate, cert_policies)
             saved_checks = ComplianceChecker.save_check_results(certificate, results)
 
             total = len(saved_checks)
