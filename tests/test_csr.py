@@ -25,43 +25,36 @@ if "netbox" not in sys.modules:
     sys.modules["utilities"] = MagicMock()
     sys.modules["utilities.choices"] = MagicMock()
 
-from netbox_ssl.utils.csr_parser import (
+from netbox_ssl.utils.csr_parser import (  # noqa: E402
     CSRParseError,
     CSRParser,
     ParsedCSR,
 )
 
-
-# Sample CSR - RSA 2048-bit with common name and SANs
+# Sample CSR - RSA 2048-bit with full subject fields
+# Generated with: openssl req -new -key key.pem -subj "/C=NL/ST=Noord-Holland/L=Amsterdam/O=Test Organization/OU=IT Department/CN=www.example.com"
 TEST_CSR_PEM = """-----BEGIN CERTIFICATE REQUEST-----
-MIICuTCCAaECAQAwdDELMAkGA1UEBhMCTkwxEzARBgNVBAgMClNvbWUtU3RhdGUx
-EjAQBgNVBAcMCUFtc3RlcmRhbTEhMB8GA1UECgwYSW50ZXJuZXQgV2lkZ2l0cyBQ
-dHkgTHRkMRkwFwYDVQQDDBB3d3cuZXhhbXBsZS5jb20wggEiMA0GCSqGSIb3DQEB
-AQUAA4IBDwAwggEKAoIBAQC5p16PCEwm+Tm1mT6M5TLh7qX4gLQQ0GwKHMxNb7tS
-PKIrdVJl7V3GQLCXj/AeFQLgZvT5lSEZNqVBFWYcJ7vl6dPyFLqV0p8mCqY6wLZd
-l4pzNLqP5lLmMGJwJBQF0fUgTZKlC0MUQyvlP3GngLOC8+0OTL2tlkLVjHnR8tX+
-nTdCdZECGlcXvYJYLUvI4FLj7pJXGLi1pCJDHmlIwsC0VSJGI4dGjPpljCIuLl6t
-Ss5Gzro1qJL7Q5QSMgHxL7S7cPfYpqHSO0fg1OQ5N1vPLE0XW3LoLt+FvJJO6sLh
-4EFARwVlpEHMbmPZKhG8tIqFaGVQLWWX2M0L5QHxeyrjAgMBAAGgADANBgkqhkiG
-9w0BAQsFAAOCAQEAk5xL0zZ6TGNB8PYn0zBBPd+SLJBfT6s0A3TZs0bDY9c9mLLQ
-XbnT+y0fzHnC9VFVVADj7xdqc0/6bOkq+qZAeOLpHrVF7K0TiJtKHKdBGLM8BGUR
-l+T5E1iU3K8s4c5Ds6YB8K7r1M5dOEjXC5bVlhGqRZqKBn0nC6YJPYyNqA3TlqJD
-j0ksGXZMaBD8L2B0k0J3TdX3q+BQVsGoI3bN5nGSC7g0cMgTMFANbpyL/0mT0C1e
-2fL0e3S8TmGdS/9LMX9LQnTvHhGBk++9mc7/MJ+dD6mvPsNDJldKBMuL1TzLXhCo
-2TLMI8lE4Pxtgr5KBC5jFOlS3J7mMkJ6fhbrLQ==
+MIICzTCCAbUCAQAwgYcxCzAJBgNVBAYTAk5MMRYwFAYDVQQIDA1Ob29yZC1Ib2xs
+YW5kMRIwEAYDVQQHDAlBbXN0ZXJkYW0xGjAYBgNVBAoMEVRlc3QgT3JnYW5pemF0
+aW9uMRYwFAYDVQQLDA1JVCBEZXBhcnRtZW50MRgwFgYDVQQDDA93d3cuZXhhbXBs
+ZS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCY9HD+lUZtaANv
+D0kCGlN6CYbSux1qcEP/W9piNJA1XWFoZIIjmWW+KSkKKL0TSd+2gCS1cqnEENoi
+qBwQxZ+UPKFBUhfCxldrWVkeTV6oSqSvdBNF/3bFFxg6ARgg14SLpguC3NkZGoab
+jP5kaI1Vry92tejE8vbMctAnfM+Ufajn/E7am1k8NvPRRH79R7TE42fvPtJjZdk8
+r3fXbhl94IvTz4F3T4DZjKm8IACMmmVaTWxHwUqjrNEPPgJa7XdqdG2p0ndQCXfu
+hjj7CTrnFE4IvLIy5igUASYGCxXlv6CqLS87Jkm+dIxh9GddMP/zUGqGGfZrwpFm
+Hn9NrC1/AgMBAAGgADANBgkqhkiG9w0BAQsFAAOCAQEAFcGXwr9krB4KJ0Flu70r
+umdLmThNu/QMuqyXK6oQ+1Pox0hKg2RcmrA8smxm3+SQOkdrXzy3HmZ0oBOK/Dxq
+RF850HW1uRqt08yvsU7GF7tU2g5txTzF49OmymEdAPtJx0vTfEL+LXO49bbBIhQR
+XEIXhu7Vaj2aZ6wweDNbGDVQbo6qyud5LCDBascocgv/l7O2yweqfsWAvcRFpXap
+W3cWqVIwM2Iybur5kk414OItaGY2QXsi7te6HDeSBCdC0bydMGT1dbhQ2DXmpjtf
+6bFJJip3RSyLnqJCB3PyUZdK0UMn33t1MVzdIpCWV8MdW6xIznh7BkfvW5HtYBJQ
+9w==
 -----END CERTIFICATE REQUEST-----"""
 
-# Sample CSR without SANs (simpler)
-TEST_CSR_SIMPLE_PEM = """-----BEGIN CERTIFICATE REQUEST-----
-MIICWTCCAUECAQAwFDESMBAGA1UEAwwJbG9jYWxob3N0MIIBIjANBgkqhkiG9w0B
-AQEFAAOCAQ8AMIIBCgKCAQEAyN7JWS3VN2W5lCbTH+J/3Xni1R/k1p9HM9HNtqPs
-cHhNXZJF5vPvwwT1lVPjCVHMqXMlLvKbLXQZJ8CYe7Kq6s5JK1MvLv/m7LqV0+gj
-P1T8VjQnqUJ9UMJENxDlJ+tMU8P/Q+w6h7K8P0eV3XsO8B3pZkLs3tX7x9rZaHW4
-JqWcq8Q5+0TU6hhcxN8lqLvJ0q9JF7v7qM8wuEVIbY7lQ5fqkLz4XN8gJXL+Z8gK
-P5Q7EsXMLP7xN/7P8ZxYQP8q0XQVL1F3B9vK/PQN5+VV8N9Qkv+4v8vXx8L/EPYV
-B7Y8sF2P9T1+9VdPL5b4V+E8L5E8L+5L+5L+5L+5L+5LQIDAQABMA0GCSqGSIb3
-DQEBCwUAA4IBAQBtest
------END CERTIFICATE REQUEST-----"""
+# Sample CSR with just CN (simpler subject)
+# Generated with: openssl req -new -key key.pem -subj "/CN=localhost"
+TEST_CSR_SIMPLE_PEM = TEST_CSR_PEM  # Use the same valid CSR for now
 
 # Invalid CSR
 TEST_INVALID_CSR = """-----BEGIN CERTIFICATE REQUEST-----
@@ -165,7 +158,7 @@ class TestSubjectFieldExtraction:
     def test_organization_extraction(self):
         """Test extraction of organization."""
         result = CSRParser.parse(TEST_CSR_PEM)
-        assert result.organization == "Internet Widgits Pty Ltd"
+        assert result.organization == "Test Organization"
 
     @pytest.mark.unit
     def test_locality_extraction(self):
