@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-01-20
+
+### Added
+
+- **REST API Import Endpoint** ([#2](https://github.com/ctrl-alt-automate/netbox-ssl/issues/2)):
+  - `POST /api/plugins/netbox-ssl/certificates/import/` endpoint
+  - PEM certificate parsing with automatic metadata extraction
+  - Private key detection and rejection for security
+  - Duplicate certificate detection (serial + issuer)
+  - Optional tenant assignment during import
+
+- **GIN Index for SANs Field** ([#3](https://github.com/ctrl-alt-automate/netbox-ssl/issues/3)):
+  - PostgreSQL GIN index on Certificate.sans field
+  - Optimized array containment queries (`sans__contains`)
+  - Uses `AddIndexConcurrently` for zero-downtime deployment
+
+- **Certificate Expiry Notification Script** ([#4](https://github.com/ctrl-alt-automate/netbox-ssl/issues/4)):
+  - Custom script for automated expiry monitoring
+  - Configurable warning/critical day thresholds
+  - Optional tenant filtering
+  - Structured JSON output for webhook integration
+  - Documentation with scheduling examples (NetBox Jobs, cron)
+
+### Changed
+
+- Improved database query performance for certificate categorization
+
 ## [0.1.0] - 2025-01-19
 
 Initial release of NetBox SSL Plugin.
@@ -74,5 +101,6 @@ Initial release of NetBox SSL Plugin.
 - NetBox 4.4.0 - 4.5.x
 - Python 3.10+
 
-[Unreleased]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ctrl-alt-automate/netbox-ssl/releases/tag/v0.1.0
