@@ -8,6 +8,7 @@ assigned to multiple services, devices, or virtual machines.
 from datetime import date
 
 from django.contrib.postgres.fields import ArrayField
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
@@ -156,6 +157,9 @@ class Certificate(NetBoxModel):
                 fields=["serial_number", "issuer"],
                 name="unique_serial_issuer",
             ),
+        ]
+        indexes = [
+            GinIndex(fields=["sans"], name="netbox_ssl_cert_sans_gin"),
         ]
 
     def __str__(self):
