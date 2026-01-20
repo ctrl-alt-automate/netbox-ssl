@@ -4,7 +4,6 @@ Views for CertificateSigningRequest model.
 
 from django.contrib import messages
 from django.shortcuts import redirect, render
-from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 from netbox.views import generic
