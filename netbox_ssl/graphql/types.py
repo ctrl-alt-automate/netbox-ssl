@@ -92,13 +92,23 @@ class CertificateSigningRequestType(NetBoxObjectType):
     requested_by: str
     target_ca: str
     notes: str
-
-    @strawberry_django.field
-    def resulting_certificate(self) -> CertificateType | None:
-        if self.resulting_certificate:
-            return self.resulting_certificate
-        return None
+    # resulting_certificate is auto-resolved by strawberry_django from the ForeignKey
+    resulting_certificate: Annotated["CertificateType", strawberry.lazy(".types")] | None
 
     @strawberry_django.field
     def subject_string(self) -> str:
-        return self.subject_string
+        """Build a subject string from the CSR fields."""
+        parts = []
+        if self.common_name:
+            parts.append(f"CN={self.common_name}")
+        if self.organization:
+            parts.append(f"O={self.organization}")
+        if self.organizational_unit:
+            parts.append(f"OU={self.organizational_unit}")
+        if self.locality:
+            parts.append(f"L={self.locality}")
+        if self.state:
+            parts.append(f"ST={self.state}")
+        if self.country:
+            parts.append(f"C={self.country}")
+        return ", ".join(parts) if parts else ""

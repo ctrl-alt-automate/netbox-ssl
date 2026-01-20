@@ -101,10 +101,8 @@ class CSRImportSerializer(serializers.Serializer):
         if not pem_content:
             return data
 
-        try:
-            parsed = CSRParser.parse(pem_content)
-        except CSRParseError:
-            return data
+        # validate_pem_content already validated the PEM, so this will succeed
+        parsed = CSRParser.parse(pem_content)
 
         existing = CertificateSigningRequest.objects.filter(
             fingerprint_sha256=parsed.fingerprint_sha256,
