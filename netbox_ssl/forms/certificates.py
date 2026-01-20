@@ -11,7 +11,12 @@ from tenancy.models import Tenant
 from utilities.forms.fields import CommentField, DynamicModelChoiceField, TagFilterField
 from utilities.forms.rendering import FieldSet
 
-from ..models import Certificate, CertificateAlgorithmChoices, CertificateStatusChoices
+from ..models import (
+    Certificate,
+    CertificateAlgorithmChoices,
+    CertificateAuthority,
+    CertificateStatusChoices,
+)
 
 
 class CertificateForm(NetBoxModelForm):
@@ -20,6 +25,11 @@ class CertificateForm(NetBoxModelForm):
     tenant = DynamicModelChoiceField(
         queryset=Tenant.objects.all(),
         required=False,
+    )
+    issuing_ca = DynamicModelChoiceField(
+        queryset=CertificateAuthority.objects.all(),
+        required=False,
+        label=_("Issuing CA"),
     )
     comments = CommentField()
 
@@ -34,6 +44,7 @@ class CertificateForm(NetBoxModelForm):
             "serial_number",
             "fingerprint_sha256",
             "issuer",
+            "issuing_ca",
             name=_("Identity"),
         ),
         FieldSet(
@@ -68,6 +79,7 @@ class CertificateForm(NetBoxModelForm):
             "serial_number",
             "fingerprint_sha256",
             "issuer",
+            "issuing_ca",
             "issuer_chain",
             "valid_from",
             "valid_to",
@@ -176,6 +188,7 @@ class CertificateFilterForm(NetBoxModelFilterSetForm):
         FieldSet(
             "common_name",
             "issuer",
+            "issuing_ca_id",
             "status",
             name=_("Certificate"),
         ),
@@ -197,6 +210,11 @@ class CertificateFilterForm(NetBoxModelFilterSetForm):
     issuer = forms.CharField(
         required=False,
         label=_("Issuer"),
+    )
+    issuing_ca_id = DynamicModelChoiceField(
+        queryset=CertificateAuthority.objects.all(),
+        required=False,
+        label=_("Issuing CA"),
     )
     status = forms.MultipleChoiceField(
         choices=CertificateStatusChoices,
@@ -235,6 +253,11 @@ class CertificateBulkEditForm(NetBoxModelBulkEditForm):
         required=False,
         label=_("Tenant"),
     )
+    issuing_ca = DynamicModelChoiceField(
+        queryset=CertificateAuthority.objects.all(),
+        required=False,
+        label=_("Issuing CA"),
+    )
     private_key_location = forms.CharField(
         max_length=512,
         required=False,
@@ -245,8 +268,9 @@ class CertificateBulkEditForm(NetBoxModelBulkEditForm):
         FieldSet(
             "status",
             "tenant",
+            "issuing_ca",
             "private_key_location",
         ),
     )
 
-    nullable_fields = ["tenant", "private_key_location"]
+    nullable_fields = ["tenant", "issuing_ca", "private_key_location"]

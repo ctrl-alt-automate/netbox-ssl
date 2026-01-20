@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Certificate Authority Tracking** ([#13](https://github.com/ctrl-alt-automate/netbox-ssl/issues/13)):
+  - New `CertificateAuthority` model for tracking CAs
+  - CA types: Public, Internal/Private, ACME/Let's Encrypt
+  - Auto-detection of issuing CA based on issuer patterns
+  - `issuing_ca` foreign key on Certificate model
+  - Pre-defined list of common CAs (DigiCert, Let's Encrypt, Sectigo, etc.)
+  - Full REST API and GraphQL support for CAs
+  - CA management views (list, detail, add, edit, delete)
+  - Filter certificates by issuing CA
+  - Navigation menu item under "Management" group
+
 - **Certificate Signing Request (CSR) Tracking** ([#12](https://github.com/ctrl-alt-automate/netbox-ssl/issues/12)):
   - New `CertificateSigningRequest` model for tracking pending certificate requests
   - Full subject field support: CN, O, OU, L, ST, C
