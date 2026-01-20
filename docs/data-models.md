@@ -125,6 +125,11 @@ The main model for storing certificate metadata.
 | `private_key_location` | CharField(500) | | Hint for key storage location |
 | `replaced_by` | ForeignKey(self) | | Link to replacement certificate |
 | `tenant` | ForeignKey(Tenant) | | Optional tenant for isolation |
+| `pem_content` | TextField | | Certificate in PEM format |
+| `chain_status` | CharField(20) | | Chain validation status |
+| `chain_validation_message` | TextField | | Detailed validation message |
+| `chain_validated_at` | DateTimeField | | When chain was last validated |
+| `chain_depth` | IntegerField | | Number of certificates in chain |
 | `comments` | TextField | | User notes |
 | `tags` | ManyToMany(Tag) | | NetBox tags |
 
@@ -146,6 +151,16 @@ The main model for storing certificate metadata.
 | `ecdsa` | ECDSA | Elliptic curve, key_size = curve bits |
 | `ed25519` | Ed25519 | Modern curve, key_size = null |
 
+### Chain Status Choices
+
+| Value | Label | Color | Description |
+|-------|-------|-------|-------------|
+| `unknown` | Unknown | Gray | Chain not yet validated |
+| `valid` | Valid | Green | Chain is complete and valid |
+| `invalid` | Invalid | Red | Chain validation failed |
+| `self_signed` | Self-Signed | Blue | Certificate is self-signed |
+| `no_chain` | No Chain | Yellow | Chain required but not provided |
+
 ### Computed Properties
 
 These properties are calculated dynamically:
@@ -158,6 +173,8 @@ These properties are calculated dynamically:
 | `is_expiring_soon` | bool | True if within warning threshold |
 | `is_critical` | bool | True if within critical threshold |
 | `expiry_status` | str | One of: `ok`, `warning`, `critical`, `expired` |
+| `chain_is_valid` | bool | True if chain validation passed |
+| `chain_needs_validation` | bool | True if chain status is unknown |
 
 ### Unique Constraint
 

@@ -1,3 +1,9 @@
+from .chain_validator import (
+    ChainValidationError,
+    ChainValidationResult,
+    ChainValidationStatus,
+    ChainValidator,
+)
 from .compliance_checker import CheckResult, ComplianceChecker
 from .csr_parser import CSRParseError, CSRParser
 from .export import CertificateExporter, ExportFormatChoices
@@ -13,4 +19,8 @@ __all__ = [
     "CheckResult",
     "CertificateExporter",
     "ExportFormatChoices",
+    "ChainValidator",
+    "ChainValidationResult",
+    "ChainValidationStatus",
+    "ChainValidationError",
 ]

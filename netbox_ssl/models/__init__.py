@@ -4,7 +4,12 @@ from .certificate_authorities import (
     CATypeChoices,
     CertificateAuthority,
 )
-from .certificates import Certificate, CertificateAlgorithmChoices, CertificateStatusChoices
+from .certificates import (
+    Certificate,
+    CertificateAlgorithmChoices,
+    CertificateStatusChoices,
+    ChainStatusChoices,
+)
 from .compliance import (
     ComplianceCheck,
     CompliancePolicy,
@@ -18,6 +23,7 @@ __all__ = [
     "Certificate",
     "CertificateStatusChoices",
     "CertificateAlgorithmChoices",
+    "ChainStatusChoices",
     "CertificateAssignment",
     "CertificateAuthority",
     "CATypeChoices",

@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Certificate Chain Validation** ([#16](https://github.com/ctrl-alt-automate/netbox-ssl/issues/16)):
+  - New `ChainValidator` utility for validating certificate chains
+  - Verifies chain completeness and signature validity
+  - Checks certificate validity periods (not expired, not yet valid)
+  - Detects self-signed certificates
+  - New Certificate fields: `chain_status`, `chain_validation_message`, `chain_validated_at`, `chain_depth`
+  - REST API endpoints:
+    - `POST /certificates/{id}/validate-chain/` - Single certificate validation
+    - `POST /certificates/bulk-validate-chain/` - Bulk validation
+  - Computed properties: `chain_is_valid`, `chain_needs_validation`
+  - Unit tests for chain validation
+
 - **Data Export Formats** ([#15](https://github.com/ctrl-alt-automate/netbox-ssl/issues/15)):
   - Multi-format certificate export: CSV, JSON, YAML, PEM
   - Bulk export endpoint: `GET/POST /api/plugins/netbox-ssl/certificates/export/`
