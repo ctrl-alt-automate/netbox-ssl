@@ -188,8 +188,8 @@ class CertificateViewSet(NetBoxModelViewSet):
                 {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
             )
 
-        certificates = Certificate.objects.filter(pk__in=ids)
-        found_ids = set(certificates.values_list("pk", flat=True))
+        certificates = list(Certificate.objects.filter(pk__in=ids))
+        found_ids = {cert.pk for cert in certificates}
         missing_ids = set(ids) - found_ids
 
         results = {
@@ -201,12 +201,16 @@ class CertificateViewSet(NetBoxModelViewSet):
             "detections": [],
         }
 
+        # Collect certificates that need updating (avoid N+1 queries)
+        certs_to_update = []
+
         for certificate in certificates:
-            result = certificate.auto_detect_acme(save=True)
+            result = certificate.auto_detect_acme(save=False)
             results["processed"] += 1
 
             if result:
-                is_acme, provider = result
+                _, provider = result
+                certs_to_update.append(certificate)
                 results["detected_acme"] += 1
                 results["detections"].append(
                     {
@@ -225,6 +229,10 @@ class CertificateViewSet(NetBoxModelViewSet):
                         "detected": False,
                     }
                 )
+
+        # Bulk update all detected certificates in a single query
+        if certs_to_update:
+            Certificate.objects.bulk_update(certs_to_update, ["is_acme", "acme_provider"])
 
         return Response(results, status=status.HTTP_200_OK)
 

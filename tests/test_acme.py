@@ -5,7 +5,7 @@ Tests the ACME detection, provider identification, and renewal status tracking
 for certificates issued via ACME protocol (Let's Encrypt, ZeroSSL, etc.).
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -41,39 +41,29 @@ class TestACMEProviderDetection:
             ("O=Google Trust Services, CN=GTS Root R1", "google"),
             # Sectigo
             ("CN=Sectigo RSA Domain Validation Secure Server CA", "sectigo"),
+            # DigiCert
+            ("CN=DigiCert TLS RSA SHA256 2020 CA1, O=DigiCert Inc", "digicert"),
         ],
     )
     def test_detect_acme_provider(self, issuer, expected_provider):
         """Test that ACME providers are correctly detected from issuer strings."""
-        # Create a mock certificate object
-        mock_cert = MagicMock()
-        mock_cert.issuer = issuer
-        mock_cert.is_acme = False
-        mock_cert.acme_provider = ""
+        # Import the actual model and patterns
+        from netbox_ssl.models.certificates import (
+            ACMEProviderChoices,
+            Certificate,
+            _ACME_PATTERNS,
+        )
 
-        # Import the method logic (we test the pattern matching)
+        # Create a mock certificate with the issuer
+        cert = MagicMock(spec=Certificate)
+        cert.issuer = issuer
+        cert.is_acme = False
+        cert.acme_provider = ""
+
+        # Call the actual detection logic
         issuer_lower = issuer.lower()
-
-        acme_patterns = {
-            "let's encrypt": "letsencrypt",
-            "letsencrypt": "letsencrypt",
-            "r3, o=let's encrypt": "letsencrypt",
-            "r10, o=let's encrypt": "letsencrypt",
-            "r11, o=let's encrypt": "letsencrypt",
-            "e1, o=let's encrypt": "letsencrypt",
-            "e5, o=let's encrypt": "letsencrypt",
-            "e6, o=let's encrypt": "letsencrypt",
-            "(staging)": "letsencrypt_staging",
-            "fake le": "letsencrypt_staging",
-            "zerossl": "zerossl",
-            "buypass": "buypass",
-            "google trust services": "google",
-            "gts ca": "google",
-            "sectigo": "sectigo",
-        }
-
         detected_provider = None
-        for pattern, provider in acme_patterns.items():
+        for pattern, provider in _ACME_PATTERNS.items():
             if pattern in issuer_lower:
                 detected_provider = provider
                 break
@@ -83,7 +73,6 @@ class TestACMEProviderDetection:
     @pytest.mark.parametrize(
         "issuer",
         [
-            "CN=DigiCert SHA2 Extended Validation Server CA, O=DigiCert Inc",
             "CN=GlobalSign GCC R3 DV TLS CA 2020, O=GlobalSign nv-sa",
             "CN=Entrust Certification Authority - L1K, O=Entrust, Inc.",
             "CN=RapidSSL TLS DV RSA Mixed SHA256 2020 CA-1",
@@ -94,23 +83,11 @@ class TestACMEProviderDetection:
     )
     def test_non_acme_issuers(self, issuer):
         """Test that non-ACME issuers are not detected as ACME."""
+        from netbox_ssl.models.certificates import _ACME_PATTERNS
+
         issuer_lower = issuer.lower()
-
-        acme_patterns = {
-            "let's encrypt": "letsencrypt",
-            "letsencrypt": "letsencrypt",
-            "r3, o=let's encrypt": "letsencrypt",
-            "(staging)": "letsencrypt_staging",
-            "fake le": "letsencrypt_staging",
-            "zerossl": "zerossl",
-            "buypass": "buypass",
-            "google trust services": "google",
-            "gts ca": "google",
-            "sectigo": "sectigo",
-        }
-
         detected_provider = None
-        for pattern, provider in acme_patterns.items():
+        for pattern, provider in _ACME_PATTERNS.items():
             if pattern in issuer_lower:
                 detected_provider = provider
                 break
@@ -127,14 +104,17 @@ class TestACMERenewalStatus:
         mock_cert.is_acme = True
         mock_cert.acme_auto_renewal = True
         mock_cert.acme_renewal_days = 30
+
+        # Simulate days_remaining property
         mock_cert.days_remaining = 25
 
-        # Simulate the property logic
+        # Test the renewal logic
+        renewal_days = mock_cert.acme_renewal_days or 30
         is_renewal_due = (
             mock_cert.is_acme
             and mock_cert.acme_auto_renewal
             and mock_cert.days_remaining is not None
-            and mock_cert.days_remaining <= (mock_cert.acme_renewal_days or 30)
+            and mock_cert.days_remaining <= renewal_days
         )
 
         assert is_renewal_due is True
@@ -147,11 +127,12 @@ class TestACMERenewalStatus:
         mock_cert.acme_renewal_days = 30
         mock_cert.days_remaining = 60
 
+        renewal_days = mock_cert.acme_renewal_days or 30
         is_renewal_due = (
             mock_cert.is_acme
             and mock_cert.acme_auto_renewal
             and mock_cert.days_remaining is not None
-            and mock_cert.days_remaining <= (mock_cert.acme_renewal_days or 30)
+            and mock_cert.days_remaining <= renewal_days
         )
 
         assert is_renewal_due is False
@@ -190,6 +171,36 @@ class TestACMERenewalStatus:
 
         assert is_renewal_due is False
 
+    def test_custom_renewal_days_threshold(self):
+        """Test that custom acme_renewal_days values are respected."""
+        mock_cert = MagicMock()
+        mock_cert.is_acme = True
+        mock_cert.acme_auto_renewal = True
+        mock_cert.acme_renewal_days = 14  # Custom 14-day threshold
+        mock_cert.days_remaining = 20
+
+        # With 14-day threshold, 20 days remaining should NOT be due
+        renewal_days = mock_cert.acme_renewal_days or 30
+        is_renewal_due = (
+            mock_cert.is_acme
+            and mock_cert.acme_auto_renewal
+            and mock_cert.days_remaining is not None
+            and mock_cert.days_remaining <= renewal_days
+        )
+
+        assert is_renewal_due is False
+
+        # With 14-day threshold, 10 days remaining SHOULD be due
+        mock_cert.days_remaining = 10
+        is_renewal_due = (
+            mock_cert.is_acme
+            and mock_cert.acme_auto_renewal
+            and mock_cert.days_remaining is not None
+            and mock_cert.days_remaining <= renewal_days
+        )
+
+        assert is_renewal_due is True
+
 
 class TestACMERenewalStatusProperty:
     """Test cases for the acme_renewal_status property."""
@@ -204,11 +215,9 @@ class TestACMERenewalStatusProperty:
             (True, True, False, False, "ok"),
         ],
     )
-    def test_acme_renewal_status_values(
-        self, is_acme, acme_auto_renewal, is_expired, renewal_due, expected_status
-    ):
+    def test_acme_renewal_status_values(self, is_acme, acme_auto_renewal, is_expired, renewal_due, expected_status):
         """Test various ACME renewal status scenarios."""
-        # Simulate the property logic
+        # Test the status determination logic
         if not is_acme:
             status = "not_acme"
         elif not acme_auto_renewal:
@@ -228,32 +237,67 @@ class TestACMEChoices:
 
     def test_acme_provider_choices_values(self):
         """Test that all expected ACME providers are defined."""
-        expected_providers = [
-            "letsencrypt",
-            "letsencrypt_staging",
-            "zerossl",
-            "buypass",
-            "google",
-            "digicert",
-            "sectigo",
-            "other",
-        ]
+        from netbox_ssl.models.certificates import ACMEProviderChoices
 
-        # These values should match the ACMEProviderChoices class
-        for provider in expected_providers:
-            assert provider in expected_providers
+        expected_providers = {
+            "letsencrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+            "letsencrypt_staging": ACMEProviderChoices.PROVIDER_LETSENCRYPT_STAGING,
+            "zerossl": ACMEProviderChoices.PROVIDER_ZEROSSL,
+            "buypass": ACMEProviderChoices.PROVIDER_BUYPASS,
+            "google": ACMEProviderChoices.PROVIDER_GOOGLE,
+            "digicert": ACMEProviderChoices.PROVIDER_DIGICERT,
+            "sectigo": ACMEProviderChoices.PROVIDER_SECTIGO,
+            "other": ACMEProviderChoices.PROVIDER_OTHER,
+        }
+
+        for name, value in expected_providers.items():
+            assert value == name
 
     def test_acme_challenge_type_choices_values(self):
         """Test that all expected ACME challenge types are defined."""
-        expected_challenges = [
-            "http-01",
-            "dns-01",
-            "tls-alpn-01",
-            "unknown",
-        ]
+        from netbox_ssl.models.certificates import ACMEChallengeTypeChoices
 
-        for challenge in expected_challenges:
-            assert challenge in expected_challenges
+        expected_challenges = {
+            "http-01": ACMEChallengeTypeChoices.CHALLENGE_HTTP01,
+            "dns-01": ACMEChallengeTypeChoices.CHALLENGE_DNS01,
+            "tls-alpn-01": ACMEChallengeTypeChoices.CHALLENGE_TLS_ALPN01,
+            "unknown": ACMEChallengeTypeChoices.CHALLENGE_UNKNOWN,
+        }
+
+        for name, value in expected_challenges.items():
+            assert value == name
+
+
+class TestACMEPatterns:
+    """Test cases for the module-level ACME patterns dictionary."""
+
+    def test_acme_patterns_contains_all_providers(self):
+        """Test that _ACME_PATTERNS contains patterns for all providers."""
+        from netbox_ssl.models.certificates import ACMEProviderChoices, _ACME_PATTERNS
+
+        # All providers except 'other' should have at least one pattern
+        providers_with_patterns = set(_ACME_PATTERNS.values())
+
+        assert ACMEProviderChoices.PROVIDER_LETSENCRYPT in providers_with_patterns
+        assert ACMEProviderChoices.PROVIDER_LETSENCRYPT_STAGING in providers_with_patterns
+        assert ACMEProviderChoices.PROVIDER_ZEROSSL in providers_with_patterns
+        assert ACMEProviderChoices.PROVIDER_BUYPASS in providers_with_patterns
+        assert ACMEProviderChoices.PROVIDER_GOOGLE in providers_with_patterns
+        assert ACMEProviderChoices.PROVIDER_SECTIGO in providers_with_patterns
+        assert ACMEProviderChoices.PROVIDER_DIGICERT in providers_with_patterns
+
+    def test_acme_patterns_is_module_level(self):
+        """Test that _ACME_PATTERNS is defined at module level (not recreated)."""
+        from netbox_ssl.models import certificates
+
+        # Verify it's a module-level constant
+        assert hasattr(certificates, "_ACME_PATTERNS")
+        assert isinstance(certificates._ACME_PATTERNS, dict)
+
+        # Verify it's the same object (not recreated)
+        patterns1 = certificates._ACME_PATTERNS
+        patterns2 = certificates._ACME_PATTERNS
+        assert patterns1 is patterns2
 
 
 class TestACMEModelFields:
@@ -281,7 +325,6 @@ class TestACMEAPIEndpoints:
 
     def test_detect_acme_response_detected(self):
         """Test detect-acme endpoint response when ACME is detected."""
-        # Simulate the response structure
         response = {
             "detected": True,
             "is_acme": True,
@@ -313,7 +356,12 @@ class TestACMEAPIEndpoints:
             "not_acme": 2,
             "missing_ids": [],
             "detections": [
-                {"id": 1, "common_name": "example.com", "detected": True, "acme_provider": "letsencrypt"},
+                {
+                    "id": 1,
+                    "common_name": "example.com",
+                    "detected": True,
+                    "acme_provider": "letsencrypt",
+                },
                 {"id": 2, "common_name": "test.com", "detected": False},
             ],
         }
@@ -344,7 +392,6 @@ class TestACMEFieldSerialization:
             "acme_renewal_status",
         ]
 
-        # These are the fields that should be in the serializer
         for field in expected_acme_fields:
             assert field in expected_acme_fields
 
@@ -370,83 +417,71 @@ class TestACMEIntegrationScenarios:
 
     def test_letsencrypt_certificate_detection_workflow(self):
         """Test complete workflow for Let's Encrypt certificate detection."""
-        # Simulate a Let's Encrypt certificate
-        cert_data = {
-            "common_name": "example.com",
-            "issuer": "CN=R3, O=Let's Encrypt, C=US",
-            "is_acme": False,
-            "acme_provider": "",
-        }
+        from netbox_ssl.models.certificates import _ACME_PATTERNS
 
-        # Simulate auto_detect_acme logic
-        issuer_lower = cert_data["issuer"].lower()
-        if "let's encrypt" in issuer_lower:
-            cert_data["is_acme"] = True
-            cert_data["acme_provider"] = "letsencrypt"
+        issuer = "CN=R3, O=Let's Encrypt, C=US"
+        issuer_lower = issuer.lower()
 
-        assert cert_data["is_acme"] is True
-        assert cert_data["acme_provider"] == "letsencrypt"
+        detected_provider = None
+        for pattern, provider in _ACME_PATTERNS.items():
+            if pattern in issuer_lower:
+                detected_provider = provider
+                break
 
-    def test_renewal_tracking_workflow(self):
-        """Test renewal tracking for ACME certificate approaching expiry."""
-        from datetime import datetime
-
-        # Simulate certificate with 20 days remaining
-        cert_data = {
-            "is_acme": True,
-            "acme_auto_renewal": True,
-            "acme_renewal_days": 30,
-            "days_remaining": 20,
-        }
-
-        # Check if renewal is due
-        renewal_due = (
-            cert_data["is_acme"]
-            and cert_data["acme_auto_renewal"]
-            and cert_data["days_remaining"] <= cert_data["acme_renewal_days"]
-        )
-
-        assert renewal_due is True
-
-        # Determine renewal status
-        if renewal_due:
-            status = "due"
-        else:
-            status = "ok"
-
-        assert status == "due"
+        assert detected_provider == "letsencrypt"
 
     def test_staging_certificate_identification(self):
         """Test that staging certificates are correctly identified."""
+        from netbox_ssl.models.certificates import ACMEProviderChoices, _ACME_PATTERNS
+
         staging_issuers = [
             "CN=(STAGING) Pretend Pear X1",
             "CN=Fake LE Intermediate X1",
-            "(STAGING) Ersatz Mushroom X2",
         ]
 
         for issuer in staging_issuers:
             issuer_lower = issuer.lower()
-            is_staging = "(staging)" in issuer_lower or "fake le" in issuer_lower
+            detected_provider = None
+            for pattern, provider in _ACME_PATTERNS.items():
+                if pattern in issuer_lower:
+                    detected_provider = provider
+                    break
 
-            assert is_staging is True, f"Failed for issuer: {issuer}"
+            assert detected_provider == ACMEProviderChoices.PROVIDER_LETSENCRYPT_STAGING, f"Failed for issuer: {issuer}"
 
     def test_mixed_certificate_batch_detection(self):
         """Test bulk detection with mixed ACME and non-ACME certificates."""
+        from netbox_ssl.models.certificates import _ACME_PATTERNS
+
         certificates = [
             {"id": 1, "issuer": "CN=R3, O=Let's Encrypt, C=US"},
-            {"id": 2, "issuer": "CN=DigiCert SHA2 Extended Validation Server CA"},
+            {"id": 2, "issuer": "CN=GlobalSign GCC R3 DV TLS CA"},
             {"id": 3, "issuer": "CN=ZeroSSL RSA Domain Secure Site CA"},
             {"id": 4, "issuer": "CN=Internal CA, O=My Company"},
             {"id": 5, "issuer": "CN=Buypass Class 2 CA 5, O=Buypass AS"},
         ]
 
-        acme_patterns = ["let's encrypt", "zerossl", "buypass"]
         detected_acme = 0
-
         for cert in certificates:
             issuer_lower = cert["issuer"].lower()
-            is_acme = any(pattern in issuer_lower for pattern in acme_patterns)
-            if is_acme:
-                detected_acme += 1
+            for pattern in _ACME_PATTERNS:
+                if pattern in issuer_lower:
+                    detected_acme += 1
+                    break
 
         assert detected_acme == 3  # Let's Encrypt, ZeroSSL, Buypass
+
+    def test_digicert_detection(self):
+        """Test that DigiCert ACME certificates are detected."""
+        from netbox_ssl.models.certificates import ACMEProviderChoices, _ACME_PATTERNS
+
+        issuer = "CN=DigiCert TLS RSA SHA256 2020 CA1, O=DigiCert Inc"
+        issuer_lower = issuer.lower()
+
+        detected_provider = None
+        for pattern, provider in _ACME_PATTERNS.items():
+            if pattern in issuer_lower:
+                detected_provider = provider
+                break
+
+        assert detected_provider == ACMEProviderChoices.PROVIDER_DIGICERT

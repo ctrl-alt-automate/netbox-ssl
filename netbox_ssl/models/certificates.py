@@ -88,6 +88,34 @@ class ACMEChallengeTypeChoices(ChoiceSet):
     ]
 
 
+# Known ACME provider patterns for auto-detection (defined at module level for performance)
+_ACME_PATTERNS = {
+    # Let's Encrypt
+    "let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+    "letsencrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+    "r3, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+    "r10, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+    "r11, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+    "e1, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+    "e5, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+    "e6, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+    # Let's Encrypt Staging
+    "(staging)": ACMEProviderChoices.PROVIDER_LETSENCRYPT_STAGING,
+    "fake le": ACMEProviderChoices.PROVIDER_LETSENCRYPT_STAGING,
+    # ZeroSSL
+    "zerossl": ACMEProviderChoices.PROVIDER_ZEROSSL,
+    # Buypass
+    "buypass": ACMEProviderChoices.PROVIDER_BUYPASS,
+    # Google Trust Services (ACME)
+    "google trust services": ACMEProviderChoices.PROVIDER_GOOGLE,
+    "gts ca": ACMEProviderChoices.PROVIDER_GOOGLE,
+    # Sectigo (has ACME services)
+    "sectigo": ACMEProviderChoices.PROVIDER_SECTIGO,
+    # DigiCert (has ACME services)
+    "digicert": ACMEProviderChoices.PROVIDER_DIGICERT,
+}
+
+
 class Certificate(NetBoxModel):
     """
     A TLS/SSL certificate.
@@ -351,33 +379,8 @@ class Certificate(NetBoxModel):
         """
         issuer_lower = self.issuer.lower()
 
-        # Known ACME provider patterns
-        acme_patterns = {
-            # Let's Encrypt
-            "let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
-            "letsencrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
-            "r3, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
-            "r10, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
-            "r11, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
-            "e1, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
-            "e5, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
-            "e6, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
-            # Let's Encrypt Staging
-            "(staging)": ACMEProviderChoices.PROVIDER_LETSENCRYPT_STAGING,
-            "fake le": ACMEProviderChoices.PROVIDER_LETSENCRYPT_STAGING,
-            # ZeroSSL
-            "zerossl": ACMEProviderChoices.PROVIDER_ZEROSSL,
-            # Buypass
-            "buypass": ACMEProviderChoices.PROVIDER_BUYPASS,
-            # Google Trust Services (ACME)
-            "google trust services": ACMEProviderChoices.PROVIDER_GOOGLE,
-            "gts ca": ACMEProviderChoices.PROVIDER_GOOGLE,
-            # Sectigo (has ACME services)
-            "sectigo": ACMEProviderChoices.PROVIDER_SECTIGO,
-        }
-
         detected_provider = None
-        for pattern, provider in acme_patterns.items():
+        for pattern, provider in _ACME_PATTERNS.items():
             if pattern in issuer_lower:
                 detected_provider = provider
                 break
@@ -398,15 +401,27 @@ class Certificate(NetBoxModel):
 
     @classmethod
     def get_acme_renewal_due(cls):
-        """Get ACME certificates due for renewal."""
-        from django.db.models import F
+        """Get ACME certificates due for renewal.
 
-        return cls.objects.filter(
-            is_acme=True,
-            acme_auto_renewal=True,
-            status=CertificateStatusChoices.STATUS_ACTIVE,
-        ).annotate(
-            days_to_expiry=(F("valid_to") - timezone.now())
-        ).filter(
-            valid_to__lte=timezone.now() + timezone.timedelta(days=30)
+        Uses each certificate's acme_renewal_days field to determine if renewal is due.
+        Defaults to 30 days if acme_renewal_days is not set.
+        """
+        from datetime import timedelta
+
+        from django.db.models import Case, F, IntegerField, Value, When
+
+        return (
+            cls.objects.filter(
+                is_acme=True,
+                acme_auto_renewal=True,
+                status=CertificateStatusChoices.STATUS_ACTIVE,
+            )
+            .annotate(
+                effective_renewal_days=Case(
+                    When(acme_renewal_days__isnull=True, then=Value(30)),
+                    default=F("acme_renewal_days"),
+                    output_field=IntegerField(),
+                )
+            )
+            .filter(valid_to__lte=timezone.now() + timedelta(days=1) * F("effective_renewal_days"))
         )

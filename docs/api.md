@@ -381,6 +381,7 @@ The detection system recognizes these ACME providers:
 | Buypass | "Buypass" | `buypass` |
 | Google Trust Services | "Google Trust Services", "GTS CA" | `google` |
 | Sectigo | "Sectigo" | `sectigo` |
+| DigiCert | "DigiCert" | `digicert` |
 
 ### ACME Filters
 
