@@ -23,7 +23,7 @@ Track certificates, monitor expiration dates, and never lose sight of where your
 | Getting Started | Daily Usage | Reference |
 |:---------------:|:-----------:|:---------:|
 | [Installation](installation.md) | [Usage](usage.md) | [API](api.md) |
-| [Configuration](configuration.md) | [Renewal Workflow](usage.md#janus-renewal-workflow) | [Data Models](data-models.md) |
+| [Configuration](configuration.md) | [Scripts](scripts.md) | [Data Models](data-models.md) |
 
 ## What Can You Do?
 
@@ -80,6 +80,7 @@ NetBox SSL is designed with **Passive Administration** in mind:
 - **[Installation](installation.md)** — Get the plugin installed and configured
 - **[Configuration](configuration.md)** — Customize thresholds, permissions, and widgets
 - **[Usage](usage.md)** — Learn the import and renewal workflows
+- **[Scripts](scripts.md)** — Expiry notifications and automation
 - **[API](api.md)** — REST API and GraphQL reference
 - **[Data Models](data-models.md)** — Database schema and relationships
 
