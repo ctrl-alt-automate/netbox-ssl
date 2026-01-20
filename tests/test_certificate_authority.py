@@ -4,10 +4,11 @@ Unit tests for CertificateAuthority model.
 Tests for Certificate Authority tracking feature (Issue #13).
 """
 
+import contextlib
 import os
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -26,10 +27,8 @@ if _in_netbox_env:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "netbox.settings")
     import django
 
-    try:
+    with contextlib.suppress(RuntimeError):
         django.setup()
-    except RuntimeError:
-        pass
     NETBOX_AVAILABLE = True
 else:
     sys.modules["netbox"] = MagicMock()
@@ -52,11 +51,12 @@ else:
 
 if NETBOX_AVAILABLE:
     try:
+        from netbox_ssl.filtersets import CertificateAuthorityFilterSet
         from netbox_ssl.models import (
+            DEFAULT_CERTIFICATE_AUTHORITIES,
             CATypeChoices,
             Certificate,
             CertificateAuthority,
-            DEFAULT_CERTIFICATE_AUTHORITIES,
         )
     except (ImportError, ModuleNotFoundError) as e:
         print(f"Warning: Could not import netbox_ssl models: {e}")
@@ -72,9 +72,6 @@ class TestCATypeChoices:
 
     def test_ca_type_choices_defined(self):
         """Verify CA type choices are properly defined."""
-        # These values should match the model definition
-        expected_types = ["public", "internal", "acme"]
-
         # Mock the choices if not available
         if not NETBOX_AVAILABLE:
             mock_choices = MagicMock()
@@ -134,7 +131,9 @@ class TestCertificateAuthorityModel:
             type=CATypeChoices.TYPE_PUBLIC,
         )
 
-        with pytest.raises(Exception):  # IntegrityError
+        from django.db import IntegrityError
+
+        with pytest.raises(IntegrityError):
             CertificateAuthority.objects.create(
                 name="Unique CA",
                 type=CATypeChoices.TYPE_INTERNAL,
@@ -147,66 +146,90 @@ class TestCertificateAuthorityModel:
 class TestCertificateAuthorityAutoDetection:
     """Tests for CA auto-detection functionality."""
 
-    def _create_mock_ca(self, name, issuer_pattern):
-        """Create a mock CA for testing."""
-        mock_ca = Mock()
-        mock_ca.name = name
-        mock_ca.issuer_pattern = issuer_pattern
-        return mock_ca
-
+    @requires_netbox
     def test_auto_detect_digicert(self):
         """Test auto-detection of DigiCert certificates."""
-        issuer = "CN=DigiCert SHA2 Extended Validation Server CA, OU=www.digicert.com, O=DigiCert Inc, C=US"
+        # Create a CA with issuer pattern
+        ca = CertificateAuthority.objects.create(
+            name="DigiCert Test",
+            type=CATypeChoices.TYPE_PUBLIC,
+            issuer_pattern="DigiCert",
+        )
 
-        # Mock the auto_detect method
-        def mock_auto_detect(issuer_string):
-            if "digicert" in issuer_string.lower():
-                return self._create_mock_ca("DigiCert", "digicert")
-            return None
+        try:
+            issuer = "CN=DigiCert SHA2 Extended Validation Server CA, OU=www.digicert.com, O=DigiCert Inc, C=US"
+            result = CertificateAuthority.auto_detect(issuer)
 
-        result = mock_auto_detect(issuer)
-        assert result is not None
-        assert result.name == "DigiCert"
+            assert result is not None
+            assert result.name == "DigiCert Test"
+        finally:
+            ca.delete()
 
+    @requires_netbox
     def test_auto_detect_lets_encrypt(self):
         """Test auto-detection of Let's Encrypt certificates."""
-        issuer = "CN=R3, O=Let's Encrypt, C=US"
+        ca = CertificateAuthority.objects.create(
+            name="Let's Encrypt Test",
+            type=CATypeChoices.TYPE_ACME,
+            issuer_pattern="Let's Encrypt",
+        )
 
-        def mock_auto_detect(issuer_string):
-            if "let's encrypt" in issuer_string.lower():
-                return self._create_mock_ca("Let's Encrypt", "let's encrypt")
-            return None
+        try:
+            issuer = "CN=R3, O=Let's Encrypt, C=US"
+            result = CertificateAuthority.auto_detect(issuer)
 
-        result = mock_auto_detect(issuer)
-        assert result is not None
-        assert result.name == "Let's Encrypt"
+            assert result is not None
+            assert result.name == "Let's Encrypt Test"
+        finally:
+            ca.delete()
 
+    @requires_netbox
     def test_auto_detect_internal_ca(self):
         """Test auto-detection of internal CA."""
-        issuer = "CN=ACME Corp Internal CA, O=ACME Corporation, C=US"
+        ca = CertificateAuthority.objects.create(
+            name="ACME Corp Internal",
+            type=CATypeChoices.TYPE_INTERNAL,
+            issuer_pattern="ACME Corp Internal",
+        )
 
-        def mock_auto_detect(issuer_string):
-            if "acme corp internal" in issuer_string.lower():
-                return self._create_mock_ca("ACME Corp Internal", "acme corp internal")
-            return None
+        try:
+            issuer = "CN=ACME Corp Internal CA, O=ACME Corporation, C=US"
+            result = CertificateAuthority.auto_detect(issuer)
 
-        result = mock_auto_detect(issuer)
-        assert result is not None
-        assert result.name == "ACME Corp Internal"
+            assert result is not None
+            assert result.name == "ACME Corp Internal"
+        finally:
+            ca.delete()
 
+    @requires_netbox
     def test_auto_detect_no_match(self):
         """Test that unknown issuers return None."""
         issuer = "CN=Unknown CA, O=Mystery Inc, C=XX"
-
-        def mock_auto_detect(issuer_string):
-            known_patterns = ["digicert", "let's encrypt", "sectigo"]
-            for pattern in known_patterns:
-                if pattern in issuer_string.lower():
-                    return self._create_mock_ca(pattern, pattern)
-            return None
-
-        result = mock_auto_detect(issuer)
+        result = CertificateAuthority.auto_detect(issuer)
         assert result is None
+
+    @requires_netbox
+    def test_auto_detect_empty_issuer(self):
+        """Test that empty issuer string returns None."""
+        assert CertificateAuthority.auto_detect("") is None
+        assert CertificateAuthority.auto_detect(None) is None
+
+    @requires_netbox
+    def test_auto_detect_case_insensitive(self):
+        """Test that pattern matching is case-insensitive."""
+        ca = CertificateAuthority.objects.create(
+            name="Test CA",
+            type=CATypeChoices.TYPE_PUBLIC,
+            issuer_pattern="TestPattern",
+        )
+
+        try:
+            # Should match regardless of case
+            assert CertificateAuthority.auto_detect("CN=TESTPATTERN Corp") is not None
+            assert CertificateAuthority.auto_detect("CN=testpattern Corp") is not None
+            assert CertificateAuthority.auto_detect("CN=TestPattern Corp") is not None
+        finally:
+            ca.delete()
 
 
 class TestDefaultCertificateAuthorities:
@@ -326,7 +349,6 @@ class TestCertificateIssuingCA:
             status="active",
         )
 
-        cert_pk = cert.pk
         ca.delete()
 
         # Refresh certificate from database
@@ -340,67 +362,178 @@ class TestCertificateIssuingCA:
 class TestCertificateAuthorityFilters:
     """Tests for CertificateAuthority filtersets."""
 
+    @requires_netbox
     def test_filter_by_type(self):
         """Test filtering CAs by type."""
-        # Mock filter test
-        mock_queryset = [
-            {"name": "DigiCert", "type": "public"},
-            {"name": "Let's Encrypt", "type": "acme"},
-            {"name": "Internal CA", "type": "internal"},
-        ]
+        # Create test CAs
+        ca_public = CertificateAuthority.objects.create(
+            name="Filter Test Public CA",
+            type=CATypeChoices.TYPE_PUBLIC,
+        )
+        ca_acme = CertificateAuthority.objects.create(
+            name="Filter Test ACME CA",
+            type=CATypeChoices.TYPE_ACME,
+        )
 
-        filtered = [ca for ca in mock_queryset if ca["type"] == "public"]
-        assert len(filtered) == 1
-        assert filtered[0]["name"] == "DigiCert"
+        try:
+            filterset = CertificateAuthorityFilterSet(
+                {"type": [CATypeChoices.TYPE_PUBLIC]}, CertificateAuthority.objects.all()
+            )
+            result = filterset.qs.filter(name__startswith="Filter Test")
 
+            assert ca_public in result
+            assert ca_acme not in result
+        finally:
+            ca_public.delete()
+            ca_acme.delete()
+
+    @requires_netbox
     def test_filter_by_is_approved(self):
         """Test filtering CAs by approval status."""
-        mock_queryset = [
-            {"name": "Approved CA", "is_approved": True},
-            {"name": "Unapproved CA", "is_approved": False},
-        ]
+        ca_approved = CertificateAuthority.objects.create(
+            name="Filter Approved CA",
+            type=CATypeChoices.TYPE_PUBLIC,
+            is_approved=True,
+        )
+        ca_unapproved = CertificateAuthority.objects.create(
+            name="Filter Unapproved CA",
+            type=CATypeChoices.TYPE_PUBLIC,
+            is_approved=False,
+        )
 
-        approved = [ca for ca in mock_queryset if ca["is_approved"]]
-        assert len(approved) == 1
-        assert approved[0]["name"] == "Approved CA"
+        try:
+            filterset = CertificateAuthorityFilterSet({"is_approved": True}, CertificateAuthority.objects.all())
+            result = filterset.qs.filter(name__startswith="Filter")
 
+            assert ca_approved in result
+            assert ca_unapproved not in result
+        finally:
+            ca_approved.delete()
+            ca_unapproved.delete()
+
+    @requires_netbox
     def test_filter_by_name(self):
         """Test filtering CAs by name (case-insensitive contains)."""
-        mock_queryset = [
-            {"name": "DigiCert"},
-            {"name": "DigiSign"},
-            {"name": "Sectigo"},
-        ]
+        ca1 = CertificateAuthority.objects.create(
+            name="DigiCert Filter Test",
+            type=CATypeChoices.TYPE_PUBLIC,
+        )
+        ca2 = CertificateAuthority.objects.create(
+            name="DigiSign Filter Test",
+            type=CATypeChoices.TYPE_PUBLIC,
+        )
+        ca3 = CertificateAuthority.objects.create(
+            name="Sectigo Filter Test",
+            type=CATypeChoices.TYPE_PUBLIC,
+        )
 
-        filtered = [ca for ca in mock_queryset if "digi" in ca["name"].lower()]
-        assert len(filtered) == 2
+        try:
+            filterset = CertificateAuthorityFilterSet({"name": "digi"}, CertificateAuthority.objects.all())
+            result = filterset.qs.filter(name__endswith="Filter Test")
+
+            assert ca1 in result
+            assert ca2 in result
+            assert ca3 not in result
+        finally:
+            ca1.delete()
+            ca2.delete()
+            ca3.delete()
 
 
 class TestCertificateFilterByIssuingCA:
     """Tests for filtering certificates by issuing CA."""
 
-    def test_filter_certificates_by_ca_id(self):
-        """Test filtering certificates by issuing CA ID."""
-        # Mock filter test
-        mock_certs = [
-            {"common_name": "cert1.example.com", "issuing_ca_id": 1},
-            {"common_name": "cert2.example.com", "issuing_ca_id": 1},
-            {"common_name": "cert3.example.com", "issuing_ca_id": 2},
-            {"common_name": "cert4.example.com", "issuing_ca_id": None},
-        ]
+    @requires_netbox
+    def test_filter_certificates_by_ca(self):
+        """Test filtering certificates by issuing CA."""
+        from django.utils import timezone
 
-        filtered = [cert for cert in mock_certs if cert["issuing_ca_id"] == 1]
-        assert len(filtered) == 2
+        from netbox_ssl.filtersets import CertificateFilterSet
 
-    def test_filter_certificates_has_issuing_ca(self):
-        """Test filtering certificates by whether they have an issuing CA."""
-        mock_certs = [
-            {"common_name": "cert1.example.com", "issuing_ca_id": 1},
-            {"common_name": "cert2.example.com", "issuing_ca_id": None},
-        ]
+        ca1 = CertificateAuthority.objects.create(
+            name="Filter CA 1",
+            type=CATypeChoices.TYPE_PUBLIC,
+        )
+        ca2 = CertificateAuthority.objects.create(
+            name="Filter CA 2",
+            type=CATypeChoices.TYPE_INTERNAL,
+        )
 
-        with_ca = [cert for cert in mock_certs if cert["issuing_ca_id"] is not None]
-        without_ca = [cert for cert in mock_certs if cert["issuing_ca_id"] is None]
+        cert1 = Certificate.objects.create(
+            common_name="filter-cert1.example.com",
+            serial_number="FILTER001",
+            fingerprint_sha256="F1:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:01",
+            issuer="CN=Filter CA 1",
+            issuing_ca=ca1,
+            valid_from=timezone.now(),
+            valid_to=timezone.now() + timezone.timedelta(days=365),
+            algorithm="rsa",
+            status="active",
+        )
+        cert2 = Certificate.objects.create(
+            common_name="filter-cert2.example.com",
+            serial_number="FILTER002",
+            fingerprint_sha256="F2:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:02",
+            issuer="CN=Filter CA 2",
+            issuing_ca=ca2,
+            valid_from=timezone.now(),
+            valid_to=timezone.now() + timezone.timedelta(days=365),
+            algorithm="rsa",
+            status="active",
+        )
 
-        assert len(with_ca) == 1
-        assert len(without_ca) == 1
+        try:
+            filterset = CertificateFilterSet({"issuing_ca_id": [ca1.pk]}, Certificate.objects.all())
+            result = filterset.qs.filter(common_name__startswith="filter-cert")
+
+            assert cert1 in result
+            assert cert2 not in result
+        finally:
+            cert1.delete()
+            cert2.delete()
+            ca1.delete()
+            ca2.delete()
+
+    @requires_netbox
+    def test_filter_certificates_without_issuing_ca(self):
+        """Test filtering certificates that have no issuing CA."""
+        from django.utils import timezone
+
+        ca = CertificateAuthority.objects.create(
+            name="Filter CA With",
+            type=CATypeChoices.TYPE_PUBLIC,
+        )
+
+        cert_with_ca = Certificate.objects.create(
+            common_name="filter-with-ca.example.com",
+            serial_number="FILTERWITH",
+            fingerprint_sha256="F3:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:03",
+            issuer="CN=Filter CA With",
+            issuing_ca=ca,
+            valid_from=timezone.now(),
+            valid_to=timezone.now() + timezone.timedelta(days=365),
+            algorithm="rsa",
+            status="active",
+        )
+        cert_without_ca = Certificate.objects.create(
+            common_name="filter-without-ca.example.com",
+            serial_number="FILTERWITHOUT",
+            fingerprint_sha256="F4:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:04",
+            issuer="CN=Unknown CA",
+            issuing_ca=None,
+            valid_from=timezone.now(),
+            valid_to=timezone.now() + timezone.timedelta(days=365),
+            algorithm="rsa",
+            status="active",
+        )
+
+        try:
+            # Filter certificates without an issuing CA
+            result = Certificate.objects.filter(issuing_ca__isnull=True, common_name__startswith="filter-")
+
+            assert cert_without_ca in result
+            assert cert_with_ca not in result
+        finally:
+            cert_with_ca.delete()
+            cert_without_ca.delete()
+            ca.delete()
