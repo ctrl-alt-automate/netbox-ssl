@@ -37,6 +37,8 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `DELETE` | `/certificates/{id}/` | Delete certificate |
 | `POST` | `/certificates/import/` | Import from PEM |
 | `POST` | `/certificates/bulk-import/` | Bulk import from PEM |
+| `POST` | `/certificates/{id}/detect-acme/` | Auto-detect ACME provider |
+| `POST` | `/certificates/bulk-detect-acme/` | Bulk ACME detection |
 
 ### Assignments
 
@@ -264,6 +266,138 @@ if response.status_code == 201:
     print(f"Imported {result['created_count']} certificates")
 else:
     print(f"Error: {response.json()}")
+```
+
+---
+
+## ACME Detection
+
+Automatically detect if certificates were issued via ACME protocol (Let's Encrypt, ZeroSSL, etc.) by analyzing the issuer field.
+
+### Single Certificate Detection
+
+`POST /api/plugins/netbox-ssl/certificates/{id}/detect-acme/`
+
+Analyzes a single certificate's issuer and updates `is_acme` and `acme_provider` fields based on known ACME CA patterns.
+
+#### Example Request
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/1/detect-acme/
+```
+
+#### Success Response (ACME Detected)
+
+```json
+{
+  "detected": true,
+  "is_acme": true,
+  "acme_provider": "letsencrypt",
+  "certificate": {
+    "id": 1,
+    "common_name": "example.com",
+    "issuer": "CN=R3, O=Let's Encrypt, C=US",
+    "is_acme": true,
+    "acme_provider": "letsencrypt"
+  }
+}
+```
+
+#### Response (Not ACME)
+
+```json
+{
+  "detected": false,
+  "message": "Certificate issuer does not match any known ACME provider patterns."
+}
+```
+
+### Bulk ACME Detection
+
+`POST /api/plugins/netbox-ssl/certificates/bulk-detect-acme/`
+
+Process multiple certificates for ACME detection in a single request.
+
+#### Request Format
+
+```json
+{
+  "ids": [1, 2, 3, 4, 5]
+}
+```
+
+#### Example Request
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"ids": [1, 2, 3, 4, 5]}' \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-detect-acme/
+```
+
+#### Success Response
+
+```json
+{
+  "total": 5,
+  "processed": 5,
+  "detected_acme": 3,
+  "not_acme": 2,
+  "missing_ids": [],
+  "detections": [
+    {
+      "id": 1,
+      "common_name": "example.com",
+      "detected": true,
+      "acme_provider": "letsencrypt"
+    },
+    {
+      "id": 2,
+      "common_name": "internal.corp",
+      "detected": false
+    },
+    {
+      "id": 3,
+      "common_name": "api.example.com",
+      "detected": true,
+      "acme_provider": "zerossl"
+    }
+  ]
+}
+```
+
+### Supported ACME Providers
+
+The detection system recognizes these ACME providers:
+
+| Provider | Detection Pattern | Provider Value |
+|----------|-------------------|----------------|
+| Let's Encrypt | "Let's Encrypt", R3, R10, R11, E1, E5, E6 | `letsencrypt` |
+| Let's Encrypt Staging | "(STAGING)", "Fake LE" | `letsencrypt_staging` |
+| ZeroSSL | "ZeroSSL" | `zerossl` |
+| Buypass | "Buypass" | `buypass` |
+| Google Trust Services | "Google Trust Services", "GTS CA" | `google` |
+| Sectigo | "Sectigo" | `sectigo` |
+
+### ACME Filters
+
+Filter certificates by ACME status:
+
+```bash
+# List all ACME certificates
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/certificates/?is_acme=true"
+
+# Filter by ACME provider
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/certificates/?acme_provider=letsencrypt"
+
+# Certificates due for renewal
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/certificates/?is_acme=true&acme_auto_renewal=true"
 ```
 
 ---

@@ -48,6 +48,46 @@ class CertificateAlgorithmChoices(ChoiceSet):
     ]
 
 
+class ACMEProviderChoices(ChoiceSet):
+    """ACME provider choices."""
+
+    PROVIDER_LETSENCRYPT = "letsencrypt"
+    PROVIDER_LETSENCRYPT_STAGING = "letsencrypt_staging"
+    PROVIDER_ZEROSSL = "zerossl"
+    PROVIDER_BUYPASS = "buypass"
+    PROVIDER_GOOGLE = "google"
+    PROVIDER_DIGICERT = "digicert"
+    PROVIDER_SECTIGO = "sectigo"
+    PROVIDER_OTHER = "other"
+
+    CHOICES = [
+        (PROVIDER_LETSENCRYPT, "Let's Encrypt", "green"),
+        (PROVIDER_LETSENCRYPT_STAGING, "Let's Encrypt (Staging)", "yellow"),
+        (PROVIDER_ZEROSSL, "ZeroSSL", "blue"),
+        (PROVIDER_BUYPASS, "Buypass", "cyan"),
+        (PROVIDER_GOOGLE, "Google Trust Services", "red"),
+        (PROVIDER_DIGICERT, "DigiCert", "purple"),
+        (PROVIDER_SECTIGO, "Sectigo", "orange"),
+        (PROVIDER_OTHER, "Other", "gray"),
+    ]
+
+
+class ACMEChallengeTypeChoices(ChoiceSet):
+    """ACME challenge type choices."""
+
+    CHALLENGE_HTTP01 = "http-01"
+    CHALLENGE_DNS01 = "dns-01"
+    CHALLENGE_TLS_ALPN01 = "tls-alpn-01"
+    CHALLENGE_UNKNOWN = "unknown"
+
+    CHOICES = [
+        (CHALLENGE_HTTP01, "HTTP-01", "blue"),
+        (CHALLENGE_DNS01, "DNS-01", "green"),
+        (CHALLENGE_TLS_ALPN01, "TLS-ALPN-01", "purple"),
+        (CHALLENGE_UNKNOWN, "Unknown", "gray"),
+    ]
+
+
 class Certificate(NetBoxModel):
     """
     A TLS/SSL certificate.
@@ -150,6 +190,48 @@ class Certificate(NetBoxModel):
         help_text="Certificate in PEM format (public certificate only)",
     )
 
+    # ACME certificate tracking
+    is_acme = models.BooleanField(
+        default=False,
+        help_text="Whether this certificate was issued via ACME protocol",
+    )
+    acme_provider = models.CharField(
+        max_length=30,
+        choices=ACMEProviderChoices,
+        blank=True,
+        help_text="ACME provider (e.g., Let's Encrypt, ZeroSSL)",
+    )
+    acme_account_email = models.EmailField(
+        blank=True,
+        help_text="Email address associated with the ACME account",
+    )
+    acme_challenge_type = models.CharField(
+        max_length=20,
+        choices=ACMEChallengeTypeChoices,
+        blank=True,
+        help_text="Challenge type used for domain validation",
+    )
+    acme_server_url = models.URLField(
+        blank=True,
+        max_length=500,
+        help_text="ACME server URL (e.g., https://acme-v02.api.letsencrypt.org/directory)",
+    )
+    acme_auto_renewal = models.BooleanField(
+        default=False,
+        help_text="Whether automatic renewal is configured",
+    )
+    acme_last_renewed = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this certificate was last renewed via ACME",
+    )
+    acme_renewal_days = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        default=30,
+        help_text="Days before expiry to attempt renewal",
+    )
+
     class Meta:
         ordering = ["-valid_to", "common_name"]
         constraints = [
@@ -231,3 +313,100 @@ class Certificate(NetBoxModel):
     def has_assignments(self):
         """Check if certificate has any assignments."""
         return self.assignments.exists()
+
+    @property
+    def acme_renewal_due(self):
+        """Check if ACME renewal is due based on renewal_days setting."""
+        if not self.is_acme or not self.acme_auto_renewal:
+            return False
+        if self.days_remaining is None:
+            return False
+        renewal_days = self.acme_renewal_days or 30
+        return self.days_remaining <= renewal_days
+
+    @property
+    def acme_renewal_status(self):
+        """Get ACME renewal status."""
+        if not self.is_acme:
+            return "not_acme"
+        if not self.acme_auto_renewal:
+            return "manual"
+        if self.is_expired:
+            return "expired"
+        if self.acme_renewal_due:
+            return "due"
+        return "ok"
+
+    def auto_detect_acme(self, save: bool = True):
+        """
+        Auto-detect if this certificate is ACME-issued based on the issuer.
+
+        Updates is_acme and acme_provider fields based on known ACME CA patterns.
+
+        Args:
+            save: If True, save the changes to the database
+
+        Returns:
+            Tuple of (is_acme, provider) or None if not detectable
+        """
+        issuer_lower = self.issuer.lower()
+
+        # Known ACME provider patterns
+        acme_patterns = {
+            # Let's Encrypt
+            "let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+            "letsencrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+            "r3, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+            "r10, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+            "r11, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+            "e1, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+            "e5, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+            "e6, o=let's encrypt": ACMEProviderChoices.PROVIDER_LETSENCRYPT,
+            # Let's Encrypt Staging
+            "(staging)": ACMEProviderChoices.PROVIDER_LETSENCRYPT_STAGING,
+            "fake le": ACMEProviderChoices.PROVIDER_LETSENCRYPT_STAGING,
+            # ZeroSSL
+            "zerossl": ACMEProviderChoices.PROVIDER_ZEROSSL,
+            # Buypass
+            "buypass": ACMEProviderChoices.PROVIDER_BUYPASS,
+            # Google Trust Services (ACME)
+            "google trust services": ACMEProviderChoices.PROVIDER_GOOGLE,
+            "gts ca": ACMEProviderChoices.PROVIDER_GOOGLE,
+            # Sectigo (has ACME services)
+            "sectigo": ACMEProviderChoices.PROVIDER_SECTIGO,
+        }
+
+        detected_provider = None
+        for pattern, provider in acme_patterns.items():
+            if pattern in issuer_lower:
+                detected_provider = provider
+                break
+
+        if detected_provider:
+            self.is_acme = True
+            self.acme_provider = detected_provider
+            if save:
+                self.save(update_fields=["is_acme", "acme_provider"])
+            return (True, detected_provider)
+
+        return None
+
+    @classmethod
+    def get_acme_certificates(cls):
+        """Get all ACME certificates."""
+        return cls.objects.filter(is_acme=True)
+
+    @classmethod
+    def get_acme_renewal_due(cls):
+        """Get ACME certificates due for renewal."""
+        from django.db.models import F
+
+        return cls.objects.filter(
+            is_acme=True,
+            acme_auto_renewal=True,
+            status=CertificateStatusChoices.STATUS_ACTIVE,
+        ).annotate(
+            days_to_expiry=(F("valid_to") - timezone.now())
+        ).filter(
+            valid_to__lte=timezone.now() + timezone.timedelta(days=30)
+        )

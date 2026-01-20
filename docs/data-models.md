@@ -75,6 +75,63 @@ The main model for storing certificate metadata.
 | `ecdsa` | ECDSA | Elliptic curve, key_size = curve bits |
 | `ed25519` | Ed25519 | Modern curve, key_size = null |
 
+### ACME Certificate Tracking
+
+The Certificate model includes fields for tracking certificates issued via the ACME protocol (Automatic Certificate Management Environment), commonly used by providers like Let's Encrypt, ZeroSSL, and others.
+
+#### ACME Fields
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `is_acme` | BooleanField | | Whether certificate was issued via ACME |
+| `acme_provider` | CharField(30) | | ACME provider (see choices below) |
+| `acme_account_email` | EmailField | | Email associated with ACME account |
+| `acme_challenge_type` | CharField(20) | | Challenge type used for validation |
+| `acme_server_url` | URLField(500) | | ACME server directory URL |
+| `acme_auto_renewal` | BooleanField | | Whether auto-renewal is configured |
+| `acme_last_renewed` | DateTimeField | | Last ACME renewal timestamp |
+| `acme_renewal_days` | SmallIntegerField | | Days before expiry to attempt renewal |
+
+#### ACME Provider Choices
+
+| Value | Label | Description |
+|-------|-------|-------------|
+| `letsencrypt` | Let's Encrypt | Free, widely-used ACME CA |
+| `letsencrypt_staging` | Let's Encrypt (Staging) | Testing environment |
+| `zerossl` | ZeroSSL | Alternative free CA |
+| `buypass` | Buypass | Norwegian CA with ACME |
+| `google` | Google Trust Services | Google's ACME service |
+| `digicert` | DigiCert | Enterprise ACME |
+| `sectigo` | Sectigo | Commercial ACME CA |
+| `other` | Other | Custom/unknown ACME provider |
+
+#### ACME Challenge Type Choices
+
+| Value | Label | Description |
+|-------|-------|-------------|
+| `http-01` | HTTP-01 | HTTP challenge on port 80 |
+| `dns-01` | DNS-01 | DNS TXT record challenge |
+| `tls-alpn-01` | TLS-ALPN-01 | TLS ALPN challenge on port 443 |
+| `unknown` | Unknown | Challenge type not recorded |
+
+#### ACME Computed Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `acme_renewal_due` | bool | True if renewal window is reached |
+| `acme_renewal_status` | str | One of: `not_acme`, `manual`, `expired`, `due`, `ok` |
+
+#### Auto-Detection
+
+The `auto_detect_acme()` method automatically identifies ACME certificates by analyzing the issuer field against known ACME provider patterns:
+
+- **Let's Encrypt**: R3, R10, R11, E1, E5, E6 intermediates
+- **Let's Encrypt Staging**: (STAGING) or Fake LE patterns
+- **ZeroSSL**: ZeroSSL in issuer
+- **Buypass**: Buypass in issuer
+- **Google Trust Services**: GTS CA patterns
+- **Sectigo**: Sectigo in issuer
+
 ### Computed Properties
 
 These properties are calculated dynamically:

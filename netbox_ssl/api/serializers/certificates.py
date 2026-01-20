@@ -23,6 +23,8 @@ class CertificateSerializer(NetBoxModelSerializer):
     is_expiring_soon = serializers.BooleanField(read_only=True)
     expiry_status = serializers.CharField(read_only=True)
     assignment_count = serializers.SerializerMethodField()
+    acme_renewal_due = serializers.BooleanField(read_only=True)
+    acme_renewal_status = serializers.CharField(read_only=True)
 
     class Meta:
         model = Certificate
@@ -50,6 +52,17 @@ class CertificateSerializer(NetBoxModelSerializer):
             "tenant",
             "pem_content",
             "assignment_count",
+            # ACME fields
+            "is_acme",
+            "acme_provider",
+            "acme_account_email",
+            "acme_challenge_type",
+            "acme_server_url",
+            "acme_auto_renewal",
+            "acme_last_renewed",
+            "acme_renewal_days",
+            "acme_renewal_due",
+            "acme_renewal_status",
             "tags",
             "custom_fields",
             "created",
@@ -64,6 +77,7 @@ class CertificateSerializer(NetBoxModelSerializer):
             "status",
             "valid_to",
             "days_remaining",
+            "is_acme",
         ]
 
     def get_assignment_count(self, obj):
