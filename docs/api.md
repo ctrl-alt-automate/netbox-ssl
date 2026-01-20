@@ -37,6 +37,8 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `DELETE` | `/certificates/{id}/` | Delete certificate |
 | `POST` | `/certificates/import/` | Import from PEM |
 | `POST` | `/certificates/bulk-import/` | Bulk import from PEM |
+| `GET/POST` | `/certificates/export/` | Export certificates |
+| `GET` | `/certificates/{id}/export/` | Export single certificate |
 | `POST` | `/certificates/{id}/compliance-check/` | Run compliance check |
 | `POST` | `/certificates/bulk-compliance-check/` | Bulk compliance check |
 
@@ -336,6 +338,182 @@ if response.status_code == 201:
     print(f"Imported {result['created_count']} certificates")
 else:
     print(f"Error: {response.json()}")
+```
+
+---
+
+## Data Export
+
+Export certificates in multiple formats for integration, reporting, and backup purposes.
+
+### Supported Formats
+
+| Format | Content-Type | Description |
+|--------|--------------|-------------|
+| `csv` | `text/csv` | Comma-separated values for spreadsheets |
+| `json` | `application/json` | JSON array with full certificate data |
+| `yaml` | `application/x-yaml` | YAML format (requires PyYAML) |
+| `pem` | `application/x-pem-file` | PEM bundle with certificate chain |
+
+### Bulk Export Endpoint
+
+`GET/POST /api/plugins/netbox-ssl/certificates/export/`
+
+#### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `format` | String | `json` | Export format (csv, json, yaml, pem) |
+| `ids` | List[int] | - | Specific certificate IDs to export |
+| `fields` | List[str] | - | Fields to include (see below) |
+| `include_pem` | Boolean | `false` | Include PEM content (json/yaml only) |
+| `include_chain` | Boolean | `true` | Include certificate chain (pem only) |
+
+#### Available Fields
+
+**Default fields:** `id`, `common_name`, `serial_number`, `fingerprint_sha256`, `issuer`, `valid_from`, `valid_to`, `days_remaining`, `algorithm`, `key_size`, `status`, `tenant`, `sans`
+
+**Extended fields:** All default fields plus `is_expired`, `is_expiring_soon`, `expiry_status`, `private_key_location`, `assignment_count`, `created`, `last_updated`
+
+#### Configuration
+
+The maximum export size can be configured in your NetBox `configuration.py`:
+
+```python
+PLUGINS_CONFIG = {
+    "netbox_ssl": {
+        "max_export_size": 1000,  # Default: 1000, max certificates per export
+    }
+}
+```
+
+### Export Examples
+
+#### CSV Export
+
+```bash
+# Export all active certificates as CSV
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/certificates/export/?format=csv&status=active"
+```
+
+Response (file download):
+```csv
+id,common_name,serial_number,fingerprint_sha256,issuer,valid_from,valid_to,days_remaining,algorithm,key_size,status,tenant
+1,example.com,01:23:45:67:89,AA:BB:CC:DD,CN=Test CA,2024-01-01T00:00:00,2025-01-01T00:00:00,180,rsa,2048,active,Production
+```
+
+#### JSON Export
+
+```bash
+# Export specific certificates as JSON with PEM content
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"format": "json", "ids": [1, 2, 3], "include_pem": true}' \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/export/
+```
+
+Response:
+```json
+[
+  {
+    "id": 1,
+    "common_name": "example.com",
+    "serial_number": "01:23:45:67:89",
+    "fingerprint_sha256": "AA:BB:CC:DD:EE:FF...",
+    "issuer": "CN=Test CA, O=Example Inc",
+    "valid_from": "2024-01-01T00:00:00",
+    "valid_to": "2025-01-01T00:00:00",
+    "days_remaining": 180,
+    "algorithm": "rsa",
+    "key_size": 2048,
+    "status": "active",
+    "tenant": "Production",
+    "sans": ["example.com", "www.example.com"],
+    "pem_content": "-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----"
+  }
+]
+```
+
+#### PEM Export
+
+```bash
+# Export certificates as PEM bundle with chain
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/certificates/export/?format=pem&include_chain=true"
+```
+
+Response:
+```
+# Certificate: example.com
+# Serial: 01:23:45:67:89
+# Expires: 2025-01-01
+
+-----BEGIN CERTIFICATE-----
+MIID...
+-----END CERTIFICATE-----
+
+# Certificate Chain
+-----BEGIN CERTIFICATE-----
+MIIE...
+-----END CERTIFICATE-----
+```
+
+#### Custom Field Selection
+
+```bash
+# Export only specific fields
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/certificates/export/?format=json&fields=id&fields=common_name&fields=valid_to&fields=days_remaining"
+```
+
+### Single Certificate Export
+
+`GET /api/plugins/netbox-ssl/certificates/{id}/export/`
+
+Export a single certificate with the certificate's common name as the filename.
+
+```bash
+# Export single certificate as PEM
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/certificates/1/export/?format=pem"
+
+# Response headers include:
+# Content-Disposition: attachment; filename="example.com.pem"
+```
+
+### Python Example
+
+```python
+import requests
+
+# Export expiring certificates
+response = requests.get(
+    "http://localhost:8000/api/plugins/netbox-ssl/certificates/export/",
+    headers={"Authorization": "Token YOUR_TOKEN"},
+    params={
+        "format": "json",
+        "status": "active",
+        "valid_to__lt": "2024-06-01",
+        "fields": ["id", "common_name", "valid_to", "days_remaining", "tenant"]
+    }
+)
+
+if response.status_code == 200:
+    certificates = response.json()
+    for cert in certificates:
+        print(f"{cert['common_name']}: {cert['days_remaining']} days remaining")
+
+# Save PEM bundle to file
+response = requests.get(
+    "http://localhost:8000/api/plugins/netbox-ssl/certificates/export/",
+    headers={"Authorization": "Token YOUR_TOKEN"},
+    params={"format": "pem", "tenant_id": 1}
+)
+
+with open("certificates.pem", "w") as f:
+    f.write(response.text)
 ```
 
 ---

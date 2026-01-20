@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Data Export Formats** ([#15](https://github.com/ctrl-alt-automate/netbox-ssl/issues/15)):
+  - Multi-format certificate export: CSV, JSON, YAML, PEM
+  - Bulk export endpoint: `GET/POST /api/plugins/netbox-ssl/certificates/export/`
+  - Single certificate export: `GET /api/plugins/netbox-ssl/certificates/{id}/export/`
+  - Configurable field selection for exports
+  - Support for filtering exports via query parameters
+  - PEM bundle export with optional certificate chain
+  - JSON/YAML export with optional PEM content inclusion
+  - Configurable max export size via `max_export_size` plugin setting
+  - Sanitized filenames using certificate common name
+
 - **Compliance Reporting** ([#14](https://github.com/ctrl-alt-automate/netbox-ssl/issues/14)):
   - New CompliancePolicy model for defining compliance rules
   - New ComplianceCheck model for storing check results

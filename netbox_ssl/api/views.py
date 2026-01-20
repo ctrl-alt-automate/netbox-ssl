@@ -4,6 +4,8 @@ REST API views for NetBox SSL plugin.
 
 from django.conf import settings
 from django.db import DatabaseError, IntegrityError, transaction
+from django.db.models import Count
+from django.http import HttpResponse
 from netbox.api.viewsets import NetBoxModelViewSet
 from rest_framework import serializers, status
 from rest_framework.decorators import action
@@ -25,7 +27,7 @@ from ..models import (
     ComplianceCheck,
     CompliancePolicy,
 )
-from ..utils import ComplianceChecker
+from ..utils import CertificateExporter, ComplianceChecker, ExportFormatChoices
 from .serializers import (
     BulkComplianceRunSerializer,
     CertificateAssignmentSerializer,
@@ -146,6 +148,143 @@ class CertificateViewSet(NetBoxModelViewSet):
             },
             status=status.HTTP_201_CREATED,
         )
+
+    @action(detail=False, methods=["get", "post"], url_path="export")
+    def export(self, request):
+        """
+        Export certificates in various formats.
+
+        GET parameters or POST body:
+        - format: Export format (csv, json, yaml, pem). Default: json
+        - ids: List of certificate IDs to export (optional, exports all if not specified)
+        - fields: List of fields to include (optional)
+        - include_pem: Include PEM content (json/yaml only). Default: false
+        - include_chain: Include certificate chain (pem only). Default: true
+
+        Supports filtering via standard query parameters (status, tenant_id, etc.)
+
+        Example:
+        GET /certificates/export/?format=csv&status=active
+        POST /certificates/export/ {"format": "json", "ids": [1,2,3], "include_pem": true}
+        """
+        # Get parameters from query string or request body
+        if request.method == "GET":
+            params = request.query_params
+            export_format = params.get("format", "json")
+            ids = params.getlist("ids") or params.getlist("ids[]")
+            fields = params.getlist("fields") or params.getlist("fields[]")
+            include_pem = params.get("include_pem", "false").lower() == "true"
+            include_chain = params.get("include_chain", "true").lower() != "false"
+        else:  # POST
+            params = request.data
+            export_format = params.get("format", "json")
+            ids = params.get("ids", [])
+            fields = params.get("fields", [])
+            include_pem = params.get("include_pem", False)
+            include_chain = params.get("include_chain", True)
+
+        # Validate format
+        valid_formats = [c[0] for c in ExportFormatChoices.get_choices()]
+        if export_format.lower() not in valid_formats:
+            raise serializers.ValidationError({"format": f"Invalid format. Choose from: {valid_formats}"})
+
+        # Get certificates to export with assignment count annotation to avoid N+1 queries
+        if ids:
+            try:
+                ids = [int(i) for i in ids]
+                certificates = Certificate.objects.filter(pk__in=ids).annotate(_assignment_count=Count("assignments"))
+            except (ValueError, TypeError) as e:
+                raise serializers.ValidationError(
+                    {"ids": "Invalid certificate IDs. Must be a list of integers."}
+                ) from e
+        else:
+            # Apply filters from query parameters
+            certificates = self.filter_queryset(self.get_queryset()).annotate(_assignment_count=Count("assignments"))
+
+        # Limit export size
+        plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+        max_export_size = plugin_settings.get("max_export_size", 1000)
+        if certificates.count() > max_export_size:
+            raise serializers.ValidationError(
+                {
+                    "detail": f"Export size exceeds maximum of {max_export_size} certificates. "
+                    "Use filters or specify IDs to reduce the result set."
+                }
+            )
+
+        # Parse fields if provided
+        if fields:
+            if isinstance(fields, str):
+                fields = [f.strip() for f in fields.split(",")]
+        else:
+            fields = None  # Use defaults
+
+        try:
+            # Generate export
+            content = CertificateExporter.export(
+                certificates,
+                format=export_format,
+                fields=fields,
+                include_pem=include_pem,
+                include_chain=include_chain,
+            )
+        except ImportError as e:
+            raise serializers.ValidationError({"detail": str(e)}) from e
+        except Exception as e:
+            raise serializers.ValidationError({"detail": f"Export failed: {str(e)}"}) from e
+
+        # Get content type and extension
+        content_type = CertificateExporter.get_content_type(export_format)
+        extension = CertificateExporter.get_file_extension(export_format)
+
+        # Create response with file download
+        response = HttpResponse(content, content_type=content_type)
+        filename = f"certificates_export.{extension}"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+        return response
+
+    @action(detail=True, methods=["get"], url_path="export")
+    def export_single(self, request, pk=None):
+        """
+        Export a single certificate.
+
+        GET parameters:
+        - format: Export format (csv, json, yaml, pem). Default: json
+        - include_pem: Include PEM content (json/yaml). Default: true
+        - include_chain: Include certificate chain (pem). Default: true
+        """
+        certificate = self.get_object()
+
+        export_format = request.query_params.get("format", "json")
+        include_pem = request.query_params.get("include_pem", "true").lower() != "false"
+        include_chain = request.query_params.get("include_chain", "true").lower() != "false"
+
+        # Validate format
+        valid_formats = [c[0] for c in ExportFormatChoices.get_choices()]
+        if export_format.lower() not in valid_formats:
+            raise serializers.ValidationError({"format": f"Invalid format. Choose from: {valid_formats}"})
+
+        try:
+            content = CertificateExporter.export(
+                [certificate],
+                format=export_format,
+                include_pem=include_pem,
+                include_chain=include_chain,
+            )
+        except ImportError as e:
+            raise serializers.ValidationError({"detail": str(e)}) from e
+
+        content_type = CertificateExporter.get_content_type(export_format)
+        extension = CertificateExporter.get_file_extension(export_format)
+
+        response = HttpResponse(content, content_type=content_type)
+        # Use common name in filename (sanitized)
+        safe_name = "".join(c if c.isalnum() or c in ".-_" else "_" for c in certificate.common_name)
+        filename = f"{safe_name}.{extension}"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+        return response
 
     @action(detail=True, methods=["post"], url_path="compliance-check")
     def compliance_check(self, request, pk=None):
