@@ -33,6 +33,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ComplianceChecker utility for running policy evaluations
   - Full documentation for compliance reporting in data-models.md and api.md
 
+- **Certificate Authority Tracking** ([#13](https://github.com/ctrl-alt-automate/netbox-ssl/issues/13)):
+  - New `CertificateAuthority` model for tracking CAs
+  - CA types: Public, Internal/Private, ACME/Let's Encrypt
+  - Auto-detection of issuing CA based on issuer patterns
+  - `issuing_ca` foreign key on Certificate model
+  - Pre-defined list of common CAs (DigiCert, Let's Encrypt, Sectigo, etc.)
+  - Full REST API and GraphQL support for CAs
+  - CA management views (list, detail, add, edit, delete)
+  - Filter certificates by issuing CA
+  - Navigation menu item under "Management" group
+
+- **Certificate Signing Request (CSR) Tracking** ([#12](https://github.com/ctrl-alt-automate/netbox-ssl/issues/12)):
+  - New `CertificateSigningRequest` model for tracking pending certificate requests
+  - Full subject field support: CN, O, OU, L, ST, C
+  - Subject Alternative Names (SANs) parsing from CSR extensions
+  - Key information extraction: algorithm and key size
+  - SHA256 fingerprint calculation for duplicate detection
+  - Status tracking: Pending, Approved, Rejected, Issued, Expired
+  - Link to resulting certificate when issued
+  - Smart Paste import via web UI
+  - REST API endpoints: CRUD + `/csrs/import/`
+  - GraphQL query support
+  - Multi-tenancy support
+
 ## [0.2.0] - 2025-01-20
 
 ### Added
