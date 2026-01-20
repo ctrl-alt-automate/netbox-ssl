@@ -9,7 +9,7 @@ import strawberry_django
 from netbox.graphql.types import NetBoxObjectType
 
 from .. import filtersets
-from ..models import Certificate, CertificateAssignment
+from ..models import Certificate, CertificateAssignment, CertificateSigningRequest
 
 
 @strawberry_django.type(
@@ -66,3 +66,49 @@ class CertificateAssignmentType(NetBoxObjectType):
     certificate: Annotated["CertificateType", strawberry.lazy(".types")]
     is_primary: bool
     notes: str
+
+
+@strawberry_django.type(
+    CertificateSigningRequest,
+    fields="__all__",
+    filters=filtersets.CertificateSigningRequestFilterSet,
+)
+class CertificateSigningRequestType(NetBoxObjectType):
+    """GraphQL type for CertificateSigningRequest model."""
+
+    common_name: str
+    organization: str
+    organizational_unit: str
+    locality: str
+    state: str
+    country: str
+    sans: list[str]
+    key_size: int | None
+    algorithm: str
+    fingerprint_sha256: str
+    pem_content: str
+    status: str
+    requested_date: str
+    requested_by: str
+    target_ca: str
+    notes: str
+    # resulting_certificate is auto-resolved by strawberry_django from the ForeignKey
+    resulting_certificate: Annotated["CertificateType", strawberry.lazy(".types")] | None
+
+    @strawberry_django.field
+    def subject_string(self) -> str:
+        """Build a subject string from the CSR fields."""
+        parts = []
+        if self.common_name:
+            parts.append(f"CN={self.common_name}")
+        if self.organization:
+            parts.append(f"O={self.organization}")
+        if self.organizational_unit:
+            parts.append(f"OU={self.organizational_unit}")
+        if self.locality:
+            parts.append(f"L={self.locality}")
+        if self.state:
+            parts.append(f"ST={self.state}")
+        if self.country:
+            parts.append(f"C={self.country}")
+        return ", ".join(parts) if parts else ""
