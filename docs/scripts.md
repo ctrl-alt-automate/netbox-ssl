@@ -56,14 +56,25 @@ NetBox 4.4+ supports scheduled jobs. To run the expiry notification on a schedul
 
 ### Using the API
 
+First, get the script's ID:
+
 ```bash
-# Create a scheduled job via API
+# Get the script ID
+curl -H "Authorization: Token $NETBOX_TOKEN" \
+  https://netbox.example.com/api/extras/scripts/netbox_ssl.scripts.CertificateExpiryNotification/
+```
+
+Then use the `id` from the response to create a scheduled job:
+
+```bash
+# Create a scheduled job via API (replace SCRIPT_ID with the id from above)
 curl -X POST \
   -H "Authorization: Token $NETBOX_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Daily Certificate Expiry Check",
     "object_type": "extras.script",
+    "object_id": SCRIPT_ID,
     "interval": 86400,
     "data": {
       "warning_days": 30,
@@ -103,7 +114,7 @@ For environments without NetBox job scheduling, use external cron:
 
 NETBOX_URL="https://netbox.example.com"
 NETBOX_TOKEN="your-api-token"
-SCRIPT_ID="netbox_ssl.CertificateExpiryNotification"
+SCRIPT_ID="netbox_ssl.scripts.CertificateExpiryNotification"
 
 # Execute the script via API
 curl -X POST \

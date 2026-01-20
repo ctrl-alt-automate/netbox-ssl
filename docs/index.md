@@ -23,7 +23,7 @@ Track certificates, monitor expiration dates, and never lose sight of where your
 | Getting Started | Daily Usage | Reference |
 |:---------------:|:-----------:|:---------:|
 | [Installation](installation.md) | [Usage](usage.md) | [API](api.md) |
-| [Configuration](configuration.md) | [Scripts](scripts.md) | [Data Models](data-models.md) |
+| [Configuration](configuration.md) | [Renewal Workflow](usage.md#janus-renewal-workflow)<br>[Scripts](scripts.md) | [Data Models](data-models.md) |
 
 ## What Can You Do?
 

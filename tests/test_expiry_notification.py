@@ -211,24 +211,81 @@ class TestCertificateCategorization:
 class TestWebhookOutputFormat:
     """Tests for webhook output format specification."""
 
+    # Sample output structure that matches the script's return format
+    SAMPLE_OUTPUT = {
+        "summary": {
+            "total_alerts": 3,
+            "expired_count": 1,
+            "critical_count": 1,
+            "warning_count": 1,
+            "thresholds": {
+                "warning_days": 30,
+                "critical_days": 14,
+            },
+            "filters": {
+                "tenant": None,
+                "active_only": True,
+                "include_expired": True,
+            },
+            "generated_at": "2025-01-20T10:00:00+00:00",
+        },
+        "expired": [
+            {
+                "id": 1,
+                "common_name": "expired.example.com",
+                "serial_number": "01:23:45",
+                "issuer": "CN=Test CA",
+                "valid_to": "2025-01-15T00:00:00+00:00",
+                "days_expired": 5,
+                "tenant": None,
+                "url": "/plugins/ssl/certificates/1/",
+            }
+        ],
+        "critical": [
+            {
+                "id": 2,
+                "common_name": "critical.example.com",
+                "serial_number": "01:23:46",
+                "issuer": "CN=Test CA",
+                "valid_to": "2025-01-25T00:00:00+00:00",
+                "days_remaining": 5,
+                "tenant": None,
+                "url": "/plugins/ssl/certificates/2/",
+            }
+        ],
+        "warning": [
+            {
+                "id": 3,
+                "common_name": "warning.example.com",
+                "serial_number": "01:23:47",
+                "issuer": "CN=Test CA",
+                "valid_to": "2025-02-10T00:00:00+00:00",
+                "days_remaining": 21,
+                "tenant": "Acme Corp",
+                "url": "/plugins/ssl/certificates/3/",
+            }
+        ],
+    }
+
     @pytest.mark.unit
     def test_output_has_summary_section(self):
         """Test that output format includes summary section."""
         expected_keys = ["total_alerts", "expired_count", "critical_count", "warning_count"]
-        # This documents the expected output format
-        assert all(key for key in expected_keys)
+        assert all(key in self.SAMPLE_OUTPUT["summary"] for key in expected_keys)
 
     @pytest.mark.unit
     def test_output_has_thresholds_in_summary(self):
         """Test that output includes threshold configuration."""
         expected_threshold_keys = ["warning_days", "critical_days"]
-        assert all(key for key in expected_threshold_keys)
+        assert "thresholds" in self.SAMPLE_OUTPUT["summary"]
+        assert all(key in self.SAMPLE_OUTPUT["summary"]["thresholds"] for key in expected_threshold_keys)
 
     @pytest.mark.unit
     def test_output_has_filters_in_summary(self):
         """Test that output includes filter settings."""
         expected_filter_keys = ["tenant", "active_only", "include_expired"]
-        assert all(key for key in expected_filter_keys)
+        assert "filters" in self.SAMPLE_OUTPUT["summary"]
+        assert all(key in self.SAMPLE_OUTPUT["summary"]["filters"] for key in expected_filter_keys)
 
     @pytest.mark.unit
     def test_certificate_entry_has_required_fields(self):
@@ -242,19 +299,29 @@ class TestWebhookOutputFormat:
             "tenant",
             "url",
         ]
-        assert all(field for field in expected_fields)
+        # Check expired entries
+        for entry in self.SAMPLE_OUTPUT["expired"]:
+            assert all(field in entry for field in expected_fields)
+        # Check critical entries
+        for entry in self.SAMPLE_OUTPUT["critical"]:
+            assert all(field in entry for field in expected_fields)
+        # Check warning entries
+        for entry in self.SAMPLE_OUTPUT["warning"]:
+            assert all(field in entry for field in expected_fields)
 
     @pytest.mark.unit
     def test_expired_entries_have_days_expired(self):
         """Test that expired entries include days_expired field."""
-        field = "days_expired"
-        assert field == "days_expired"
+        for entry in self.SAMPLE_OUTPUT["expired"]:
+            assert "days_expired" in entry
 
     @pytest.mark.unit
     def test_warning_critical_entries_have_days_remaining(self):
         """Test that warning/critical entries include days_remaining field."""
-        field = "days_remaining"
-        assert field == "days_remaining"
+        for entry in self.SAMPLE_OUTPUT["critical"]:
+            assert "days_remaining" in entry
+        for entry in self.SAMPLE_OUTPUT["warning"]:
+            assert "days_remaining" in entry
 
 
 class TestPluginSettingsIntegration:

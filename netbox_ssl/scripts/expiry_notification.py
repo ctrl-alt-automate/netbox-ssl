@@ -9,7 +9,6 @@ manually. Results can be sent to external systems via webhooks.
 from datetime import timedelta
 
 from django.conf import settings
-from django.db.models import Q
 from django.utils import timezone
 from extras.scripts import BooleanVar, IntegerVar, ObjectVar, Script
 
@@ -64,8 +63,13 @@ class CertificateExpiryNotification(Script):
     def run(self, data, commit):
         """Execute the expiry notification check."""
         # Get thresholds from input or plugin settings
-        warning_days = data.get("warning_days") or self.get_plugin_setting("expiry_warning_days", 30)
-        critical_days = data.get("critical_days") or self.get_plugin_setting("expiry_critical_days", 14)
+        # Use explicit None check to allow 0 as a valid value
+        warning_days = data.get("warning_days")
+        if warning_days is None:
+            warning_days = self.get_plugin_setting("expiry_warning_days", 30)
+        critical_days = data.get("critical_days")
+        if critical_days is None:
+            critical_days = self.get_plugin_setting("expiry_critical_days", 14)
         tenant = data.get("tenant")
         include_expired = data.get("include_expired", True)
         active_only = data.get("active_only", True)
@@ -90,23 +94,23 @@ class CertificateExpiryNotification(Script):
             queryset = queryset.filter(tenant=tenant)
             self.log_info(f"  Tenant filter: {tenant.name}")
 
-        # Categorize certificates
+        # Categorize certificates with a single optimized query
         expired = []
         critical = []
         warning = []
 
-        if include_expired:
-            expired = list(queryset.filter(valid_to__lt=now).order_by("valid_to"))
+        # Fetch all certificates within the warning threshold in one query
+        certs_to_check = queryset.filter(valid_to__lte=warning_threshold)
+        if not include_expired:
+            certs_to_check = certs_to_check.filter(valid_to__gte=now)
 
-        critical = list(
-            queryset.filter(Q(valid_to__gte=now) & Q(valid_to__lte=critical_threshold)).order_by("valid_to")
-        )
-
-        warning = list(
-            queryset.filter(Q(valid_to__gt=critical_threshold) & Q(valid_to__lte=warning_threshold)).order_by(
-                "valid_to"
-            )
-        )
+        for cert in certs_to_check.order_by("valid_to"):
+            if cert.valid_to < now:
+                expired.append(cert)
+            elif cert.valid_to <= critical_threshold:
+                critical.append(cert)
+            else:
+                warning.append(cert)
 
         # Generate report
         total_alerts = len(expired) + len(critical) + len(warning)
