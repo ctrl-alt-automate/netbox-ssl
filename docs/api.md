@@ -39,6 +39,19 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `POST` | `/certificates/bulk-import/` | Bulk import from PEM |
 | `GET/POST` | `/certificates/export/` | Export certificates |
 | `GET` | `/certificates/{id}/export/` | Export single certificate |
+| `POST` | `/certificates/{id}/compliance-check/` | Run compliance check |
+| `POST` | `/certificates/bulk-compliance-check/` | Bulk compliance check |
+
+### Certificate Authorities
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/certificate-authorities/` | List all CAs |
+| `POST` | `/certificate-authorities/` | Create a CA |
+| `GET` | `/certificate-authorities/{id}/` | Get CA details |
+| `PUT` | `/certificate-authorities/{id}/` | Full update |
+| `PATCH` | `/certificate-authorities/{id}/` | Partial update |
+| `DELETE` | `/certificate-authorities/{id}/` | Delete CA |
 
 ### Assignments
 
@@ -49,6 +62,35 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `GET` | `/assignments/{id}/` | Get assignment details |
 | `PUT` | `/assignments/{id}/` | Update assignment |
 | `DELETE` | `/assignments/{id}/` | Delete assignment |
+
+### Certificate Signing Requests (CSRs)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/csrs/` | List all CSRs |
+| `POST` | `/csrs/` | Create a CSR |
+| `GET` | `/csrs/{id}/` | Get CSR details |
+| `PUT` | `/csrs/{id}/` | Full update |
+| `PATCH` | `/csrs/{id}/` | Partial update |
+| `DELETE` | `/csrs/{id}/` | Delete CSR |
+| `POST` | `/csrs/import/` | Import from PEM |
+
+### Compliance Policies
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/compliance-policies/` | List all policies |
+| `POST` | `/compliance-policies/` | Create policy |
+| `GET` | `/compliance-policies/{id}/` | Get policy details |
+| `PUT` | `/compliance-policies/{id}/` | Update policy |
+| `DELETE` | `/compliance-policies/{id}/` | Delete policy |
+
+### Compliance Checks
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/compliance-checks/` | List all check results |
+| `GET` | `/compliance-checks/{id}/` | Get check result details |
 
 ---
 
@@ -63,8 +105,23 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `status` | Choice | `active` | Filter by status |
 | `tenant_id` | Integer | `1` | Filter by tenant |
 | `issuer` | String | `DigiCert` | Filter by issuer |
+| `issuing_ca_id` | Integer | `1` | Filter by issuing CA |
+| `has_issuing_ca` | Boolean | `true` | Filter by whether CA is set |
 | `valid_to__lt` | DateTime | `2024-06-01` | Expiring before date |
 | `valid_to__gt` | DateTime | `2024-01-01` | Expiring after date |
+| `tag` | String | `production` | Filter by tag slug |
+
+### CSR Filters
+
+| Parameter | Type | Example | Description |
+|-----------|------|---------|-------------|
+| `common_name` | String | `example.com` | Filter by CN (contains) |
+| `common_name__ic` | String | `example` | Case-insensitive contains |
+| `status` | Choice | `pending` | Filter by status |
+| `tenant_id` | Integer | `1` | Filter by tenant |
+| `organization` | String | `Example Inc` | Filter by organization |
+| `requested_by` | String | `john` | Filter by requester |
+| `target_ca` | String | `DigiCert` | Filter by target CA |
 | `tag` | String | `production` | Filter by tag slug |
 
 ### Examples
@@ -126,6 +183,21 @@ curl -X POST \
        "notes": "Production HTTPS endpoint"
      }' \
      http://localhost:8000/api/plugins/netbox-ssl/assignments/
+```
+
+### Import a CSR
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "pem_content": "-----BEGIN CERTIFICATE REQUEST-----\nMIIC...\n-----END CERTIFICATE REQUEST-----",
+       "requested_by": "john.doe@example.com",
+       "target_ca": "DigiCert",
+       "tenant": 1
+     }' \
+     http://localhost:8000/api/plugins/netbox-ssl/csrs/import/
 ```
 
 ---
@@ -446,6 +518,199 @@ with open("certificates.pem", "w") as f:
 
 ---
 
+## Compliance Reporting
+
+Run compliance checks on certificates against defined policies to ensure they meet organizational security requirements.
+
+### Single Certificate Compliance Check
+
+`POST /api/plugins/netbox-ssl/certificates/{id}/compliance-check/`
+
+Run all enabled compliance policies against a single certificate.
+
+#### Example Request
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{}' \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/1/compliance-check/
+```
+
+#### With Specific Policies
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"policy_ids": [1, 2, 3]}' \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/1/compliance-check/
+```
+
+#### Success Response
+
+```json
+{
+  "certificate_id": 1,
+  "certificate_name": "example.com",
+  "total_checks": 5,
+  "passed": 4,
+  "failed": 1,
+  "compliance_score": 80.0,
+  "checks": [
+    {
+      "id": 10,
+      "policy": {"id": 1, "name": "Min Key Size 2048", "policy_type": "min_key_size"},
+      "result": "pass",
+      "message": "Key size 4096 bits meets minimum requirement of 2048 bits",
+      "checked_value": "4096 bits",
+      "expected_value": ">= 2048 bits"
+    },
+    {
+      "id": 11,
+      "policy": {"id": 2, "name": "Expiry Warning 30 Days", "policy_type": "expiry_warning"},
+      "result": "fail",
+      "message": "Certificate expires in 15 days (threshold: 30)",
+      "checked_value": "15 days",
+      "expected_value": "> 30 days"
+    }
+  ]
+}
+```
+
+### Bulk Compliance Check
+
+`POST /api/plugins/netbox-ssl/certificates/bulk-compliance-check/`
+
+Run compliance checks on multiple certificates.
+
+#### Example Request
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "certificate_ids": [1, 2, 3, 4, 5],
+       "policy_ids": [1, 2]
+     }' \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-compliance-check/
+```
+
+#### Success Response
+
+```json
+{
+  "total_certificates": 5,
+  "processed": 5,
+  "missing_ids": [],
+  "overall_passed": 8,
+  "overall_failed": 2,
+  "overall_score": 80.0,
+  "reports": [
+    {
+      "certificate_id": 1,
+      "certificate_name": "example.com",
+      "total_checks": 2,
+      "passed": 2,
+      "failed": 0,
+      "compliance_score": 100.0
+    },
+    {
+      "certificate_id": 2,
+      "certificate_name": "api.example.com",
+      "total_checks": 2,
+      "passed": 1,
+      "failed": 1,
+      "compliance_score": 50.0
+    }
+  ]
+}
+```
+
+### Creating Compliance Policies
+
+`POST /api/plugins/netbox-ssl/compliance-policies/`
+
+#### Policy Examples
+
+```bash
+# Minimum key size policy
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "Min Key Size 2048",
+       "description": "Require at least 2048-bit keys for all certificates",
+       "policy_type": "min_key_size",
+       "severity": "critical",
+       "enabled": true,
+       "parameters": {"min_bits": 2048}
+     }' \
+     http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/
+
+# Expiry warning policy
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "Expiry Warning 30 Days",
+       "description": "Warn when certificates expire within 30 days",
+       "policy_type": "expiry_warning",
+       "severity": "warning",
+       "enabled": true,
+       "parameters": {"warning_days": 30}
+     }' \
+     http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/
+
+# Forbidden algorithm policy
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "No DSA Algorithm",
+       "description": "DSA algorithm is not allowed",
+       "policy_type": "algorithm_forbidden",
+       "severity": "critical",
+       "enabled": true,
+       "parameters": {"algorithms": ["dsa"]}
+     }' \
+     http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/
+
+# Wildcard forbidden policy
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "No Wildcards",
+       "description": "Wildcard certificates are not allowed",
+       "policy_type": "wildcard_forbidden",
+       "severity": "warning",
+       "enabled": true,
+       "parameters": {}
+     }' \
+     http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/
+```
+
+### Compliance Filters
+
+```bash
+# List all compliance checks that failed
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/compliance-checks/?result=fail"
+
+# List critical severity policy violations
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/compliance-checks/?severity=critical&result=fail"
+
+# List all enabled policies
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/?enabled=true"
+```
+
+---
+
 ## GraphQL
 
 NetBox SSL extends NetBox's GraphQL API.
@@ -531,6 +796,40 @@ query {
 }
 ```
 
+### Query Certificate Authorities
+
+```graphql
+query {
+  certificate_authority_list {
+    id
+    name
+    type
+    description
+    issuer_pattern
+    website_url
+    portal_url
+    contact_email
+    is_approved
+    certificate_count
+  }
+}
+```
+
+### Single Certificate Authority
+
+```graphql
+query {
+  certificate_authority(id: 1) {
+    name
+    type
+    description
+    issuer_pattern
+    is_approved
+    certificate_count
+  }
+}
+```
+
 ### Query Assignments
 
 ```graphql
@@ -549,6 +848,56 @@ query {
 }
 ```
 
+### Query CSRs
+
+```graphql
+query {
+  certificate_signing_request_list {
+    id
+    common_name
+    organization
+    status
+    requested_date
+    requested_by
+    target_ca
+    algorithm
+    key_size
+    tenant {
+      name
+    }
+    resulting_certificate {
+      common_name
+      valid_to
+    }
+  }
+}
+```
+
+### Single CSR
+
+```graphql
+query {
+  certificate_signing_request(id: 1) {
+    common_name
+    organization
+    organizational_unit
+    locality
+    state
+    country
+    sans
+    fingerprint_sha256
+    algorithm
+    key_size
+    status
+    requested_date
+    requested_by
+    target_ca
+    notes
+    subject_string
+  }
+}
+```
+
 ---
 
 ## Webhooks
@@ -561,6 +910,7 @@ NetBox SSL triggers webhooks for certificate lifecycle events.
 |-------------|--------|
 | Certificate | Created, Updated, Deleted |
 | CertificateAssignment | Created, Updated, Deleted |
+| CertificateSigningRequest | Created, Updated, Deleted |
 
 ### Configuration
 
