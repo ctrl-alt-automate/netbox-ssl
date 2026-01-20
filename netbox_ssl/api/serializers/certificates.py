@@ -23,6 +23,8 @@ class CertificateSerializer(NetBoxModelSerializer):
     is_expiring_soon = serializers.BooleanField(read_only=True)
     expiry_status = serializers.CharField(read_only=True)
     assignment_count = serializers.SerializerMethodField()
+    chain_is_valid = serializers.BooleanField(read_only=True)
+    chain_needs_validation = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Certificate
@@ -50,6 +52,13 @@ class CertificateSerializer(NetBoxModelSerializer):
             "tenant",
             "pem_content",
             "assignment_count",
+            # Chain validation fields
+            "chain_status",
+            "chain_validation_message",
+            "chain_validated_at",
+            "chain_depth",
+            "chain_is_valid",
+            "chain_needs_validation",
             "tags",
             "custom_fields",
             "created",
@@ -64,6 +73,7 @@ class CertificateSerializer(NetBoxModelSerializer):
             "status",
             "valid_to",
             "days_remaining",
+            "chain_status",
         ]
 
     def get_assignment_count(self, obj):

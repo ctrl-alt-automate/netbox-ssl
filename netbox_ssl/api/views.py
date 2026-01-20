@@ -125,6 +125,110 @@ class CertificateViewSet(NetBoxModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    @action(detail=True, methods=["post"], url_path="validate-chain")
+    def validate_chain(self, request, pk=None):
+        """
+        Validate the certificate chain for a specific certificate.
+
+        Performs chain validation and updates the certificate's chain_status,
+        chain_validation_message, chain_validated_at, and chain_depth fields.
+        """
+        certificate = self.get_object()
+
+        if not certificate.pem_content:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Certificate has no PEM content for validation",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        result = certificate.validate_chain(save=True)
+
+        if result is None:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Chain validation failed - no PEM content",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "status": result.status.value,
+                "is_valid": result.is_valid,
+                "message": result.message,
+                "chain_depth": result.chain_depth,
+                "certificates": result.certificates,
+                "errors": result.errors,
+                "validated_at": result.validated_at.isoformat(),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["post"], url_path="bulk-validate-chain")
+    def bulk_validate_chain(self, request):
+        """
+        Validate certificate chains for multiple certificates.
+
+        Accepts a list of certificate IDs and validates each one.
+        """
+        certificate_ids = request.data.get("ids", [])
+
+        if not certificate_ids:
+            raise serializers.ValidationError(
+                {"detail": "No certificate IDs provided. Send {'ids': [1, 2, 3]}."}
+            )
+
+        # Limit batch size
+        plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+        max_batch_size = plugin_settings.get("bulk_validate_max_batch_size", 100)
+        if len(certificate_ids) > max_batch_size:
+            raise serializers.ValidationError(
+                {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
+            )
+
+        certificates = Certificate.objects.filter(pk__in=certificate_ids)
+        results = []
+
+        for cert in certificates:
+            if cert.pem_content:
+                result = cert.validate_chain(save=True)
+                results.append(
+                    {
+                        "id": cert.pk,
+                        "common_name": cert.common_name,
+                        "status": result.status.value if result else "error",
+                        "is_valid": result.is_valid if result else False,
+                        "message": result.message if result else "No PEM content",
+                        "chain_depth": result.chain_depth if result else None,
+                    }
+                )
+            else:
+                results.append(
+                    {
+                        "id": cert.pk,
+                        "common_name": cert.common_name,
+                        "status": "error",
+                        "is_valid": False,
+                        "message": "No PEM content available",
+                        "chain_depth": None,
+                    }
+                )
+
+        valid_count = sum(1 for r in results if r["is_valid"])
+        return Response(
+            {
+                "validated_count": len(results),
+                "valid_count": valid_count,
+                "invalid_count": len(results) - valid_count,
+                "results": results,
+            },
+            status=status.HTTP_200_OK,
+        )
+
 
 class CertificateAssignmentViewSet(NetBoxModelViewSet):
     """API viewset for CertificateAssignment model."""

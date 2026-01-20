@@ -37,6 +37,8 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `DELETE` | `/certificates/{id}/` | Delete certificate |
 | `POST` | `/certificates/import/` | Import from PEM |
 | `POST` | `/certificates/bulk-import/` | Bulk import from PEM |
+| `POST` | `/certificates/{id}/validate-chain/` | Validate certificate chain |
+| `POST` | `/certificates/bulk-validate-chain/` | Bulk validate chains |
 
 ### Assignments
 
@@ -265,6 +267,123 @@ if response.status_code == 201:
 else:
     print(f"Error: {response.json()}")
 ```
+
+---
+
+## Chain Validation
+
+Validate certificate chains to ensure they are complete and properly signed.
+
+### Single Certificate Validation
+
+`POST /api/plugins/netbox-ssl/certificates/{id}/validate-chain/`
+
+Validates the chain for a specific certificate and updates its chain status fields.
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/1/validate-chain/
+```
+
+### Response
+
+```json
+{
+  "status": "valid",
+  "is_valid": true,
+  "message": "Certificate chain is complete and valid",
+  "chain_depth": 3,
+  "certificates": [
+    {
+      "common_name": "www.example.com",
+      "subject": "CN=www.example.com,O=Example Inc",
+      "issuer": "CN=DigiCert TLS RSA SHA256 2020 CA1",
+      "is_leaf": true,
+      "is_self_signed": false
+    },
+    {
+      "common_name": "DigiCert TLS RSA SHA256 2020 CA1",
+      "subject": "CN=DigiCert TLS RSA SHA256 2020 CA1",
+      "issuer": "CN=DigiCert Global Root CA",
+      "is_leaf": false,
+      "is_self_signed": false
+    },
+    {
+      "common_name": "DigiCert Global Root CA",
+      "subject": "CN=DigiCert Global Root CA",
+      "issuer": "CN=DigiCert Global Root CA",
+      "is_leaf": false,
+      "is_self_signed": true
+    }
+  ],
+  "errors": [],
+  "validated_at": "2024-01-20T15:30:00Z"
+}
+```
+
+### Bulk Chain Validation
+
+`POST /api/plugins/netbox-ssl/certificates/bulk-validate-chain/`
+
+Validates chains for multiple certificates in a single request.
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"ids": [1, 2, 3, 4, 5]}' \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-validate-chain/
+```
+
+### Response
+
+```json
+{
+  "validated_count": 5,
+  "valid_count": 4,
+  "invalid_count": 1,
+  "results": [
+    {
+      "id": 1,
+      "common_name": "www.example.com",
+      "status": "valid",
+      "is_valid": true,
+      "message": "Certificate chain is complete and valid",
+      "chain_depth": 3
+    },
+    {
+      "id": 2,
+      "common_name": "api.example.com",
+      "status": "self_signed",
+      "is_valid": true,
+      "message": "Certificate is self-signed (no chain required)",
+      "chain_depth": 1
+    },
+    {
+      "id": 3,
+      "common_name": "internal.example.com",
+      "status": "no_chain",
+      "is_valid": false,
+      "message": "Certificate requires a chain but none provided",
+      "chain_depth": 1
+    }
+  ]
+}
+```
+
+### Chain Status Values
+
+| Status | Description |
+|--------|-------------|
+| `valid` | Chain is complete and all signatures verified |
+| `self_signed` | Certificate is self-signed (valid, no chain needed) |
+| `no_chain` | Certificate requires chain but none provided |
+| `incomplete` | Chain is missing intermediate certificates |
+| `invalid_signature` | One or more signatures in chain are invalid |
+| `expired` | One or more certificates in chain have expired |
+| `not_yet_valid` | One or more certificates are not yet valid |
+| `parse_error` | Failed to parse certificate or chain |
 
 ---
 
