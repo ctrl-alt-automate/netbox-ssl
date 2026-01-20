@@ -43,6 +43,29 @@ menu = PluginMenu(
                 ),
             ),
         ),
+        (
+            "Requests",
+            (
+                PluginMenuItem(
+                    link="plugins:netbox_ssl:certificatesigningrequest_list",
+                    link_text="CSRs",
+                    permissions=["netbox_ssl.view_certificatesigningrequest"],
+                    buttons=(
+                        PluginMenuButton(
+                            link="plugins:netbox_ssl:certificatesigningrequest_add",
+                            title="Add",
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["netbox_ssl.add_certificatesigningrequest"],
+                        ),
+                    ),
+                ),
+                PluginMenuItem(
+                    link="plugins:netbox_ssl:csr_import",
+                    link_text="Import CSR",
+                    permissions=["netbox_ssl.add_certificatesigningrequest"],
+                ),
+            ),
+        ),
     ),
     icon_class="mdi mdi-certificate",
 )

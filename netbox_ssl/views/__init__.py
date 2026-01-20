@@ -15,6 +15,15 @@ from .certificates import (
     CertificateRenewView,
     CertificateView,
 )
+from .csr import (
+    CertificateSigningRequestBulkDeleteView,
+    CertificateSigningRequestBulkEditView,
+    CertificateSigningRequestDeleteView,
+    CertificateSigningRequestEditView,
+    CertificateSigningRequestListView,
+    CertificateSigningRequestView,
+    CSRImportView,
+)
 
 __all__ = [
     # Certificate views
@@ -26,6 +35,14 @@ __all__ = [
     "CertificateBulkDeleteView",
     "CertificateImportView",
     "CertificateRenewView",
+    # CSR views
+    "CertificateSigningRequestListView",
+    "CertificateSigningRequestView",
+    "CertificateSigningRequestEditView",
+    "CertificateSigningRequestDeleteView",
+    "CertificateSigningRequestBulkEditView",
+    "CertificateSigningRequestBulkDeleteView",
+    "CSRImportView",
     # Assignment views
     "CertificateAssignmentListView",
     "CertificateAssignmentView",

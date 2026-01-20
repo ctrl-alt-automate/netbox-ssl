@@ -9,7 +9,7 @@ import strawberry_django
 from netbox.graphql.types import NetBoxObjectType
 
 from .. import filtersets
-from ..models import Certificate, CertificateAssignment
+from ..models import Certificate, CertificateAssignment, CertificateSigningRequest
 
 
 @strawberry_django.type(
@@ -66,3 +66,39 @@ class CertificateAssignmentType(NetBoxObjectType):
     certificate: Annotated["CertificateType", strawberry.lazy(".types")]
     is_primary: bool
     notes: str
+
+
+@strawberry_django.type(
+    CertificateSigningRequest,
+    fields="__all__",
+    filters=filtersets.CertificateSigningRequestFilterSet,
+)
+class CertificateSigningRequestType(NetBoxObjectType):
+    """GraphQL type for CertificateSigningRequest model."""
+
+    common_name: str
+    organization: str
+    organizational_unit: str
+    locality: str
+    state: str
+    country: str
+    sans: list[str]
+    key_size: int | None
+    algorithm: str
+    fingerprint_sha256: str
+    pem_content: str
+    status: str
+    requested_date: str
+    requested_by: str
+    target_ca: str
+    notes: str
+
+    @strawberry_django.field
+    def resulting_certificate(self) -> CertificateType | None:
+        if self.resulting_certificate:
+            return self.resulting_certificate
+        return None
+
+    @strawberry_django.field
+    def subject_string(self) -> str:
+        return self.subject_string

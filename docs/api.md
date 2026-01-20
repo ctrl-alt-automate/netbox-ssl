@@ -48,6 +48,18 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `PUT` | `/assignments/{id}/` | Update assignment |
 | `DELETE` | `/assignments/{id}/` | Delete assignment |
 
+### Certificate Signing Requests (CSRs)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/csrs/` | List all CSRs |
+| `POST` | `/csrs/` | Create a CSR |
+| `GET` | `/csrs/{id}/` | Get CSR details |
+| `PUT` | `/csrs/{id}/` | Full update |
+| `PATCH` | `/csrs/{id}/` | Partial update |
+| `DELETE` | `/csrs/{id}/` | Delete CSR |
+| `POST` | `/csrs/import/` | Import from PEM |
+
 ---
 
 ## Filtering
@@ -63,6 +75,19 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `issuer` | String | `DigiCert` | Filter by issuer |
 | `valid_to__lt` | DateTime | `2024-06-01` | Expiring before date |
 | `valid_to__gt` | DateTime | `2024-01-01` | Expiring after date |
+| `tag` | String | `production` | Filter by tag slug |
+
+### CSR Filters
+
+| Parameter | Type | Example | Description |
+|-----------|------|---------|-------------|
+| `common_name` | String | `example.com` | Filter by CN (contains) |
+| `common_name__ic` | String | `example` | Case-insensitive contains |
+| `status` | Choice | `pending` | Filter by status |
+| `tenant_id` | Integer | `1` | Filter by tenant |
+| `organization` | String | `Example Inc` | Filter by organization |
+| `requested_by` | String | `john` | Filter by requester |
+| `target_ca` | String | `DigiCert` | Filter by target CA |
 | `tag` | String | `production` | Filter by tag slug |
 
 ### Examples
@@ -124,6 +149,21 @@ curl -X POST \
        "notes": "Production HTTPS endpoint"
      }' \
      http://localhost:8000/api/plugins/netbox-ssl/assignments/
+```
+
+### Import a CSR
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "pem_content": "-----BEGIN CERTIFICATE REQUEST-----\nMIIC...\n-----END CERTIFICATE REQUEST-----",
+       "requested_by": "john.doe@example.com",
+       "target_ca": "DigiCert",
+       "tenant": 1
+     }' \
+     http://localhost:8000/api/plugins/netbox-ssl/csrs/import/
 ```
 
 ---
@@ -371,6 +411,56 @@ query {
 }
 ```
 
+### Query CSRs
+
+```graphql
+query {
+  certificate_signing_request_list {
+    id
+    common_name
+    organization
+    status
+    requested_date
+    requested_by
+    target_ca
+    algorithm
+    key_size
+    tenant {
+      name
+    }
+    resulting_certificate {
+      common_name
+      valid_to
+    }
+  }
+}
+```
+
+### Single CSR
+
+```graphql
+query {
+  certificate_signing_request(id: 1) {
+    common_name
+    organization
+    organizational_unit
+    locality
+    state
+    country
+    sans
+    fingerprint_sha256
+    algorithm
+    key_size
+    status
+    requested_date
+    requested_by
+    target_ca
+    notes
+    subject_string
+  }
+}
+```
+
 ---
 
 ## Webhooks
@@ -383,6 +473,7 @@ NetBox SSL triggers webhooks for certificate lifecycle events.
 |-------------|--------|
 | Certificate | Created, Updated, Deleted |
 | CertificateAssignment | Created, Updated, Deleted |
+| CertificateSigningRequest | Created, Updated, Deleted |
 
 ### Configuration
 

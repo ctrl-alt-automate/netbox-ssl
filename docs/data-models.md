@@ -28,6 +28,20 @@ This page documents the database models used by NetBox SSL Plugin.
     ┌───────┐ ┌───────┐ ┌───────┐
     │Device │ │  VM   │ │Service│
     └───────┘ └───────┘ └───────┘
+
+
+┌─────────────────────────────────────────┐
+│    CertificateSigningRequest (CSR)      │
+│  • common_name, subject fields          │
+│  • SANs, algorithm, key_size            │
+│  • status, fingerprint                  │
+│  • requested_by, target_ca              │
+└─────────────────┬───────────────────────┘
+                  │ Optional FK
+                  ▼
+            ┌────────────┐
+            │Certificate │
+            └────────────┘
 ```
 
 ---
@@ -132,12 +146,72 @@ Assignments must be unique on `(certificate, assigned_object_type, assigned_obje
 
 ---
 
+## CertificateSigningRequest (CSR)
+
+Tracks pending Certificate Signing Requests before they become issued certificates.
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `common_name` | CharField(255) | Yes | Common Name (CN) from CSR subject |
+| `organization` | CharField(255) | | Organization (O) from CSR subject |
+| `organizational_unit` | CharField(255) | | Organizational Unit (OU) |
+| `locality` | CharField(255) | | Locality/City (L) |
+| `state` | CharField(255) | | State/Province (ST) |
+| `country` | CharField(2) | | Country (C) - 2-letter code |
+| `sans` | JSONField | | Subject Alternative Names (array) |
+| `key_size` | IntegerField | | Key size in bits |
+| `algorithm` | CharField(20) | Yes | Key algorithm (RSA, ECDSA, Ed25519) |
+| `fingerprint_sha256` | CharField(95) | Yes | SHA256 fingerprint of CSR (unique) |
+| `pem_content` | TextField | Yes | CSR in PEM format |
+| `status` | CharField(20) | Yes | CSR lifecycle status |
+| `requested_date` | DateTimeField | Yes | When the CSR was imported |
+| `requested_by` | CharField(255) | | Who requested this certificate |
+| `target_ca` | CharField(255) | | Intended CA for signing |
+| `notes` | TextField | | Additional notes |
+| `resulting_certificate` | ForeignKey(Certificate) | | Certificate issued from this CSR |
+| `tenant` | ForeignKey(Tenant) | | Optional tenant for isolation |
+| `tags` | ManyToMany(Tag) | | NetBox tags |
+
+### Status Choices
+
+| Value | Label | Color | Description |
+|-------|-------|-------|-------------|
+| `pending` | Pending | Yellow | CSR awaiting approval/signing |
+| `approved` | Approved | Green | CSR approved, ready for CA |
+| `rejected` | Rejected | Red | CSR was rejected |
+| `issued` | Issued | Cyan | Certificate has been issued |
+| `expired` | Expired | Gray | CSR expired without issuance |
+
+### Computed Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `subject_string` | str | Formatted subject string (CN=..., O=..., etc.) |
+
+### Unique Constraint
+
+CSRs must be unique on `fingerprint_sha256`. This prevents duplicate imports.
+
+### Smart Paste Import
+
+CSRs can be imported via "Smart Paste":
+
+1. User pastes PEM-formatted CSR content
+2. Parser extracts all subject fields, SANs, and key info
+3. Fingerprint is calculated for duplicate detection
+4. CSR record is created with `pending` status
+
+---
+
 ## Database Tables
 
 | Model | Table Name |
 |-------|------------|
 | Certificate | `netbox_ssl_certificate` |
 | CertificateAssignment | `netbox_ssl_certificateassignment` |
+| CertificateSigningRequest | `netbox_ssl_certificatesigningrequest` |
 
 ### Indexes
 
