@@ -108,7 +108,10 @@ class CertificateExporter:
             elif field == "last_updated":
                 data[field] = certificate.last_updated.isoformat() if certificate.last_updated else None
             elif field == "assignment_count":
-                data[field] = certificate.assignments.count()
+                # Use pre-annotated count if available (avoids N+1 queries in bulk exports)
+                data[field] = getattr(certificate, "_assignment_count", None)
+                if data[field] is None:
+                    data[field] = certificate.assignments.count()
             elif field == "days_remaining":
                 data[field] = certificate.days_remaining
             elif field == "is_expired":

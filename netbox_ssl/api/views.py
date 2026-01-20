@@ -4,6 +4,7 @@ REST API views for NetBox SSL plugin.
 
 from django.conf import settings
 from django.db import DatabaseError, IntegrityError, transaction
+from django.db.models import Count
 from django.http import HttpResponse
 from netbox.api.viewsets import NetBoxModelViewSet
 from rest_framework import serializers, status
@@ -166,18 +167,18 @@ class CertificateViewSet(NetBoxModelViewSet):
         if export_format.lower() not in valid_formats:
             raise serializers.ValidationError({"format": f"Invalid format. Choose from: {valid_formats}"})
 
-        # Get certificates to export
+        # Get certificates to export with assignment count annotation to avoid N+1 queries
         if ids:
             try:
                 ids = [int(i) for i in ids]
-                certificates = Certificate.objects.filter(pk__in=ids)
+                certificates = Certificate.objects.filter(pk__in=ids).annotate(_assignment_count=Count("assignments"))
             except (ValueError, TypeError) as e:
                 raise serializers.ValidationError(
                     {"ids": "Invalid certificate IDs. Must be a list of integers."}
                 ) from e
         else:
             # Apply filters from query parameters
-            certificates = self.filter_queryset(self.get_queryset())
+            certificates = self.filter_queryset(self.get_queryset()).annotate(_assignment_count=Count("assignments"))
 
         # Limit export size
         plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
