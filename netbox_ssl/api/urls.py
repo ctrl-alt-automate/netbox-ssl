@@ -9,5 +9,7 @@ from . import views
 router = NetBoxRouter()
 router.register("certificates", views.CertificateViewSet)
 router.register("assignments", views.CertificateAssignmentViewSet)
+router.register("compliance-policies", views.CompliancePolicyViewSet)
+router.register("compliance-checks", views.ComplianceCheckViewSet)
 
 urlpatterns = router.urls

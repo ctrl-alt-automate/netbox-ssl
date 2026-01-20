@@ -132,12 +132,124 @@ Assignments must be unique on `(certificate, assigned_object_type, assigned_obje
 
 ---
 
+## CompliancePolicy
+
+Defines compliance rules for certificate validation.
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `name` | CharField(100) | Yes | Unique policy name |
+| `description` | TextField | | Detailed description |
+| `policy_type` | CharField(30) | Yes | Type of compliance check |
+| `severity` | CharField(20) | Yes | Severity when violated |
+| `enabled` | BooleanField | Yes | Whether policy is active |
+| `parameters` | JSONField | | Policy parameters (varies by type) |
+| `tenant` | ForeignKey(Tenant) | | Limit to specific tenant |
+| `tags` | ManyToMany(Tag) | | NetBox tags |
+
+### Policy Type Choices
+
+| Value | Label | Description |
+|-------|-------|-------------|
+| `min_key_size` | Minimum Key Size | Check key meets minimum bits |
+| `max_validity_days` | Maximum Validity Period | Check validity period limit |
+| `algorithm_allowed` | Algorithm Allowed | Check algorithm is in allowed list |
+| `algorithm_forbidden` | Algorithm Forbidden | Check algorithm not in forbidden list |
+| `expiry_warning` | Expiry Warning Threshold | Check expiry within warning days |
+| `chain_required` | Chain Required | Check certificate chain is present |
+| `san_required` | SAN Required | Check SANs are present |
+| `wildcard_forbidden` | Wildcard Forbidden | Check no wildcard domains |
+| `issuer_allowed` | Issuer Allowed | Check issuer in allowed list |
+| `issuer_forbidden` | Issuer Forbidden | Check issuer not in forbidden list |
+
+### Severity Choices
+
+| Value | Label | Description |
+|-------|-------|-------------|
+| `critical` | Critical | Urgent compliance violation |
+| `warning` | Warning | Important but not critical |
+| `info` | Info | Informational finding |
+
+### Policy Parameters Examples
+
+```json
+// min_key_size
+{"min_bits": 2048}
+
+// max_validity_days
+{"max_days": 397}
+
+// algorithm_allowed
+{"algorithms": ["rsa", "ecdsa", "ed25519"]}
+
+// algorithm_forbidden
+{"algorithms": ["dsa"]}
+
+// expiry_warning
+{"warning_days": 30}
+
+// san_required
+{"min_count": 1}
+
+// issuer_allowed
+{"issuers": ["DigiCert", "Let's Encrypt"]}
+
+// issuer_forbidden
+{"issuers": ["Unknown CA", "Self-Signed"]}
+```
+
+---
+
+## ComplianceCheck
+
+Stores results of compliance checks against certificates.
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `certificate` | ForeignKey | Yes | Certificate that was checked |
+| `policy` | ForeignKey | Yes | Policy that was applied |
+| `result` | CharField(20) | Yes | Result of the check |
+| `message` | TextField | | Detailed result message |
+| `checked_at` | DateTimeField | Yes | When check was performed |
+| `checked_value` | CharField(255) | | Actual value that was checked |
+| `expected_value` | CharField(255) | | Expected value per policy |
+| `tags` | ManyToMany(Tag) | | NetBox tags |
+
+### Result Choices
+
+| Value | Label | Description |
+|-------|-------|-------------|
+| `pass` | Pass | Certificate meets policy |
+| `fail` | Fail | Certificate violates policy |
+| `error` | Error | Error during check |
+| `skipped` | Skipped | Check was skipped |
+
+### Computed Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `is_passing` | bool | True if result is pass |
+| `is_failing` | bool | True if result is fail |
+| `severity` | str | Severity from associated policy |
+
+### Unique Constraint
+
+Only one check result per (certificate, policy) combination. Running compliance checks updates the existing record.
+
+---
+
 ## Database Tables
 
 | Model | Table Name |
 |-------|------------|
 | Certificate | `netbox_ssl_certificate` |
 | CertificateAssignment | `netbox_ssl_certificateassignment` |
+| CompliancePolicy | `netbox_ssl_compliancepolicy` |
+| ComplianceCheck | `netbox_ssl_compliancecheck` |
 
 ### Indexes
 

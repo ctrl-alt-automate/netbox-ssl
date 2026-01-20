@@ -9,12 +9,22 @@ from rest_framework import serializers, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from ..filtersets import CertificateAssignmentFilterSet, CertificateFilterSet
-from ..models import Certificate, CertificateAssignment
+from ..filtersets import (
+    CertificateAssignmentFilterSet,
+    CertificateFilterSet,
+    ComplianceCheckFilterSet,
+    CompliancePolicyFilterSet,
+)
+from ..models import Certificate, CertificateAssignment, ComplianceCheck, CompliancePolicy
+from ..utils import ComplianceChecker
 from .serializers import (
+    BulkComplianceRunSerializer,
     CertificateAssignmentSerializer,
     CertificateImportSerializer,
     CertificateSerializer,
+    ComplianceCheckSerializer,
+    CompliancePolicySerializer,
+    ComplianceRunSerializer,
 )
 
 
@@ -125,6 +135,138 @@ class CertificateViewSet(NetBoxModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    @action(detail=True, methods=["post"], url_path="compliance-check")
+    def compliance_check(self, request, pk=None):
+        """
+        Run compliance checks on a single certificate.
+
+        Runs all enabled compliance policies against the certificate and
+        returns detailed results. Optionally specify specific policy IDs.
+
+        Example payload (optional):
+        {
+            "policy_ids": [1, 2, 3]
+        }
+        """
+        certificate = self.get_object()
+        serializer = ComplianceRunSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Get policies to check
+        policy_ids = serializer.validated_data.get("policy_ids")
+        if policy_ids:
+            policies = CompliancePolicy.objects.filter(pk__in=policy_ids, enabled=True)
+        else:
+            policies = None  # Will use all enabled policies
+
+        # Run compliance checks
+        results = ComplianceChecker.run_all_checks(certificate, policies)
+
+        # Save results to database
+        saved_checks = ComplianceChecker.save_check_results(certificate, results)
+
+        # Calculate summary
+        total = len(saved_checks)
+        passed = sum(1 for c in saved_checks if c.is_passing)
+        failed = total - passed
+        score = (passed / total * 100) if total > 0 else 0
+
+        # Serialize and return
+        check_serializer = ComplianceCheckSerializer(
+            saved_checks, many=True, context={"request": request}
+        )
+
+        return Response(
+            {
+                "certificate_id": certificate.pk,
+                "certificate_name": certificate.common_name,
+                "total_checks": total,
+                "passed": passed,
+                "failed": failed,
+                "compliance_score": round(score, 1),
+                "checks": check_serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["post"], url_path="bulk-compliance-check")
+    def bulk_compliance_check(self, request):
+        """
+        Run compliance checks on multiple certificates.
+
+        Example payload:
+        {
+            "certificate_ids": [1, 2, 3, 4, 5],
+            "policy_ids": [1, 2]  // optional
+        }
+        """
+        serializer = BulkComplianceRunSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        certificate_ids = serializer.validated_data["certificate_ids"]
+        policy_ids = serializer.validated_data.get("policy_ids")
+
+        # Limit batch size
+        plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+        max_batch_size = plugin_settings.get("bulk_compliance_max_batch_size", 100)
+        if len(certificate_ids) > max_batch_size:
+            raise serializers.ValidationError(
+                {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
+            )
+
+        # Get certificates
+        certificates = Certificate.objects.filter(pk__in=certificate_ids)
+        found_ids = set(certificates.values_list("pk", flat=True))
+        missing_ids = set(certificate_ids) - found_ids
+
+        # Get policies
+        if policy_ids:
+            policies = CompliancePolicy.objects.filter(pk__in=policy_ids, enabled=True)
+        else:
+            policies = None
+
+        # Run checks for each certificate
+        results_summary = {
+            "total_certificates": len(certificate_ids),
+            "processed": 0,
+            "missing_ids": list(missing_ids),
+            "overall_passed": 0,
+            "overall_failed": 0,
+            "reports": [],
+        }
+
+        for certificate in certificates:
+            results = ComplianceChecker.run_all_checks(certificate, policies)
+            saved_checks = ComplianceChecker.save_check_results(certificate, results)
+
+            total = len(saved_checks)
+            passed = sum(1 for c in saved_checks if c.is_passing)
+            failed = total - passed
+            score = (passed / total * 100) if total > 0 else 0
+
+            results_summary["processed"] += 1
+            results_summary["overall_passed"] += passed
+            results_summary["overall_failed"] += failed
+
+            results_summary["reports"].append({
+                "certificate_id": certificate.pk,
+                "certificate_name": certificate.common_name,
+                "total_checks": total,
+                "passed": passed,
+                "failed": failed,
+                "compliance_score": round(score, 1),
+            })
+
+        # Calculate overall score
+        total_checks = results_summary["overall_passed"] + results_summary["overall_failed"]
+        results_summary["overall_score"] = (
+            round(results_summary["overall_passed"] / total_checks * 100, 1)
+            if total_checks > 0
+            else 0
+        )
+
+        return Response(results_summary, status=status.HTTP_200_OK)
+
 
 class CertificateAssignmentViewSet(NetBoxModelViewSet):
     """API viewset for CertificateAssignment model."""
@@ -136,3 +278,25 @@ class CertificateAssignmentViewSet(NetBoxModelViewSet):
     )
     serializer_class = CertificateAssignmentSerializer
     filterset_class = CertificateAssignmentFilterSet
+
+
+class CompliancePolicyViewSet(NetBoxModelViewSet):
+    """API viewset for CompliancePolicy model."""
+
+    queryset = CompliancePolicy.objects.prefetch_related(
+        "tenant",
+        "tags",
+    )
+    serializer_class = CompliancePolicySerializer
+    filterset_class = CompliancePolicyFilterSet
+
+
+class ComplianceCheckViewSet(NetBoxModelViewSet):
+    """API viewset for ComplianceCheck model."""
+
+    queryset = ComplianceCheck.objects.select_related(
+        "certificate",
+        "policy",
+    ).prefetch_related("tags")
+    serializer_class = ComplianceCheckSerializer
+    filterset_class = ComplianceCheckFilterSet
