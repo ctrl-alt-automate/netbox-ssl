@@ -314,9 +314,7 @@ class Certificate(NetBoxModel):
             ChainValidationStatus.PARSE_ERROR: ChainStatusChoices.STATUS_INVALID,
         }
 
-        self.chain_status = status_mapping.get(
-            result.status, ChainStatusChoices.STATUS_UNKNOWN
-        )
+        self.chain_status = status_mapping.get(result.status, ChainStatusChoices.STATUS_UNKNOWN)
         self.chain_validation_message = result.message
         self.chain_validated_at = result.validated_at
         self.chain_depth = result.chain_depth

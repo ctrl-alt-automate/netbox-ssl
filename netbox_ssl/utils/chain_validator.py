@@ -139,9 +139,7 @@ class ChainValidator:
 
             # Check if parent is the issuer
             if child_cert.issuer != parent_cert.subject:
-                errors.append(
-                    f"Certificate #{i + 1} issuer does not match certificate #{i + 2} subject"
-                )
+                errors.append(f"Certificate #{i + 1} issuer does not match certificate #{i + 2} subject")
                 return ChainValidationResult(
                     status=ChainValidationStatus.INCOMPLETE,
                     is_valid=False,
@@ -156,9 +154,7 @@ class ChainValidator:
             try:
                 cls._verify_signature(child_cert, parent_cert)
             except InvalidSignature:
-                errors.append(
-                    f"Invalid signature: certificate #{i + 1} not signed by certificate #{i + 2}"
-                )
+                errors.append(f"Invalid signature: certificate #{i + 1} not signed by certificate #{i + 2}")
                 return ChainValidationResult(
                     status=ChainValidationStatus.INVALID_SIGNATURE,
                     is_valid=False,

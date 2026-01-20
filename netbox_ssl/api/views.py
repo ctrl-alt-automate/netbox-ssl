@@ -178,9 +178,7 @@ class CertificateViewSet(NetBoxModelViewSet):
         certificate_ids = request.data.get("ids", [])
 
         if not certificate_ids:
-            raise serializers.ValidationError(
-                {"detail": "No certificate IDs provided. Send {'ids': [1, 2, 3]}."}
-            )
+            raise serializers.ValidationError({"detail": "No certificate IDs provided. Send {'ids': [1, 2, 3]}."})
 
         # Limit batch size
         plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
