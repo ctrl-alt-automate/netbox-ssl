@@ -294,9 +294,7 @@ class TestComplianceCheckerIssuer:
         forbidden_issuers = ["Unknown CA", "Self-Signed"]
 
         issuer_lower = issuer.lower()
-        passed = not any(
-            forbidden.lower() in issuer_lower for forbidden in forbidden_issuers
-        )
+        passed = not any(forbidden.lower() in issuer_lower for forbidden in forbidden_issuers)
 
         assert passed is True
 
@@ -306,9 +304,7 @@ class TestComplianceCheckerIssuer:
         forbidden_issuers = ["Unknown CA", "Self-Signed"]
 
         issuer_lower = issuer.lower()
-        passed = not any(
-            forbidden.lower() in issuer_lower for forbidden in forbidden_issuers
-        )
+        passed = not any(forbidden.lower() in issuer_lower for forbidden in forbidden_issuers)
 
         assert passed is False
 

@@ -48,9 +48,7 @@ class CompliancePolicyFilterSet(NetBoxModelFilterSet):
         """Search by name or description."""
         if not value.strip():
             return queryset
-        return queryset.filter(
-            models.Q(name__icontains=value) | models.Q(description__icontains=value)
-        )
+        return queryset.filter(models.Q(name__icontains=value) | models.Q(description__icontains=value))
 
 
 class ComplianceCheckFilterSet(NetBoxModelFilterSet):
@@ -100,7 +98,4 @@ class ComplianceCheckFilterSet(NetBoxModelFilterSet):
         """Search by certificate name or message."""
         if not value.strip():
             return queryset
-        return queryset.filter(
-            models.Q(certificate__common_name__icontains=value)
-            | models.Q(message__icontains=value)
-        )
+        return queryset.filter(models.Q(certificate__common_name__icontains=value) | models.Q(message__icontains=value))

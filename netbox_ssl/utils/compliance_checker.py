@@ -369,9 +369,7 @@ class ComplianceChecker:
 
             if certificate.tenant:
                 # Include global policies (no tenant) and tenant-specific policies
-                policies = policies.filter(
-                    models.Q(tenant__isnull=True) | models.Q(tenant=certificate.tenant)
-                )
+                policies = policies.filter(models.Q(tenant__isnull=True) | models.Q(tenant=certificate.tenant))
             else:
                 # Only include global policies for certificates without tenant
                 policies = policies.filter(tenant__isnull=True)

@@ -172,9 +172,7 @@ class CertificateViewSet(NetBoxModelViewSet):
         score = (passed / total * 100) if total > 0 else 0
 
         # Serialize and return
-        check_serializer = ComplianceCheckSerializer(
-            saved_checks, many=True, context={"request": request}
-        )
+        check_serializer = ComplianceCheckSerializer(saved_checks, many=True, context={"request": request})
 
         return Response(
             {
@@ -248,21 +246,21 @@ class CertificateViewSet(NetBoxModelViewSet):
             results_summary["overall_passed"] += passed
             results_summary["overall_failed"] += failed
 
-            results_summary["reports"].append({
-                "certificate_id": certificate.pk,
-                "certificate_name": certificate.common_name,
-                "total_checks": total,
-                "passed": passed,
-                "failed": failed,
-                "compliance_score": round(score, 1),
-            })
+            results_summary["reports"].append(
+                {
+                    "certificate_id": certificate.pk,
+                    "certificate_name": certificate.common_name,
+                    "total_checks": total,
+                    "passed": passed,
+                    "failed": failed,
+                    "compliance_score": round(score, 1),
+                }
+            )
 
         # Calculate overall score
         total_checks = results_summary["overall_passed"] + results_summary["overall_failed"]
         results_summary["overall_score"] = (
-            round(results_summary["overall_passed"] / total_checks * 100, 1)
-            if total_checks > 0
-            else 0
+            round(results_summary["overall_passed"] / total_checks * 100, 1) if total_checks > 0 else 0
         )
 
         return Response(results_summary, status=status.HTTP_200_OK)
