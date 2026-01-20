@@ -258,7 +258,8 @@ class ChainValidator:
             try:
                 cert = x509.load_pem_x509_certificate(block.encode("utf-8"))
                 certs.append(cert)
-            except Exception:
+            except (ValueError, TypeError):
+                # Skip invalid PEM blocks (ValueError from cryptography, TypeError for encoding issues)
                 continue
 
         return certs
@@ -310,7 +311,8 @@ class ChainValidator:
             cn_attrs = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
             if cn_attrs:
                 cn = cn_attrs[0].value
-        except Exception:
+        except (AttributeError, IndexError, ValueError):
+            # Handle missing or malformed CN attribute
             pass
 
         # Calculate fingerprint

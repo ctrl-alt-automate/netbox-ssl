@@ -188,12 +188,15 @@ class CertificateViewSet(NetBoxModelViewSet):
                 {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
             )
 
-        certificates = Certificate.objects.filter(pk__in=certificate_ids)
+        certificates = list(Certificate.objects.filter(pk__in=certificate_ids))
         results = []
+        certs_to_update = []
 
         for cert in certificates:
             if cert.pem_content:
-                result = cert.validate_chain(save=True)
+                # Validate without saving to database (we'll bulk update later)
+                result = cert.validate_chain(save=False)
+                certs_to_update.append(cert)
                 results.append(
                     {
                         "id": cert.pk,
@@ -205,6 +208,9 @@ class CertificateViewSet(NetBoxModelViewSet):
                     }
                 )
             else:
+                # Still update chain status for certificates without PEM
+                cert.validate_chain(save=False)
+                certs_to_update.append(cert)
                 results.append(
                     {
                         "id": cert.pk,
@@ -215,6 +221,13 @@ class CertificateViewSet(NetBoxModelViewSet):
                         "chain_depth": None,
                     }
                 )
+
+        # Bulk update all certificates at once to avoid N+1 writes
+        if certs_to_update:
+            Certificate.objects.bulk_update(
+                certs_to_update,
+                ["chain_status", "chain_validation_message", "chain_validated_at", "chain_depth"],
+            )
 
         valid_count = sum(1 for r in results if r["is_valid"])
         return Response(
