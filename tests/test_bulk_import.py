@@ -382,17 +382,27 @@ class TestBulkImportPerformance:
 
 
 def django_api_available():
-    """Check if Django REST framework test client is available."""
+    """Check if Django REST framework test client is available and configured."""
     try:
+        # Check if Django is configured
+        from django.conf import settings
+
+        if not settings.configured:
+            return False
+
+        # Try to import REST framework test client
         from django.contrib.auth import get_user_model  # noqa: F401
         from rest_framework.test import APIClient  # noqa: F401
 
         return True
-    except ImportError:
+    except Exception:
+        # Catch all exceptions (ImportError, ImproperlyConfigured, etc.)
         return False
 
 
-skip_if_no_django_api = pytest.mark.skipif(not django_api_available(), reason="Django REST Framework not available")
+skip_if_no_django_api = pytest.mark.skipif(
+    not django_api_available(), reason="Django REST Framework not available or not configured"
+)
 
 
 @pytest.fixture
