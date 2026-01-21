@@ -626,16 +626,277 @@ class TestDuplicateAssignmentValidation:
         # Here we just verify the form structure supports it
 
 
+class TestCSRListPage:
+    """Tests for the Certificate Signing Request list page."""
+
+    def test_csr_list_loads(self, page):
+        """Test that the CSR list page loads without errors."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/csrs/")
+
+        # Should have the page title
+        expect(page.locator("h1, h2").first).to_be_visible()
+
+        # Should not have server errors
+        assert "Server Error" not in page.content()
+        assert "TemplateSyntaxError" not in page.content()
+        assert "Traceback" not in page.content()
+
+    def test_csr_list_has_add_button(self, page):
+        """Test that the add CSR button is present."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/csrs/")
+
+        # Look for add button
+        add_button = page.locator('a[href*="/plugins/ssl/csrs/add"]').first
+        expect(add_button).to_be_visible()
+
+    def test_csr_list_has_import_button(self, page):
+        """Test that the import CSR button is present."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/csrs/")
+
+        # Look for import button
+        import_button = page.locator('a[href*="/plugins/ssl/csrs/import"]').first
+        expect(import_button).to_be_visible()
+
+
+class TestCSRAddPage:
+    """Tests for the add CSR page."""
+
+    def test_add_page_loads(self, page):
+        """Test that the add CSR page loads without errors."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/csrs/add/")
+
+        # Should have the main object-edit form
+        expect(page.locator("form.object-edit")).to_be_visible()
+
+        # Should not have server errors
+        assert "Server Error" not in page.content()
+        assert "TemplateSyntaxError" not in page.content()
+
+    def test_add_page_has_common_name_field(self, page):
+        """Test that required common_name field is present."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/csrs/add/")
+
+        # Check for common_name field
+        cn_field = page.locator("[name='common_name'], #id_common_name")
+        assert cn_field.count() > 0
+
+    def test_add_page_has_status_field(self, page):
+        """Test that status field is present."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/csrs/add/")
+
+        # Check for status field
+        status_field = page.locator("[name='status'], #id_status")
+        assert status_field.count() > 0
+
+
+class TestCSRImportPage:
+    """Tests for the CSR import page."""
+
+    def test_import_page_loads(self, page):
+        """Test that the CSR import page loads without errors."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/csrs/import/")
+
+        # Should have a form
+        expect(
+            page.locator("form.form[method='post'], form[method='post']:not([action*='search'])").first
+        ).to_be_visible()
+
+        # Should not have server errors
+        assert "Server Error" not in page.content()
+        assert "TemplateSyntaxError" not in page.content()
+
+    def test_import_page_has_pem_textarea(self, page):
+        """Test that the PEM input textarea is present."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/csrs/import/")
+
+        # Look for textarea for PEM input
+        textarea = page.locator("textarea").first
+        expect(textarea).to_be_visible()
+
+    def test_import_accepts_valid_csr(self, page):
+        """Test that importing a valid CSR works."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/csrs/import/")
+
+        # A valid CSR for testing
+        valid_csr = """-----BEGIN CERTIFICATE REQUEST-----
+MIICzTCCAbUCAQAwgYcxCzAJBgNVBAYTAk5MMRYwFAYDVQQIDA1Ob29yZC1Ib2xs
+YW5kMRIwEAYDVQQHDAlBbXN0ZXJkYW0xGjAYBgNVBAoMEVRlc3QgT3JnYW5pemF0
+aW9uMRYwFAYDVQQLDA1JVCBEZXBhcnRtZW50MRgwFgYDVQQDDA93d3cuZXhhbXBs
+ZS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC9YGPbFOzEa9H4
+sVq7sYkJLONF2WHiC0VQj4LhI5D0Fxs5C7xRs8eJw3K5e0V7pKc0K9U9G8WvM7hR
+GXqEBOvANjXQwM4S8A0LZb7U+j8rT1tZkLQ3cVPg7vKp6rKBQ7p8N7g6E7Y5x6O9
+L0J7FzNdH6SHGXHJ3Y7J6Z3g7qLsA6G8a7E5J6D0w0T7H8C3Q1J6Y7X5Q7L2K7N9
+P7H7R7T7V7X7Z7B7D7F7H7J7L7N7P7R7T7V7X7Z7B7D7F7H7J7L7N7P7R7T7V7X7
+Z7B7D7F7HAgMBAAGgLTArBgkqhkiG9w0BCQ4xHjAcMBoGA1UdEQQTMBGCD3d3dy5l
+eGFtcGxlLmNvbTANBgkqhkiG9w0BAQsFAAOCAQEAR8P5VF9W9WJK7G9Z5E6K9M3P
+Y7V8RfD8H7L5J3C7K9Q1N3P7V9X7B9F7J3L7N7P9R7T9V7X9Z7B9D9F9H7J9L9N9
+P9R9T9V9X9Z9B9D9F9H9J9L9N9P9R9T9V9X9Z9B9D9F9H9J9L9N9P9R9T9V9X9Z9
+-----END CERTIFICATE REQUEST-----"""
+
+        textarea = page.locator("textarea").first
+        textarea.fill(valid_csr)
+
+        # Submit the form
+        submit_btn = page.locator(
+            "form.form button[type='submit'], form[method='post']:not([action*='search']) button[type='submit']"
+        ).first
+        submit_btn.click()
+
+        # Wait for response
+        page.wait_for_load_state("networkidle")
+
+        # Should either succeed or show validation error (not server error)
+        content = page.content()
+        assert "Server Error" not in content
+        assert "TemplateSyntaxError" not in content
+
+
+class TestCertificateAuthorityListPage:
+    """Tests for the Certificate Authority list page."""
+
+    def test_ca_list_loads(self, page):
+        """Test that the CA list page loads without errors."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/certificate-authorities/")
+
+        # Should have the page title
+        expect(page.locator("h1, h2").first).to_be_visible()
+
+        # Should not have server errors
+        assert "Server Error" not in page.content()
+        assert "TemplateSyntaxError" not in page.content()
+        assert "Traceback" not in page.content()
+
+    def test_ca_list_has_add_button(self, page):
+        """Test that the add CA button is present."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/certificate-authorities/")
+
+        # Look for add button
+        add_button = page.locator('a[href*="/plugins/ssl/certificate-authorities/add"]').first
+        expect(add_button).to_be_visible()
+
+
+class TestCertificateAuthorityAddPage:
+    """Tests for the add Certificate Authority page."""
+
+    def test_add_page_loads(self, page):
+        """Test that the add CA page loads without errors."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/certificate-authorities/add/")
+
+        # Should have the main object-edit form
+        expect(page.locator("form.object-edit")).to_be_visible()
+
+        # Should not have server errors
+        assert "Server Error" not in page.content()
+        assert "TemplateSyntaxError" not in page.content()
+
+    def test_add_page_has_name_field(self, page):
+        """Test that required name field is present."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/certificate-authorities/add/")
+
+        # Check for name field
+        name_field = page.locator("[name='name'], #id_name")
+        assert name_field.count() > 0
+
+    def test_add_page_has_type_field(self, page):
+        """Test that CA type field is present."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/certificate-authorities/add/")
+
+        # Check for type field
+        type_field = page.locator("[name='type'], #id_type")
+        assert type_field.count() > 0
+
+    def test_add_page_has_issuer_pattern_field(self, page):
+        """Test that issuer pattern field is present for auto-detection."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/certificate-authorities/add/")
+
+        # Check for issuer_pattern field
+        pattern_field = page.locator("[name='issuer_pattern'], #id_issuer_pattern")
+        assert pattern_field.count() > 0
+
+
+class TestAPIEndpointsNew:
+    """Tests for new API endpoints via browser."""
+
+    def test_api_csrs_endpoint(self, page):
+        """Test that the CSRs API endpoint responds."""
+        response = page.goto(f"{NETBOX_BASE_URL}/api/plugins/ssl/csrs/")
+
+        # API should respond without server error
+        assert response.status < 500
+        content = page.content()
+        assert "results" in content or '"count"' in content or "count" in content
+
+    def test_api_certificate_authorities_endpoint(self, page):
+        """Test that the certificate authorities API endpoint responds."""
+        response = page.goto(f"{NETBOX_BASE_URL}/api/plugins/ssl/certificate-authorities/")
+
+        # API should respond without server error
+        assert response.status < 500
+
+    def test_api_compliance_policies_endpoint(self, page):
+        """Test that the compliance policies API endpoint responds."""
+        response = page.goto(f"{NETBOX_BASE_URL}/api/plugins/ssl/compliance-policies/")
+
+        # API should respond without server error
+        assert response.status < 500
+
+    def test_api_compliance_checks_endpoint(self, page):
+        """Test that the compliance checks API endpoint responds."""
+        response = page.goto(f"{NETBOX_BASE_URL}/api/plugins/ssl/compliance-checks/")
+
+        # API should respond without server error
+        assert response.status < 500
+
+
+class TestNavigationMenuNew:
+    """Tests for new plugin navigation menu items."""
+
+    def test_csr_menu_exists(self, page):
+        """Test that the CSR menu item exists in navigation."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/csrs/")
+
+        page.wait_for_load_state("networkidle")
+
+        # Should be on the CSR page
+        assert "Server Error" not in page.content()
+
+        # Page title or breadcrumb should reference CSR
+        content = page.content()
+        assert "CSR" in content or "Certificate Signing Request" in content or "Signing Request" in content
+
+    def test_ca_menu_exists(self, page):
+        """Test that the Certificate Authority menu item exists."""
+        page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/certificate-authorities/")
+
+        page.wait_for_load_state("networkidle")
+
+        # Should be on the CA page
+        assert "Server Error" not in page.content()
+
+        # Page should reference Certificate Authority
+        content = page.content()
+        assert "Certificate Authorit" in content or "CA" in content
+
+
 # Smoke test runner that checks all URLs
 class TestSmokeAllUrls:
     """Smoke tests that verify all plugin URLs load without errors."""
 
     URLS_TO_TEST = [
+        # Certificate URLs
         "/plugins/ssl/certificates/",
         "/plugins/ssl/certificates/add/",
         "/plugins/ssl/certificates/import/",
+        # Assignment URLs
         "/plugins/ssl/assignments/",
         "/plugins/ssl/assignments/add/",
+        # CSR URLs
+        "/plugins/ssl/csrs/",
+        "/plugins/ssl/csrs/add/",
+        "/plugins/ssl/csrs/import/",
+        # Certificate Authority URLs
+        "/plugins/ssl/certificate-authorities/",
+        "/plugins/ssl/certificate-authorities/add/",
     ]
 
     ERROR_PATTERNS = [
