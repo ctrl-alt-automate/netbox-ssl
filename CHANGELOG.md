@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2025-01-21
 
 ### Added
 
@@ -79,6 +79,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - REST API endpoints: CRUD + `/csrs/import/`
   - GraphQL query support
   - Multi-tenancy support
+
+## [0.3.0] - 2025-01-20
+
+### Added
+
+- **Bulk Certificate Import API** ([#9](https://github.com/ctrl-alt-automate/netbox-ssl/issues/9)):
+  - `POST /api/plugins/netbox-ssl/certificates/bulk-import/` endpoint
+  - Accepts JSON array of certificate objects
+  - Atomic transactions (all-or-nothing import)
+  - Validation before creation
+  - Maximum batch size configurable via `bulk_import_max_batch_size` setting (default: 100)
+  - Detailed error reporting with failed certificate indices
+  - Test fixtures with 15 sample certificates
 
 ## [0.2.0] - 2025-01-20
 
@@ -174,6 +187,7 @@ Initial release of NetBox SSL Plugin.
 - NetBox 4.4.0 - 4.5.x
 - Python 3.10+
 
-[Unreleased]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.2.0...HEAD
+[0.4.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ctrl-alt-automate/netbox-ssl/releases/tag/v0.1.0
