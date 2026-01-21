@@ -746,17 +746,18 @@ class TestAPIAuthentication:
     """Tests for API authentication."""
 
     @pytest.mark.api
-    def test_unauthenticated_request_rejected(self):
+    def test_unauthenticated_request_rejected(self, api_client):
         """Test that requests without authentication are rejected."""
-
+        # api_client fixture ensures NetBox is available
+        # Make unauthenticated request (without using the client's auth)
         resp = requests.get(f"{API_BASE}/certificates/")
         # Should be 403 Forbidden or 401 Unauthorized
         assert resp.status_code in [401, 403]
 
     @pytest.mark.api
-    def test_invalid_token_rejected(self):
+    def test_invalid_token_rejected(self, api_client):
         """Test that requests with invalid token are rejected."""
-
+        # api_client fixture ensures NetBox is available
         headers = {"Authorization": "Token invalid_token_12345"}
         resp = requests.get(f"{API_BASE}/certificates/", headers=headers)
         assert resp.status_code in [401, 403]
