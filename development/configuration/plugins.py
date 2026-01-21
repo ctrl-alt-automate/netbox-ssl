@@ -1,5 +1,7 @@
 # NetBox SSL Plugin Configuration for Development
 
+import os
+
 PLUGINS = [
     "netbox_ssl",
 ]
@@ -12,6 +14,7 @@ PLUGINS_CONFIG = {
 }
 
 # API Token Peppers for v2 tokens (v4.5+ requires dictionary, min 50 chars)
-API_TOKEN_PEPPERS = {
-    1: "Eb_30LtX2Rz01aSiZ29i8IwRyrbyy-maTokgIzAzADCt78gtlu5jd6EY1wGlX7RJ4XvpjRdLsyc4jnwj",
-}
+# Load from environment variable for security
+_pepper = os.environ.get("API_TOKEN_PEPPER_1")
+if _pepper:
+    API_TOKEN_PEPPERS = {1: _pepper}

@@ -12,7 +12,7 @@ Run with: pytest tests/test_api_endpoints.py -v -m api
 
 Requires:
 - Running NetBox instance at http://localhost:8000
-- Valid API token (uses admin/admin by default)
+- NETBOX_TOKEN environment variable with valid API token (v2 format: nbt_xxx.yyy)
 """
 
 import os
@@ -23,7 +23,7 @@ import requests
 
 # Configuration
 NETBOX_URL = os.environ.get("NETBOX_URL", "http://localhost:8000")
-NETBOX_TOKEN = os.environ.get("NETBOX_TOKEN", None)  # Full v2 token: nbt_xxx.yyy
+NETBOX_TOKEN = os.environ.get("NETBOX_TOKEN")  # Required: v2 token format nbt_xxx.yyy
 API_BASE = f"{NETBOX_URL}/api/plugins/ssl"  # Note: 'ssl' not 'netbox-ssl'
 
 # Test certificate PEM
@@ -68,68 +68,7 @@ HJF2qwG6kv3C0qRN7g5P0nL5L8N9ZXMN7P3vN8J8LNBO
 -----END CERTIFICATE REQUEST-----"""
 
 
-def get_api_token():
-    """Get API token by logging in or using environment variable."""
-    if NETBOX_TOKEN:
-        return NETBOX_TOKEN
-
-    # Try to get token via login
-    try:
-        session = requests.Session()
-        # Get CSRF token
-        login_page = session.get(f"{NETBOX_URL}/login/")
-        if login_page.status_code != 200:
-            return None
-
-        # Login
-        login_resp = session.post(
-            f"{NETBOX_URL}/login/",
-            data={
-                "username": "admin",
-                "password": "admin",
-                "csrfmiddlewaretoken": session.cookies.get("csrftoken", ""),
-            },
-            headers={"Referer": f"{NETBOX_URL}/login/"},
-        )
-
-        # Try to get/create API token
-        token_resp = session.get(f"{NETBOX_URL}/api/users/tokens/")
-        if token_resp.status_code == 200:
-            tokens = token_resp.json().get("results", [])
-            if tokens:
-                return tokens[0].get("key")
-
-        return None
-    except Exception:
-        return None
-
-
-@pytest.fixture(scope="module")
-def api_client():
-    """Create an API client with authentication.
-
-    For NetBox 4.5+, use v2 tokens with format: Bearer nbt_xxx.yyy
-    Set NETBOX_TOKEN env var with the full token value.
-    """
-    token = get_api_token()
-    if not token:
-        pytest.skip("Could not obtain API token - is NetBox running? Set NETBOX_TOKEN env var.")
-
-    session = requests.Session()
-    # v2 tokens use "Bearer" prefix, v1 tokens use "Token" prefix
-    auth_prefix = "Bearer" if token.startswith("nbt_") else "Token"
-    session.headers.update(
-        {
-            "Authorization": f"{auth_prefix} {token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-    )
-    return session
-
-
-@pytest.fixture(scope="module")
-def netbox_available():
+def _is_netbox_available():
     """Check if NetBox is available.
 
     Returns True if NetBox responds (200 or 403 - auth required but server is up).
@@ -138,14 +77,86 @@ def netbox_available():
         resp = requests.get(f"{NETBOX_URL}/api/", timeout=5)
         # 200 = authenticated/public, 403 = auth required but server is responding
         return resp.status_code in (200, 403)
-    except Exception:
+    except requests.exceptions.RequestException:
         return False
 
 
-def skip_if_netbox_unavailable(netbox_available):
-    """Skip test if NetBox is not available."""
-    if not netbox_available:
-        pytest.skip("NetBox not available")
+@pytest.fixture(scope="module")
+def api_client():
+    """Create an API client with authentication.
+
+    For NetBox 4.5+, use v2 tokens with format: Bearer nbt_xxx.yyy
+    Requires NETBOX_TOKEN environment variable to be set.
+    """
+    if not NETBOX_TOKEN:
+        pytest.skip("NETBOX_TOKEN environment variable not set")
+
+    if not _is_netbox_available():
+        pytest.skip("NetBox not available at " + NETBOX_URL)
+
+    session = requests.Session()
+    # v2 tokens use "Bearer" prefix, v1 tokens use "Token" prefix
+    auth_prefix = "Bearer" if NETBOX_TOKEN.startswith("nbt_") else "Token"
+    session.headers.update(
+        {
+            "Authorization": f"{auth_prefix} {NETBOX_TOKEN}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+    )
+    return session
+
+
+@pytest.fixture
+def test_certificate(api_client):
+    """Create a test certificate for use in tests, cleanup after.
+
+    This fixture creates a certificate via the import API and deletes it
+    after the test completes, ensuring tests are self-contained.
+    """
+    # Import a test certificate
+    resp = api_client.post(
+        f"{API_BASE}/certificates/import/",
+        json={
+            "pem_content": TEST_CERTIFICATE_PEM,
+            "private_key_location": "test-fixture",
+        },
+    )
+
+    if resp.status_code != 201:
+        pytest.skip(f"Could not create test certificate: {resp.text}")
+
+    cert_data = resp.json()
+    cert_id = cert_data["id"]
+
+    yield cert_data
+
+    # Cleanup: delete the certificate
+    api_client.delete(f"{API_BASE}/certificates/{cert_id}/")
+
+
+@pytest.fixture
+def test_compliance_policy(api_client):
+    """Create a test compliance policy for use in tests, cleanup after."""
+    policy_data = {
+        "name": f"Test Policy {os.urandom(4).hex()}",
+        "enabled": True,
+        "min_key_size": 2048,
+        "allowed_algorithms": ["rsa", "ecdsa"],
+    }
+
+    resp = api_client.post(f"{API_BASE}/compliance-policies/", json=policy_data)
+
+    if resp.status_code != 201:
+        pytest.skip(f"Could not create test policy: {resp.text}")
+
+    policy = resp.json()
+    policy_id = policy["id"]
+
+    yield policy
+
+    # Cleanup
+    api_client.delete(f"{API_BASE}/compliance-policies/{policy_id}/")
 
 
 # =============================================================================
@@ -157,9 +168,8 @@ class TestCertificateAuthorityAPI:
     """Tests for Certificate Authority API endpoints."""
 
     @pytest.mark.api
-    def test_list_certificate_authorities(self, api_client, netbox_available):
+    def test_list_certificate_authorities(self, api_client):
         """Test GET /certificate-authorities/ returns list."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.get(f"{API_BASE}/certificate-authorities/")
         assert resp.status_code == 200
@@ -169,9 +179,8 @@ class TestCertificateAuthorityAPI:
         assert isinstance(data["results"], list)
 
     @pytest.mark.api
-    def test_create_certificate_authority(self, api_client, netbox_available):
+    def test_create_certificate_authority(self, api_client):
         """Test POST /certificate-authorities/ creates a new CA."""
-        skip_if_netbox_unavailable(netbox_available)
 
         ca_data = {
             "name": f"Test CA API {os.urandom(4).hex()}",
@@ -193,9 +202,8 @@ class TestCertificateAuthorityAPI:
         api_client.delete(f"{API_BASE}/certificate-authorities/{ca_id}/")
 
     @pytest.mark.api
-    def test_retrieve_certificate_authority(self, api_client, netbox_available):
+    def test_retrieve_certificate_authority(self, api_client):
         """Test GET /certificate-authorities/{id}/ returns CA details."""
-        skip_if_netbox_unavailable(netbox_available)
 
         # First create a CA
         ca_data = {"name": f"Test CA Retrieve {os.urandom(4).hex()}", "type": "public"}
@@ -214,9 +222,8 @@ class TestCertificateAuthorityAPI:
         api_client.delete(f"{API_BASE}/certificate-authorities/{ca_id}/")
 
     @pytest.mark.api
-    def test_update_certificate_authority(self, api_client, netbox_available):
+    def test_update_certificate_authority(self, api_client):
         """Test PUT /certificate-authorities/{id}/ updates CA."""
-        skip_if_netbox_unavailable(netbox_available)
 
         # Create CA
         ca_data = {"name": f"Test CA Update {os.urandom(4).hex()}", "type": "internal"}
@@ -239,9 +246,8 @@ class TestCertificateAuthorityAPI:
         api_client.delete(f"{API_BASE}/certificate-authorities/{ca_id}/")
 
     @pytest.mark.api
-    def test_delete_certificate_authority(self, api_client, netbox_available):
+    def test_delete_certificate_authority(self, api_client):
         """Test DELETE /certificate-authorities/{id}/ deletes CA."""
-        skip_if_netbox_unavailable(netbox_available)
 
         # Create CA
         ca_data = {"name": f"Test CA Delete {os.urandom(4).hex()}", "type": "acme"}
@@ -257,9 +263,8 @@ class TestCertificateAuthorityAPI:
         assert resp.status_code == 404
 
     @pytest.mark.api
-    def test_certificate_authority_not_found(self, api_client, netbox_available):
+    def test_certificate_authority_not_found(self, api_client):
         """Test GET /certificate-authorities/{id}/ returns 404 for non-existent CA."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.get(f"{API_BASE}/certificate-authorities/99999/")
         assert resp.status_code == 404
@@ -274,9 +279,8 @@ class TestCertificateAPI:
     """Tests for Certificate API endpoints."""
 
     @pytest.mark.api
-    def test_list_certificates(self, api_client, netbox_available):
+    def test_list_certificates(self, api_client):
         """Test GET /certificates/ returns list."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.get(f"{API_BASE}/certificates/")
         assert resp.status_code == 200
@@ -285,9 +289,8 @@ class TestCertificateAPI:
         assert "count" in data
 
     @pytest.mark.api
-    def test_import_certificate(self, api_client, netbox_available):
+    def test_import_certificate(self, api_client):
         """Test POST /certificates/import/ imports a PEM certificate."""
-        skip_if_netbox_unavailable(netbox_available)
 
         import_data = {
             "pem_content": TEST_CERTIFICATE_PEM,
@@ -308,9 +311,8 @@ class TestCertificateAPI:
             assert resp.status_code == 400
 
     @pytest.mark.api
-    def test_import_certificate_rejects_private_key(self, api_client, netbox_available):
+    def test_import_certificate_rejects_private_key(self, api_client):
         """Test POST /certificates/import/ rejects PEM with private key."""
-        skip_if_netbox_unavailable(netbox_available)
 
         pem_with_key = (
             TEST_CERTIFICATE_PEM
@@ -323,9 +325,8 @@ class TestCertificateAPI:
         assert "private key" in resp.text.lower() or "Private key" in resp.text
 
     @pytest.mark.api
-    def test_bulk_import_certificates(self, api_client, netbox_available):
+    def test_bulk_import_certificates(self, api_client):
         """Test POST /certificates/bulk-import/ imports multiple certificates."""
-        skip_if_netbox_unavailable(netbox_available)
 
         # Load real certificates
         fixtures_dir = Path(__file__).parent / "fixtures" / "real_world"
@@ -345,33 +346,24 @@ class TestCertificateAPI:
         assert resp.status_code in [201, 400]
 
     @pytest.mark.api
-    def test_bulk_import_empty_list(self, api_client, netbox_available):
+    def test_bulk_import_empty_list(self, api_client):
         """Test POST /certificates/bulk-import/ rejects empty list."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.post(f"{API_BASE}/certificates/bulk-import/", json=[])
         assert resp.status_code == 400
         assert "empty" in resp.text.lower() or "required" in resp.text.lower()
 
     @pytest.mark.api
-    def test_bulk_import_not_list(self, api_client, netbox_available):
+    def test_bulk_import_not_list(self, api_client):
         """Test POST /certificates/bulk-import/ rejects non-list input."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.post(f"{API_BASE}/certificates/bulk-import/", json={"pem_content": "test"})
         assert resp.status_code == 400
 
     @pytest.mark.api
-    def test_retrieve_certificate(self, api_client, netbox_available):
+    def test_retrieve_certificate(self, api_client, test_certificate):
         """Test GET /certificates/{id}/ returns certificate details."""
-        skip_if_netbox_unavailable(netbox_available)
-
-        # First get a certificate ID from the list
-        list_resp = api_client.get(f"{API_BASE}/certificates/")
-        if list_resp.json()["count"] == 0:
-            pytest.skip("No certificates available for testing")
-
-        cert_id = list_resp.json()["results"][0]["id"]
+        cert_id = test_certificate["id"]
 
         resp = api_client.get(f"{API_BASE}/certificates/{cert_id}/")
         assert resp.status_code == 200
@@ -383,9 +375,8 @@ class TestCertificateAPI:
         assert "valid_to" in data
 
     @pytest.mark.api
-    def test_certificate_not_found(self, api_client, netbox_available):
+    def test_certificate_not_found(self, api_client):
         """Test GET /certificates/{id}/ returns 404 for non-existent certificate."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.get(f"{API_BASE}/certificates/99999/")
         assert resp.status_code == 404
@@ -400,24 +391,11 @@ class TestCertificateChainValidationAPI:
     """Tests for certificate chain validation API endpoints."""
 
     @pytest.mark.api
-    def test_validate_chain_single(self, api_client, netbox_available):
+    def test_validate_chain_single(self, api_client, test_certificate):
         """Test POST /certificates/{id}/validate-chain/ validates chain."""
-        skip_if_netbox_unavailable(netbox_available)
+        cert_id = test_certificate["id"]
 
-        # Get a certificate with PEM content
-        list_resp = api_client.get(f"{API_BASE}/certificates/")
-        certs = list_resp.json().get("results", [])
-
-        cert_with_pem = None
-        for cert in certs:
-            if cert.get("pem_content"):
-                cert_with_pem = cert
-                break
-
-        if not cert_with_pem:
-            pytest.skip("No certificates with PEM content available")
-
-        resp = api_client.post(f"{API_BASE}/certificates/{cert_with_pem['id']}/validate-chain/")
+        resp = api_client.post(f"{API_BASE}/certificates/{cert_id}/validate-chain/")
         assert resp.status_code == 200
         data = resp.json()
         assert "status" in data
@@ -425,18 +403,9 @@ class TestCertificateChainValidationAPI:
         assert "message" in data
 
     @pytest.mark.api
-    def test_bulk_validate_chain(self, api_client, netbox_available):
+    def test_bulk_validate_chain(self, api_client, test_certificate):
         """Test POST /certificates/bulk-validate-chain/ validates multiple chains."""
-        skip_if_netbox_unavailable(netbox_available)
-
-        # Get some certificate IDs
-        list_resp = api_client.get(f"{API_BASE}/certificates/")
-        certs = list_resp.json().get("results", [])
-
-        if len(certs) < 1:
-            pytest.skip("No certificates available for testing")
-
-        cert_ids = [c["id"] for c in certs[:3]]
+        cert_ids = [test_certificate["id"]]
 
         resp = api_client.post(f"{API_BASE}/certificates/bulk-validate-chain/", json={"ids": cert_ids})
         assert resp.status_code == 200
@@ -448,17 +417,15 @@ class TestCertificateChainValidationAPI:
         assert len(data["results"]) == len(cert_ids)
 
     @pytest.mark.api
-    def test_bulk_validate_chain_empty_ids(self, api_client, netbox_available):
+    def test_bulk_validate_chain_empty_ids(self, api_client):
         """Test POST /certificates/bulk-validate-chain/ rejects empty IDs."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.post(f"{API_BASE}/certificates/bulk-validate-chain/", json={"ids": []})
         assert resp.status_code == 400
 
     @pytest.mark.api
-    def test_bulk_validate_chain_no_ids(self, api_client, netbox_available):
+    def test_bulk_validate_chain_no_ids(self, api_client):
         """Test POST /certificates/bulk-validate-chain/ rejects missing IDs."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.post(f"{API_BASE}/certificates/bulk-validate-chain/", json={})
         assert resp.status_code == 400
@@ -473,18 +440,9 @@ class TestCertificateComplianceAPI:
     """Tests for certificate compliance API endpoints."""
 
     @pytest.mark.api
-    def test_compliance_check_single(self, api_client, netbox_available):
+    def test_compliance_check_single(self, api_client, test_certificate):
         """Test POST /certificates/{id}/compliance-check/ runs compliance check."""
-        skip_if_netbox_unavailable(netbox_available)
-
-        # Get a certificate
-        list_resp = api_client.get(f"{API_BASE}/certificates/")
-        certs = list_resp.json().get("results", [])
-
-        if not certs:
-            pytest.skip("No certificates available for testing")
-
-        cert_id = certs[0]["id"]
+        cert_id = test_certificate["id"]
 
         resp = api_client.post(f"{API_BASE}/certificates/{cert_id}/compliance-check/", json={})
         assert resp.status_code == 200
@@ -496,18 +454,9 @@ class TestCertificateComplianceAPI:
         assert "compliance_score" in data
 
     @pytest.mark.api
-    def test_bulk_compliance_check(self, api_client, netbox_available):
+    def test_bulk_compliance_check(self, api_client, test_certificate):
         """Test POST /certificates/bulk-compliance-check/ runs bulk compliance."""
-        skip_if_netbox_unavailable(netbox_available)
-
-        # Get some certificate IDs
-        list_resp = api_client.get(f"{API_BASE}/certificates/")
-        certs = list_resp.json().get("results", [])
-
-        if not certs:
-            pytest.skip("No certificates available for testing")
-
-        cert_ids = [c["id"] for c in certs[:3]]
+        cert_ids = [test_certificate["id"]]
 
         resp = api_client.post(
             f"{API_BASE}/certificates/bulk-compliance-check/", json={"certificate_ids": cert_ids}
@@ -521,26 +470,12 @@ class TestCertificateComplianceAPI:
         assert "reports" in data
 
     @pytest.mark.api
-    def test_bulk_compliance_check_with_policies(self, api_client, netbox_available):
+    def test_bulk_compliance_check_with_policies(self, api_client, test_certificate, test_compliance_policy):
         """Test bulk compliance check with specific policy IDs."""
-        skip_if_netbox_unavailable(netbox_available)
+        cert_ids = [test_certificate["id"]]
+        policy_ids = [test_compliance_policy["id"]]
 
-        # Get certificate and policy IDs
-        certs_resp = api_client.get(f"{API_BASE}/certificates/")
-        policies_resp = api_client.get(f"{API_BASE}/compliance-policies/")
-
-        certs = certs_resp.json().get("results", [])
-        policies = policies_resp.json().get("results", [])
-
-        if not certs:
-            pytest.skip("No certificates available")
-
-        cert_ids = [c["id"] for c in certs[:2]]
-        policy_ids = [p["id"] for p in policies[:2]] if policies else None
-
-        payload = {"certificate_ids": cert_ids}
-        if policy_ids:
-            payload["policy_ids"] = policy_ids
+        payload = {"certificate_ids": cert_ids, "policy_ids": policy_ids}
 
         resp = api_client.post(f"{API_BASE}/certificates/bulk-compliance-check/", json=payload)
         assert resp.status_code == 200
@@ -555,62 +490,49 @@ class TestCertificateExportAPI:
     """Tests for certificate export API endpoints."""
 
     @pytest.mark.api
-    def test_export_certificates_json(self, api_client, netbox_available):
+    def test_export_certificates_json(self, api_client):
         """Test GET /certificates/export/?format=json exports as JSON."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.get(f"{API_BASE}/certificates/export/?format=json")
         assert resp.status_code == 200
         assert "application/json" in resp.headers.get("Content-Type", "")
 
     @pytest.mark.api
-    def test_export_certificates_csv(self, api_client, netbox_available):
+    def test_export_certificates_csv(self, api_client):
         """Test POST /certificates/export/ with format=csv exports as CSV.
 
         Note: Must use POST because DRF intercepts GET ?format=xxx for content negotiation.
         """
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.post(f"{API_BASE}/certificates/export/", json={"format": "csv"})
         assert resp.status_code == 200
         assert "text/csv" in resp.headers.get("Content-Type", "")
 
     @pytest.mark.api
-    def test_export_certificates_pem(self, api_client, netbox_available):
+    def test_export_certificates_pem(self, api_client):
         """Test POST /certificates/export/ with format=pem exports as PEM.
 
         Note: Must use POST because DRF intercepts GET ?format=xxx for content negotiation.
         """
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.post(f"{API_BASE}/certificates/export/", json={"format": "pem"})
         assert resp.status_code == 200
         assert "application/x-pem-file" in resp.headers.get("Content-Type", "")
 
     @pytest.mark.api
-    def test_export_single_certificate(self, api_client, netbox_available):
+    def test_export_single_certificate(self, api_client, test_certificate):
         """Test GET /certificates/{id}/export/ exports single certificate."""
-        skip_if_netbox_unavailable(netbox_available)
-
-        # Get a certificate
-        list_resp = api_client.get(f"{API_BASE}/certificates/")
-        certs = list_resp.json().get("results", [])
-
-        if not certs:
-            pytest.skip("No certificates available")
-
-        cert_id = certs[0]["id"]
+        cert_id = test_certificate["id"]
 
         resp = api_client.get(f"{API_BASE}/certificates/{cert_id}/export/?format=json")
         assert resp.status_code == 200
 
     @pytest.mark.api
-    def test_export_invalid_format(self, api_client, netbox_available):
+    def test_export_invalid_format(self, api_client):
         """Test export with invalid format returns error.
 
         Note: Must use POST because DRF intercepts GET ?format=xxx for content negotiation.
         """
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.post(f"{API_BASE}/certificates/export/", json={"format": "invalid"})
         assert resp.status_code == 400
@@ -625,9 +547,8 @@ class TestCertificateAssignmentAPI:
     """Tests for Certificate Assignment API endpoints."""
 
     @pytest.mark.api
-    def test_list_assignments(self, api_client, netbox_available):
+    def test_list_assignments(self, api_client):
         """Test GET /assignments/ returns list."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.get(f"{API_BASE}/assignments/")
         assert resp.status_code == 200
@@ -636,9 +557,8 @@ class TestCertificateAssignmentAPI:
         assert "count" in data
 
     @pytest.mark.api
-    def test_assignment_not_found(self, api_client, netbox_available):
+    def test_assignment_not_found(self, api_client):
         """Test GET /assignments/{id}/ returns 404 for non-existent assignment."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.get(f"{API_BASE}/assignments/99999/")
         assert resp.status_code == 404
@@ -653,9 +573,8 @@ class TestCSRAPI:
     """Tests for Certificate Signing Request API endpoints."""
 
     @pytest.mark.api
-    def test_list_csrs(self, api_client, netbox_available):
+    def test_list_csrs(self, api_client):
         """Test GET /csrs/ returns list."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.get(f"{API_BASE}/csrs/")
         assert resp.status_code == 200
@@ -664,9 +583,8 @@ class TestCSRAPI:
         assert "count" in data
 
     @pytest.mark.api
-    def test_csr_not_found(self, api_client, netbox_available):
+    def test_csr_not_found(self, api_client):
         """Test GET /csrs/{id}/ returns 404 for non-existent CSR."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.get(f"{API_BASE}/csrs/99999/")
         assert resp.status_code == 404
@@ -681,9 +599,8 @@ class TestCompliancePolicyAPI:
     """Tests for Compliance Policy API endpoints."""
 
     @pytest.mark.api
-    def test_list_compliance_policies(self, api_client, netbox_available):
+    def test_list_compliance_policies(self, api_client):
         """Test GET /compliance-policies/ returns list."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.get(f"{API_BASE}/compliance-policies/")
         assert resp.status_code == 200
@@ -692,9 +609,8 @@ class TestCompliancePolicyAPI:
         assert "count" in data
 
     @pytest.mark.api
-    def test_create_compliance_policy(self, api_client, netbox_available):
+    def test_create_compliance_policy(self, api_client):
         """Test POST /compliance-policies/ creates a new policy."""
-        skip_if_netbox_unavailable(netbox_available)
 
         policy_data = {
             "name": f"Test Policy {os.urandom(4).hex()}",
@@ -714,9 +630,8 @@ class TestCompliancePolicyAPI:
         api_client.delete(f"{API_BASE}/compliance-policies/{data['id']}/")
 
     @pytest.mark.api
-    def test_retrieve_compliance_policy(self, api_client, netbox_available):
+    def test_retrieve_compliance_policy(self, api_client):
         """Test GET /compliance-policies/{id}/ returns policy details."""
-        skip_if_netbox_unavailable(netbox_available)
 
         # Create a policy
         policy_data = {
@@ -738,9 +653,8 @@ class TestCompliancePolicyAPI:
         api_client.delete(f"{API_BASE}/compliance-policies/{policy_id}/")
 
     @pytest.mark.api
-    def test_update_compliance_policy(self, api_client, netbox_available):
+    def test_update_compliance_policy(self, api_client):
         """Test PUT /compliance-policies/{id}/ updates policy."""
-        skip_if_netbox_unavailable(netbox_available)
 
         # Create policy
         policy_data = {
@@ -768,9 +682,8 @@ class TestCompliancePolicyAPI:
         api_client.delete(f"{API_BASE}/compliance-policies/{policy_id}/")
 
     @pytest.mark.api
-    def test_delete_compliance_policy(self, api_client, netbox_available):
+    def test_delete_compliance_policy(self, api_client):
         """Test DELETE /compliance-policies/{id}/ deletes policy."""
-        skip_if_netbox_unavailable(netbox_available)
 
         # Create policy
         policy_data = {
@@ -791,9 +704,8 @@ class TestCompliancePolicyAPI:
         assert resp.status_code == 404
 
     @pytest.mark.api
-    def test_compliance_policy_not_found(self, api_client, netbox_available):
+    def test_compliance_policy_not_found(self, api_client):
         """Test GET /compliance-policies/{id}/ returns 404 for non-existent policy."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.get(f"{API_BASE}/compliance-policies/99999/")
         assert resp.status_code == 404
@@ -808,9 +720,8 @@ class TestComplianceCheckAPI:
     """Tests for Compliance Check API endpoints."""
 
     @pytest.mark.api
-    def test_list_compliance_checks(self, api_client, netbox_available):
+    def test_list_compliance_checks(self, api_client):
         """Test GET /compliance-checks/ returns list."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.get(f"{API_BASE}/compliance-checks/")
         assert resp.status_code == 200
@@ -819,9 +730,8 @@ class TestComplianceCheckAPI:
         assert "count" in data
 
     @pytest.mark.api
-    def test_compliance_check_not_found(self, api_client, netbox_available):
+    def test_compliance_check_not_found(self, api_client):
         """Test GET /compliance-checks/{id}/ returns 404 for non-existent check."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = api_client.get(f"{API_BASE}/compliance-checks/99999/")
         assert resp.status_code == 404
@@ -836,18 +746,16 @@ class TestAPIAuthentication:
     """Tests for API authentication."""
 
     @pytest.mark.api
-    def test_unauthenticated_request_rejected(self, netbox_available):
+    def test_unauthenticated_request_rejected(self):
         """Test that requests without authentication are rejected."""
-        skip_if_netbox_unavailable(netbox_available)
 
         resp = requests.get(f"{API_BASE}/certificates/")
         # Should be 403 Forbidden or 401 Unauthorized
         assert resp.status_code in [401, 403]
 
     @pytest.mark.api
-    def test_invalid_token_rejected(self, netbox_available):
+    def test_invalid_token_rejected(self):
         """Test that requests with invalid token are rejected."""
-        skip_if_netbox_unavailable(netbox_available)
 
         headers = {"Authorization": "Token invalid_token_12345"}
         resp = requests.get(f"{API_BASE}/certificates/", headers=headers)
