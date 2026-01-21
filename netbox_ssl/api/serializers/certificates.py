@@ -8,7 +8,7 @@ from tenancy.api.serializers import TenantSerializer
 from tenancy.models import Tenant
 
 from ...models import Certificate, CertificateStatusChoices
-from ...utils import CertificateParseError, CertificateParser
+from ...utils import CertificateParseError, CertificateParser, detect_issuing_ca
 from .certificate_authorities import CertificateAuthoritySerializer
 
 
@@ -149,11 +149,15 @@ class CertificateImportSerializer(serializers.Serializer):
         pem_content = validated_data["pem_content"]
         parsed = CertificateParser.parse(pem_content)
 
+        # Auto-detect issuing CA based on issuer string
+        issuing_ca = detect_issuing_ca(parsed.issuer)
+
         certificate = Certificate.objects.create(
             common_name=parsed.common_name,
             serial_number=parsed.serial_number,
             fingerprint_sha256=parsed.fingerprint_sha256,
             issuer=parsed.issuer,
+            issuing_ca=issuing_ca,
             valid_from=parsed.valid_from,
             valid_to=parsed.valid_to,
             sans=parsed.sans,

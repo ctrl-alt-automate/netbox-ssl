@@ -256,13 +256,26 @@ Track which CAs issue your certificates for better visibility and compliance.
 
 ### Auto-Detection
 
-When importing certificates, the plugin can automatically link them to a CA:
+When importing certificates, the plugin **automatically** links them to a matching CA:
 
-1. Set an **Issuer Pattern** on the CA (e.g., "let's encrypt")
-2. Import a certificate with matching issuer
-3. The `issuing_ca` field is automatically populated
+1. Create a CA with an **Issuer Pattern** (e.g., "let's encrypt", "digicert", "sectigo")
+2. Import a certificate via UI or API
+3. The plugin matches the certificate's issuer against all CA patterns
+4. If a match is found, `issuing_ca` is automatically set
 
-> **Tip:** Use lowercase patterns for case-insensitive matching.
+**How it works:**
+- Pattern matching is **case-insensitive**
+- The pattern is checked as a substring of the issuer
+- First matching CA wins (order by database ID)
+
+**Example:**
+```
+CA: "Let's Encrypt" with pattern "let's encrypt"
+Certificate issuer: "C=US, O=Let's Encrypt, CN=E7"
+→ Automatically linked to "Let's Encrypt" CA
+```
+
+> **Tip:** Use lowercase patterns and include the most distinctive part of the issuer name.
 
 ### Approved CAs
 

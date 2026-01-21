@@ -1,3 +1,4 @@
+from .ca_detector import detect_issuing_ca, get_or_create_ca_from_issuer
 from .chain_validator import (
     ChainValidationError,
     ChainValidationResult,
@@ -23,4 +24,6 @@ __all__ = [
     "ChainValidationResult",
     "ChainValidationStatus",
     "ChainValidationError",
+    "detect_issuing_ca",
+    "get_or_create_ca_from_issuer",
 ]

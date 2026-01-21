@@ -21,7 +21,12 @@ from ..forms import (
 )
 from ..models import Certificate, CertificateStatusChoices
 from ..tables import CertificateTable
-from ..utils import CertificateParseError, CertificateParser, PrivateKeyDetectedError
+from ..utils import (
+    CertificateParseError,
+    CertificateParser,
+    PrivateKeyDetectedError,
+    detect_issuing_ca,
+)
 
 
 class CertificateListView(generic.ObjectListView):
@@ -173,12 +178,16 @@ class CertificateImportView(View):
 
                 return redirect(reverse("plugins:netbox_ssl:certificate_renew"))
 
+            # Auto-detect issuing CA
+            issuing_ca = detect_issuing_ca(parsed.issuer)
+
             # Create the certificate
             certificate = Certificate.objects.create(
                 common_name=parsed.common_name,
                 serial_number=parsed.serial_number,
                 fingerprint_sha256=parsed.fingerprint_sha256,
                 issuer=parsed.issuer,
+                issuing_ca=issuing_ca,
                 valid_from=parsed.valid_from,
                 valid_to=parsed.valid_to,
                 sans=parsed.sans,
@@ -191,7 +200,14 @@ class CertificateImportView(View):
                 status=CertificateStatusChoices.STATUS_ACTIVE,
             )
 
-            messages.success(request, _(f"Certificate imported successfully: {certificate.common_name}"))
+            # Show message with CA info if detected
+            if issuing_ca:
+                messages.success(
+                    request,
+                    _(f"Certificate imported successfully: {certificate.common_name} (CA: {issuing_ca.name})"),
+                )
+            else:
+                messages.success(request, _(f"Certificate imported successfully: {certificate.common_name}"))
             return redirect(certificate.get_absolute_url())
 
         except PrivateKeyDetectedError as e:
@@ -268,6 +284,9 @@ class CertificateRenewView(View):
         valid_from = datetime.fromisoformat(pending_data["valid_from"])
         valid_to = datetime.fromisoformat(pending_data["valid_to"])
 
+        # Auto-detect issuing CA
+        issuing_ca = detect_issuing_ca(pending_data["issuer"])
+
         if is_renewal and renewal_candidate_id:
             # Janus Renewal: Replace & Archive
             old_certificate = get_object_or_404(Certificate, pk=renewal_candidate_id)
@@ -279,6 +298,7 @@ class CertificateRenewView(View):
                     serial_number=pending_data["serial_number"],
                     fingerprint_sha256=pending_data["fingerprint_sha256"],
                     issuer=pending_data["issuer"],
+                    issuing_ca=issuing_ca,
                     valid_from=valid_from,
                     valid_to=valid_to,
                     sans=pending_data["sans"],
@@ -328,6 +348,7 @@ class CertificateRenewView(View):
                 serial_number=pending_data["serial_number"],
                 fingerprint_sha256=pending_data["fingerprint_sha256"],
                 issuer=pending_data["issuer"],
+                issuing_ca=issuing_ca,
                 valid_from=valid_from,
                 valid_to=valid_to,
                 sans=pending_data["sans"],
