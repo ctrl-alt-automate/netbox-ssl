@@ -35,6 +35,16 @@ Repository = "https://github.com/ctrl-alt-automate/netbox-ssl"
 [tool.setuptools.packages.find]
 include = ["netbox_ssl*"]
 
+[tool.pytest.ini_options]
+markers = [
+    "unit: marks tests as unit tests (fast, no external dependencies)",
+    "api: marks tests as API integration tests (requires running NetBox)",
+    "browser: marks tests as browser tests (requires running NetBox and Playwright)",
+]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+
 [tool.ruff]
 line-length = 120
 target-version = "py310"
