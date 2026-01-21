@@ -9,7 +9,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("netbox_ssl", "0002_certificate_sans_gin_index"),
+        ("netbox_ssl", "0005_compliance_reporting"),
     ]
 
     operations = [

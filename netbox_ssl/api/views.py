@@ -188,6 +188,9 @@ class CertificateViewSet(NetBoxModelViewSet):
                 "certificates": result.certificates,
                 "errors": result.errors,
                 "validated_at": result.validated_at.isoformat(),
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=False, methods=["get", "post"], url_path="export")
     def export(self, request):
