@@ -138,6 +138,8 @@ def run_browser_tests():
         "-m",
         "browser",
         "--tb=short",
+        "-p",
+        "no:django",  # Disable pytest-django for browser tests
     ]
 
     return run_command(cmd, "Browser tests")
