@@ -45,9 +45,7 @@ def detect_issuing_ca(issuer: str) -> CertificateAuthority | None:
     issuer_lower = issuer.lower()
 
     # Find CAs with issuer patterns
-    cas_with_patterns = CertificateAuthority.objects.exclude(
-        issuer_pattern__isnull=True
-    ).exclude(issuer_pattern="")
+    cas_with_patterns = CertificateAuthority.objects.exclude(issuer_pattern__isnull=True).exclude(issuer_pattern="")
 
     for ca in cas_with_patterns:
         if ca.issuer_pattern.lower() in issuer_lower:
@@ -145,7 +143,7 @@ def _extract_cn_from_issuer(issuer: str) -> str | None:
             # Find the = and return everything after it
             eq_pos = part.find("=")
             if eq_pos != -1:
-                return part[eq_pos + 1:].strip()
+                return part[eq_pos + 1 :].strip()
 
     # Also try O= (Organization) as fallback
     for part in parts:
@@ -154,7 +152,7 @@ def _extract_cn_from_issuer(issuer: str) -> str | None:
         if part_upper.startswith("O=") or part_upper.startswith("O ="):
             eq_pos = part.find("=")
             if eq_pos != -1:
-                return part[eq_pos + 1:].strip()
+                return part[eq_pos + 1 :].strip()
 
     return None
 
