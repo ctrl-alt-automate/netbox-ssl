@@ -22,8 +22,11 @@ Track certificates, monitor expiration dates, and never lose sight of where your
 
 | Getting Started | Daily Usage | Reference |
 |:---------------:|:-----------:|:---------:|
-| [Installation](installation.md) | [Usage](usage.md) | [API](api.md) |
-| [Configuration](configuration.md) | [Renewal Workflow](usage.md#janus-renewal-workflow)<br>[Scripts](scripts.md) | [Data Models](data-models.md) |
+| [Installation](installation.md) | [Usage Guide](usage.md) | [API](api.md) |
+| [Configuration](configuration.md) | [Janus Renewal](usage.md#janus-renewal-workflow) | [Data Models](data-models.md) |
+| | [CSR Management](usage.md#certificate-signing-requests-csrs) | |
+| | [Compliance](usage.md#compliance-policies) | |
+| | [Scripts](scripts.md) | |
 
 ## What Can You Do?
 
@@ -57,6 +60,42 @@ The dashboard widget shows certificates that need attention:
 <p align="center">
   <img src="images/dashboard-widget.png" alt="Dashboard Widget" width="400">
 </p>
+
+### Track Certificate Requests
+
+Manage the full certificate lifecycle with CSR tracking:
+- Import and parse Certificate Signing Requests
+- Track approval status from request to issuance
+- Link issued certificates back to their CSRs
+
+### Manage Certificate Authorities
+
+Keep track of which CAs issue your certificates:
+- Register public, internal, and ACME CAs
+- Auto-detect CA from certificate issuer field
+- Track approved vs. non-approved CAs
+
+### Enforce Compliance Policies
+
+Define and enforce certificate standards:
+- Minimum key sizes and allowed algorithms
+- Maximum validity periods
+- Required SANs and forbidden wildcards
+- Approved issuer restrictions
+
+### Validate Certificate Chains
+
+Verify your certificate chains are complete:
+- Check chain completeness and signatures
+- Identify self-signed and missing intermediates
+- Bulk validate across your inventory
+
+### Export Your Data
+
+Export certificates for reporting and integration:
+- JSON for API integration
+- CSV for spreadsheets and reporting
+- PEM for deployment verification
 
 ## Security Philosophy
 
