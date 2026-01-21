@@ -388,6 +388,11 @@ class CertificateViewSet(NetBoxModelViewSet):
         Validate certificate chains for multiple certificates.
 
         Accepts a list of certificate IDs and validates each one.
+
+        Example payload:
+        {
+            "ids": [1, 2, 3, 4, 5]
+        }
         """
         certificate_ids = request.data.get("ids", [])
 
@@ -397,6 +402,58 @@ class CertificateViewSet(NetBoxModelViewSet):
         # Limit batch size
         plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
         max_batch_size = plugin_settings.get("bulk_validate_max_batch_size", 100)
+        if len(certificate_ids) > max_batch_size:
+            raise serializers.ValidationError(
+                {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
+            )
+
+        certificates = list(Certificate.objects.filter(pk__in=certificate_ids))
+        results = []
+        certs_to_update = []
+
+        for cert in certificates:
+            if cert.pem_content:
+                result = cert.validate_chain(save=False)
+                certs_to_update.append(cert)
+                results.append(
+                    {
+                        "id": cert.pk,
+                        "common_name": cert.common_name,
+                        "status": result.status.value if result else "error",
+                        "is_valid": result.is_valid if result else False,
+                        "message": result.message if result else "Validation error",
+                        "chain_depth": result.chain_depth if result else None,
+                    }
+                )
+            else:
+                results.append(
+                    {
+                        "id": cert.pk,
+                        "common_name": cert.common_name,
+                        "status": "error",
+                        "is_valid": False,
+                        "message": "No PEM content available",
+                        "chain_depth": None,
+                    }
+                )
+
+        # Bulk update all certificates at once
+        if certs_to_update:
+            Certificate.objects.bulk_update(
+                certs_to_update,
+                ["chain_status", "chain_validation_message", "chain_validated_at", "chain_depth"],
+            )
+
+        valid_count = sum(1 for r in results if r["is_valid"])
+        return Response(
+            {
+                "validated_count": len(results),
+                "valid_count": valid_count,
+                "invalid_count": len(results) - valid_count,
+                "results": results,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=False, methods=["post"], url_path="bulk-compliance-check")
     def bulk_compliance_check(self, request):
@@ -422,59 +479,6 @@ class CertificateViewSet(NetBoxModelViewSet):
             raise serializers.ValidationError(
                 {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
             )
-
-        certificates = list(Certificate.objects.filter(pk__in=certificate_ids))
-        results = []
-        certs_to_update = []
-
-        for cert in certificates:
-            if cert.pem_content:
-                # Validate without saving to database (we'll bulk update later)
-                result = cert.validate_chain(save=False)
-                certs_to_update.append(cert)
-                results.append(
-                    {
-                        "id": cert.pk,
-                        "common_name": cert.common_name,
-                        "status": result.status.value if result else "error",
-                        "is_valid": result.is_valid if result else False,
-                        "message": result.message if result else "No PEM content",
-                        "chain_depth": result.chain_depth if result else None,
-                    }
-                )
-            else:
-                # Still update chain status for certificates without PEM
-                cert.validate_chain(save=False)
-                certs_to_update.append(cert)
-                results.append(
-                    {
-                        "id": cert.pk,
-                        "common_name": cert.common_name,
-                        "status": "error",
-                        "is_valid": False,
-                        "message": "No PEM content available",
-                        "chain_depth": None,
-                    }
-                )
-
-        # Bulk update all certificates at once to avoid N+1 writes
-        if certs_to_update:
-            Certificate.objects.bulk_update(
-                certs_to_update,
-                ["chain_status", "chain_validation_message", "chain_validated_at", "chain_depth"],
-            )
-
-        valid_count = sum(1 for r in results if r["is_valid"])
-        return Response(
-            {
-                "validated_count": len(results),
-                "valid_count": valid_count,
-                "invalid_count": len(results) - valid_count,
-                "results": results,
-            },
-            status=status.HTTP_200_OK,
-        )
-
 
         # Get certificates with tenant prefetched to avoid N+1 queries
         certificates = Certificate.objects.filter(pk__in=certificate_ids).select_related("tenant")

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def detect_issuing_ca(issuer: str) -> "CertificateAuthority | None":
+def detect_issuing_ca(issuer: str) -> CertificateAuthority | None:
     """
     Find a CertificateAuthority that matches the given issuer string.
 
@@ -63,7 +63,7 @@ def detect_issuing_ca(issuer: str) -> "CertificateAuthority | None":
     return None
 
 
-def get_or_create_ca_from_issuer(issuer: str) -> "CertificateAuthority | None":
+def get_or_create_ca_from_issuer(issuer: str) -> CertificateAuthority | None:
     """
     Find or create a CertificateAuthority based on the issuer string.
 
