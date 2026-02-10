@@ -1,4 +1,5 @@
 {% extends 'generic/object_edit.html' %}
+{% load helpers %}
 {% load i18n %}
 
 {% block title %}Certificate Renewal{% endblock %}
@@ -100,11 +101,11 @@
           </tr>
           <tr>
             <th>Valid From</th>
-            <td>{{ pending_certificate.valid_from }}</td>
+            <td>{{ pending_certificate.valid_from_formatted }}</td>
           </tr>
           <tr>
             <th>Valid To</th>
-            <td>{{ pending_certificate.valid_to }}</td>
+            <td>{{ pending_certificate.valid_to_formatted }}</td>
           </tr>
           <tr>
             <th>Issuer</th>
@@ -123,6 +124,53 @@
     </div>
   </div>
 </div>
+
+{% if assignments %}
+<div class="row mt-4">
+  <div class="col col-12">
+    <div class="card">
+      <h5 class="card-header">
+        <i class="mdi mdi-link-variant"></i> Assignments to Transfer ({{ assignments|length }})
+      </h5>
+      <div class="card-body">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Assigned To</th>
+              <th>Primary</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for assignment in assignments %}
+            <tr>
+              <td>{% badge assignment.assigned_object_type_name %}</td>
+              <td>
+                {% if assignment.assigned_object %}
+                  <a href="{{ assignment.assigned_object.get_absolute_url }}">
+                    {{ assignment.assigned_object }}
+                  </a>
+                  {% if assignment.assigned_object_type.model == 'service' and assignment.assigned_object.parent %}
+                    <span class="text-muted">
+                      on <a href="{{ assignment.assigned_object.parent.get_absolute_url }}">{{ assignment.assigned_object.parent }}</a>
+                    </span>
+                  {% endif %}
+                {% else %}
+                  <span class="text-muted">Unknown</span>
+                {% endif %}
+              </td>
+              <td>{% checkmark assignment.is_primary %}</td>
+              <td>{{ assignment.notes|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <div class="row mt-4">
   <div class="col col-12">

@@ -21,6 +21,10 @@ class CertificateTable(NetBoxTable):
     issuer = tables.Column(
         verbose_name="Issuer",
     )
+    issuing_ca = tables.Column(
+        linkify=True,
+        verbose_name="Issuing CA",
+    )
     valid_from = columns.DateTimeColumn(
         verbose_name="Valid From",
     )
@@ -56,6 +60,7 @@ class CertificateTable(NetBoxTable):
             "common_name",
             "status",
             "issuer",
+            "issuing_ca",
             "valid_from",
             "valid_to",
             "days_remaining",
@@ -68,7 +73,7 @@ class CertificateTable(NetBoxTable):
         default_columns = (
             "common_name",
             "status",
-            "issuer",
+            "issuing_ca",
             "valid_to",
             "days_remaining",
             "algorithm",

@@ -192,6 +192,274 @@ Import multiple certificates at once:
 
 ---
 
+## Certificate Signing Requests (CSRs)
+
+Track pending certificate requests before they become issued certificates.
+
+### Importing a CSR
+
+1. Navigate to **Plugins > SSL Certificates > CSRs**
+2. Click the **Import** button
+3. Paste your CSR in PEM format
+4. Click **Import CSR**
+
+The plugin extracts:
+- Common Name (CN) and subject fields (O, OU, L, ST, C)
+- Subject Alternative Names (SANs)
+- Key algorithm and size
+- SHA256 fingerprint for duplicate detection
+
+### CSR Workflow
+
+| Status | Description |
+|--------|-------------|
+| **Pending** | CSR awaiting approval |
+| **Approved** | Ready to submit to CA |
+| **Rejected** | CSR was rejected |
+| **Issued** | Certificate has been issued |
+| **Expired** | CSR expired without issuance |
+
+### Linking CSR to Certificate
+
+When a certificate is issued from a CSR:
+1. Import the new certificate
+2. Edit the CSR record
+3. Set **Resulting Certificate** to link them
+4. Update status to **Issued**
+
+This creates an audit trail from request to issued certificate.
+
+---
+
+## Certificate Authorities
+
+Track which CAs issue your certificates for better visibility and compliance.
+
+### Adding a Certificate Authority
+
+1. Navigate to **Plugins > SSL Certificates > Certificate Authorities**
+2. Click **+ Add**
+3. Fill in the CA details:
+   - **Name** — Unique identifier (e.g., "DigiCert EV")
+   - **Type** — Public, Internal, or ACME
+   - **Issuer Pattern** — For auto-detection (e.g., "digicert")
+   - **Website/Portal URLs** — For quick access
+   - **Is Approved** — Whether this CA is approved for use
+
+### CA Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| **Public** | Commercial CA | DigiCert, Sectigo, GlobalSign |
+| **Internal** | Organization's private CA | Active Directory CS, EJBCA |
+| **ACME** | Automated CA | Let's Encrypt, ZeroSSL |
+
+### Auto-Detection
+
+When importing certificates, the plugin **automatically** links them to a matching CA:
+
+1. Create a CA with an **Issuer Pattern** (e.g., "let's encrypt", "digicert", "sectigo")
+2. Import a certificate via UI or API
+3. The plugin matches the certificate's issuer against all CA patterns
+4. If a match is found, `issuing_ca` is automatically set
+
+**How it works:**
+- Pattern matching is **case-insensitive**
+- The pattern is checked as a substring of the issuer
+- First matching CA wins (order by database ID)
+
+**Example:**
+```
+CA: "Let's Encrypt" with pattern "let's encrypt"
+Certificate issuer: "C=US, O=Let's Encrypt, CN=E7"
+→ Automatically linked to "Let's Encrypt" CA
+```
+
+> **Tip:** Use lowercase patterns and include the most distinctive part of the issuer name.
+
+### Approved CAs
+
+Use the **Is Approved** flag to track which CAs are sanctioned for use:
+- Filter certificates by `issuing_ca__is_approved=false` to find non-compliant certificates
+- Create compliance policies to enforce approved CA usage
+
+---
+
+## Compliance Policies
+
+Define and enforce certificate standards across your organization.
+
+### Creating a Policy
+
+1. Navigate to **Plugins > SSL Certificates > Compliance Policies**
+2. Click **+ Add**
+3. Configure the policy:
+   - **Name** — Descriptive name (e.g., "Minimum 2048-bit keys")
+   - **Policy Type** — What to check
+   - **Severity** — Critical, Warning, or Info
+   - **Parameters** — Type-specific settings (JSON)
+   - **Tenant** — Scope to specific tenant (optional)
+
+### Policy Types
+
+| Type | Description | Parameters |
+|------|-------------|------------|
+| `min_key_size` | Minimum key size | `{"min_bits": 2048}` |
+| `max_validity_days` | Maximum validity period | `{"max_days": 397}` |
+| `algorithm_allowed` | Allowed algorithms | `{"algorithms": ["rsa", "ecdsa"]}` |
+| `algorithm_forbidden` | Forbidden algorithms | `{"algorithms": ["dsa"]}` |
+| `expiry_warning` | Expiry threshold | `{"warning_days": 30}` |
+| `chain_required` | Chain must be present | `{}` |
+| `san_required` | SANs required | `{"min_count": 1}` |
+| `wildcard_forbidden` | No wildcards allowed | `{}` |
+| `issuer_allowed` | Allowed issuers | `{"issuers": ["DigiCert"]}` |
+| `issuer_forbidden` | Forbidden issuers | `{"issuers": ["Unknown CA"]}` |
+
+### Running Compliance Checks
+
+**Single Certificate:**
+1. Go to certificate detail page
+2. Click **Run Compliance Check** (or use API)
+
+**Bulk Check via API:**
+```bash
+curl -X POST \
+  -H "Authorization: Token YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"certificate_ids": [1, 2, 3]}' \
+  http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-compliance-check/
+```
+
+### Viewing Results
+
+- **Certificate detail page** — Shows compliance status
+- **Compliance Checks list** — All check results at *Plugins > SSL Certificates > Compliance Checks*
+- **Filter by result** — `result=fail` to find violations
+
+---
+
+## Chain Validation
+
+Verify certificate chains are complete and valid.
+
+### What Chain Validation Checks
+
+1. **Chain Completeness** — All intermediate certificates present
+2. **Signature Verification** — Each certificate signed by the next
+3. **Validity Periods** — All certificates in chain are valid
+4. **Trust Path** — Chain leads to a trusted root
+
+### Chain Status
+
+| Status | Description |
+|--------|-------------|
+| **Unknown** | Not yet validated |
+| **Valid** | Chain is complete and valid |
+| **Invalid** | Validation failed (see message) |
+| **Self-Signed** | Certificate is self-signed |
+| **No Chain** | Chain required but not provided |
+
+### Running Validation
+
+**Single Certificate:**
+```bash
+curl -X POST \
+  -H "Authorization: Token YOUR_TOKEN" \
+  http://localhost:8000/api/plugins/netbox-ssl/certificates/1/validate-chain/
+```
+
+**Bulk Validation:**
+```bash
+curl -X POST \
+  -H "Authorization: Token YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"certificate_ids": [1, 2, 3]}' \
+  http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-validate-chain/
+```
+
+### Importing with Chain
+
+When importing a certificate, include the full chain:
+
+```
+-----BEGIN CERTIFICATE-----
+(your certificate)
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+(intermediate certificate)
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+(root certificate - optional)
+-----END CERTIFICATE-----
+```
+
+The plugin stores intermediates in the `issuer_chain` field.
+
+---
+
+## Data Export
+
+Export certificates in various formats for reporting and integration.
+
+### Export Formats
+
+| Format | Description | Use Case |
+|--------|-------------|----------|
+| **JSON** | Full data export | API integration, backup |
+| **CSV** | Spreadsheet format | Excel, reporting |
+| **PEM** | Certificate format | Deployment, verification |
+
+### Exporting via UI
+
+1. Navigate to certificate list
+2. Select certificates (checkboxes)
+3. Click **Export** dropdown
+4. Choose format
+
+### Exporting via API
+
+**Single Certificate:**
+```bash
+# JSON (default)
+curl -H "Authorization: Token YOUR_TOKEN" \
+  "http://localhost:8000/api/plugins/netbox-ssl/certificates/1/export/"
+
+# CSV
+curl -H "Authorization: Token YOUR_TOKEN" \
+  "http://localhost:8000/api/plugins/netbox-ssl/certificates/1/export/?format=csv"
+
+# PEM
+curl -H "Authorization: Token YOUR_TOKEN" \
+  "http://localhost:8000/api/plugins/netbox-ssl/certificates/1/export/?format=pem"
+```
+
+**Bulk Export:**
+```bash
+# Export all active certificates as CSV
+curl -H "Authorization: Token YOUR_TOKEN" \
+  "http://localhost:8000/api/plugins/netbox-ssl/certificates/export/?status=active&format=csv"
+
+# Export with filters
+curl -X POST \
+  -H "Authorization: Token YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"certificate_ids": [1, 2, 3], "format": "json"}' \
+  "http://localhost:8000/api/plugins/netbox-ssl/certificates/export/"
+```
+
+### Export Fields (CSV/JSON)
+
+- Common name, serial number, fingerprint
+- Issuer and issuing CA
+- Validity dates and days remaining
+- Algorithm, key size
+- Status and tenant
+- SANs (comma-separated in CSV)
+- Chain validation status
+- Assignment count
+
+---
+
 ## Keyboard Shortcuts
 
 NetBox SSL inherits NetBox's keyboard shortcuts:

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "netbox-ssl"
-version = "0.1.0"
+version = "0.4.0"
 description = "NetBox plugin for TLS/SSL certificate management - Project Janus"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -12,7 +12,7 @@ authors = [
     {name = "NetBox SSL Team"}
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Framework :: Django",
     "Intended Audience :: System Administrators",
     "License :: OSI Approved :: Apache Software License",
@@ -34,6 +34,16 @@ Repository = "https://github.com/ctrl-alt-automate/netbox-ssl"
 
 [tool.setuptools.packages.find]
 include = ["netbox_ssl*"]
+
+[tool.pytest.ini_options]
+markers = [
+    "unit: marks tests as unit tests (fast, no external dependencies)",
+    "api: marks tests as API integration tests (requires running NetBox)",
+    "browser: marks tests as browser tests (requires running NetBox and Playwright)",
+]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
 
 [tool.ruff]
 line-length = 120

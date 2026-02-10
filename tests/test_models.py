@@ -279,6 +279,7 @@ class TestCertificateAlgorithmChoices:
         assert hasattr(CertificateAlgorithmChoices, "ALGORITHM_RSA")
         assert hasattr(CertificateAlgorithmChoices, "ALGORITHM_ECDSA")
         assert hasattr(CertificateAlgorithmChoices, "ALGORITHM_ED25519")
+        assert hasattr(CertificateAlgorithmChoices, "ALGORITHM_UNKNOWN")
 
     @requires_netbox
     @pytest.mark.unit
@@ -289,6 +290,7 @@ class TestCertificateAlgorithmChoices:
         assert CertificateAlgorithmChoices.ALGORITHM_RSA == "rsa"
         assert CertificateAlgorithmChoices.ALGORITHM_ECDSA == "ecdsa"
         assert CertificateAlgorithmChoices.ALGORITHM_ED25519 == "ed25519"
+        assert CertificateAlgorithmChoices.ALGORITHM_UNKNOWN == "unknown"
 
 
 class TestJanusRenewalWorkflow:

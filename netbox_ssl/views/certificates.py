@@ -4,6 +4,9 @@ Views for Certificate model.
 Includes Smart Paste import and Janus Renewal workflow views.
 """
 
+from datetime import datetime
+
+from django.conf import settings
 from django.contrib import messages
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
@@ -21,7 +24,24 @@ from ..forms import (
 )
 from ..models import Certificate, CertificateStatusChoices
 from ..tables import CertificateTable
-from ..utils import CertificateParseError, CertificateParser, PrivateKeyDetectedError
+from ..utils import (
+    CertificateParseError,
+    CertificateParser,
+    PrivateKeyDetectedError,
+    detect_issuing_ca,
+)
+
+
+def _get_assigned_object_tenant(obj):
+    if obj is None:
+        return None
+    if hasattr(obj, "parent") and obj.parent:
+        return getattr(obj.parent, "tenant", None)
+    if hasattr(obj, "device") and obj.device:
+        return getattr(obj.device, "tenant", None)
+    if hasattr(obj, "virtual_machine") and obj.virtual_machine:
+        return getattr(obj.virtual_machine, "tenant", None)
+    return getattr(obj, "tenant", None)
 
 
 class CertificateListView(generic.ObjectListView):
@@ -98,11 +118,23 @@ class CertificateImportView(View):
     def get(self, request):
         """Display the import form."""
         form = CertificateImportForm()
+
+        # Check for renew_from query parameter (from detail page "Renew" button)
+        renew_from = request.GET.get("renew_from")
+        renew_certificate = None
+        if renew_from:
+            try:
+                renew_certificate = Certificate.objects.get(pk=int(renew_from))
+                request.session["renew_from_id"] = renew_certificate.pk
+            except (ValueError, TypeError, Certificate.DoesNotExist):
+                pass
+
         return render(
             request,
             self.template_name,
             {
                 "form": form,
+                "renew_certificate": renew_certificate,
             },
         )
 
@@ -147,9 +179,13 @@ class CertificateImportView(View):
                 )
 
             # Check for potential renewal candidate
+            plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+            warning_days = plugin_settings.get("expiry_warning_days", 30)
             renewal_candidate = CertificateParser.find_renewal_candidate(
                 parsed.common_name,
                 Certificate,
+                warning_days=warning_days,
+                tenant=tenant,
             )
 
             if renewal_candidate:
@@ -173,12 +209,16 @@ class CertificateImportView(View):
 
                 return redirect(reverse("plugins:netbox_ssl:certificate_renew"))
 
+            # Auto-detect issuing CA
+            issuing_ca = detect_issuing_ca(parsed.issuer)
+
             # Create the certificate
             certificate = Certificate.objects.create(
                 common_name=parsed.common_name,
                 serial_number=parsed.serial_number,
                 fingerprint_sha256=parsed.fingerprint_sha256,
                 issuer=parsed.issuer,
+                issuing_ca=issuing_ca,
                 valid_from=parsed.valid_from,
                 valid_to=parsed.valid_to,
                 sans=parsed.sans,
@@ -191,7 +231,14 @@ class CertificateImportView(View):
                 status=CertificateStatusChoices.STATUS_ACTIVE,
             )
 
-            messages.success(request, _(f"Certificate imported successfully: {certificate.common_name}"))
+            # Show message with CA info if detected
+            if issuing_ca:
+                messages.success(
+                    request,
+                    _(f"Certificate imported successfully: {certificate.common_name} (CA: {issuing_ca.name})"),
+                )
+            else:
+                messages.success(request, _(f"Certificate imported successfully: {certificate.common_name}"))
             return redirect(certificate.get_absolute_url())
 
         except PrivateKeyDetectedError as e:
@@ -236,12 +283,23 @@ class CertificateRenewView(View):
 
         old_certificate = get_object_or_404(Certificate, pk=renewal_candidate_id)
 
+        # Parse ISO date strings into formatted dates for the template
+        pending_data = dict(pending_data)
+        pending_data["valid_from_formatted"] = datetime.fromisoformat(pending_data["valid_from"]).strftime(
+            "%Y-%m-%d %H:%M"
+        )
+        pending_data["valid_to_formatted"] = datetime.fromisoformat(pending_data["valid_to"]).strftime("%Y-%m-%d %H:%M")
+
+        # Get assignments for the old certificate
+        assignments = old_certificate.assignments.select_related("assigned_object_type").all()
+
         return render(
             request,
             self.template_name,
             {
                 "pending_certificate": pending_data,
                 "old_certificate": old_certificate,
+                "assignments": assignments,
             },
         )
 
@@ -263,14 +321,33 @@ class CertificateRenewView(View):
             tenant = Tenant.objects.filter(pk=pending_data["tenant_id"]).first()
 
         # Parse dates back from ISO format
-        from datetime import datetime
-
         valid_from = datetime.fromisoformat(pending_data["valid_from"])
         valid_to = datetime.fromisoformat(pending_data["valid_to"])
+
+        # Auto-detect issuing CA
+        issuing_ca = detect_issuing_ca(pending_data["issuer"])
 
         if is_renewal and renewal_candidate_id:
             # Janus Renewal: Replace & Archive
             old_certificate = get_object_or_404(Certificate, pk=renewal_candidate_id)
+
+            # If the old certificate is tenant-scoped, carry it forward
+            if tenant is None and old_certificate.tenant:
+                tenant = old_certificate.tenant
+
+            # Ensure assignments respect tenant boundaries
+            if tenant:
+                cross_tenant = []
+                for assignment in old_certificate.assignments.all():
+                    obj_tenant = _get_assigned_object_tenant(assignment.assigned_object)
+                    if obj_tenant and obj_tenant != tenant:
+                        cross_tenant.append(str(assignment.assigned_object))
+                if cross_tenant:
+                    messages.error(
+                        request,
+                        _(f"Renewal blocked due to cross-tenant assignments: {', '.join(cross_tenant[:5])}"),
+                    )
+                    return redirect(reverse("plugins:netbox_ssl:certificate_import"))
 
             with transaction.atomic():
                 # Create new certificate
@@ -279,6 +356,7 @@ class CertificateRenewView(View):
                     serial_number=pending_data["serial_number"],
                     fingerprint_sha256=pending_data["fingerprint_sha256"],
                     issuer=pending_data["issuer"],
+                    issuing_ca=issuing_ca,
                     valid_from=valid_from,
                     valid_to=valid_to,
                     sans=pending_data["sans"],
@@ -295,13 +373,15 @@ class CertificateRenewView(View):
                 from ..models import CertificateAssignment
 
                 for assignment in old_certificate.assignments.all():
-                    CertificateAssignment.objects.create(
+                    new_assignment = CertificateAssignment(
                         certificate=new_certificate,
                         assigned_object_type=assignment.assigned_object_type,
                         assigned_object_id=assignment.assigned_object_id,
                         is_primary=assignment.is_primary,
                         notes=assignment.notes,
                     )
+                    new_assignment.full_clean()
+                    new_assignment.save()
 
                 # Archive old certificate
                 old_certificate.status = CertificateStatusChoices.STATUS_REPLACED
@@ -328,6 +408,7 @@ class CertificateRenewView(View):
                 serial_number=pending_data["serial_number"],
                 fingerprint_sha256=pending_data["fingerprint_sha256"],
                 issuer=pending_data["issuer"],
+                issuing_ca=issuing_ca,
                 valid_from=valid_from,
                 valid_to=valid_to,
                 sans=pending_data["sans"],

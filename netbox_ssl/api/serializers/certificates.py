@@ -8,7 +8,8 @@ from tenancy.api.serializers import TenantSerializer
 from tenancy.models import Tenant
 
 from ...models import Certificate, CertificateStatusChoices
-from ...utils import CertificateParseError, CertificateParser
+from ...utils import CertificateParseError, CertificateParser, detect_issuing_ca
+from .certificate_authorities import CertificateAuthoritySerializer
 
 
 class CertificateSerializer(NetBoxModelSerializer):
@@ -18,11 +19,14 @@ class CertificateSerializer(NetBoxModelSerializer):
         view_name="plugins-api:netbox_ssl-api:certificate-detail",
     )
     tenant = TenantSerializer(nested=True, required=False, allow_null=True)
+    issuing_ca = CertificateAuthoritySerializer(nested=True, required=False, allow_null=True)
     days_remaining = serializers.IntegerField(read_only=True)
     is_expired = serializers.BooleanField(read_only=True)
     is_expiring_soon = serializers.BooleanField(read_only=True)
     expiry_status = serializers.CharField(read_only=True)
     assignment_count = serializers.SerializerMethodField()
+    chain_is_valid = serializers.BooleanField(read_only=True)
+    chain_needs_validation = serializers.BooleanField(read_only=True)
     acme_renewal_due = serializers.BooleanField(read_only=True)
     acme_renewal_status = serializers.CharField(read_only=True)
 
@@ -36,6 +40,7 @@ class CertificateSerializer(NetBoxModelSerializer):
             "serial_number",
             "fingerprint_sha256",
             "issuer",
+            "issuing_ca",
             "issuer_chain",
             "valid_from",
             "valid_to",
@@ -52,6 +57,13 @@ class CertificateSerializer(NetBoxModelSerializer):
             "tenant",
             "pem_content",
             "assignment_count",
+            # Chain validation fields
+            "chain_status",
+            "chain_validation_message",
+            "chain_validated_at",
+            "chain_depth",
+            "chain_is_valid",
+            "chain_needs_validation",
             # ACME fields
             "is_acme",
             "acme_provider",
@@ -77,6 +89,7 @@ class CertificateSerializer(NetBoxModelSerializer):
             "status",
             "valid_to",
             "days_remaining",
+            "chain_status",
             "is_acme",
         ]
 
@@ -150,11 +163,15 @@ class CertificateImportSerializer(serializers.Serializer):
         pem_content = validated_data["pem_content"]
         parsed = CertificateParser.parse(pem_content)
 
+        # Auto-detect issuing CA based on issuer string
+        issuing_ca = detect_issuing_ca(parsed.issuer)
+
         certificate = Certificate.objects.create(
             common_name=parsed.common_name,
             serial_number=parsed.serial_number,
             fingerprint_sha256=parsed.fingerprint_sha256,
             issuer=parsed.issuer,
+            issuing_ca=issuing_ca,
             valid_from=parsed.valid_from,
             valid_to=parsed.valid_to,
             sans=parsed.sans,

@@ -10,6 +10,7 @@ Provides an expiry alert widget showing certificates organized by status:
 
 from datetime import timedelta
 
+from django.conf import settings
 from django.db.models import Count
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -31,8 +32,11 @@ class CertificateExpiryWidget(DashboardWidget):
         from .models import Certificate
 
         now = timezone.now()
-        critical_threshold = now + timedelta(days=14)
-        warning_threshold = now + timedelta(days=30)
+        plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+        warning_days = plugin_settings.get("expiry_warning_days", 30)
+        critical_days = plugin_settings.get("expiry_critical_days", 14)
+        critical_threshold = now + timedelta(days=critical_days)
+        warning_threshold = now + timedelta(days=warning_days)
 
         # Get certificate lists by status (limit to 5 each)
         critical_certs = Certificate.objects.filter(

@@ -34,17 +34,37 @@ class CertificateStatusChoices(ChoiceSet):
     ]
 
 
+class ChainStatusChoices(ChoiceSet):
+    """Status choices for certificate chain validation."""
+
+    STATUS_UNKNOWN = "unknown"
+    STATUS_VALID = "valid"
+    STATUS_INVALID = "invalid"
+    STATUS_SELF_SIGNED = "self_signed"
+    STATUS_NO_CHAIN = "no_chain"
+
+    CHOICES = [
+        (STATUS_UNKNOWN, "Unknown", "gray"),
+        (STATUS_VALID, "Valid", "green"),
+        (STATUS_INVALID, "Invalid", "red"),
+        (STATUS_SELF_SIGNED, "Self-Signed", "blue"),
+        (STATUS_NO_CHAIN, "No Chain", "yellow"),
+    ]
+
+
 class CertificateAlgorithmChoices(ChoiceSet):
     """Key algorithm choices."""
 
     ALGORITHM_RSA = "rsa"
     ALGORITHM_ECDSA = "ecdsa"
     ALGORITHM_ED25519 = "ed25519"
+    ALGORITHM_UNKNOWN = "unknown"
 
     CHOICES = [
         (ALGORITHM_RSA, "RSA", "blue"),
         (ALGORITHM_ECDSA, "ECDSA", "green"),
         (ALGORITHM_ED25519, "Ed25519", "purple"),
+        (ALGORITHM_UNKNOWN, "Unknown", "gray"),
     ]
 
 
@@ -212,10 +232,42 @@ class Certificate(NetBoxModel):
         help_text="Tenant this certificate belongs to",
     )
 
+    # Issuing Certificate Authority
+    issuing_ca = models.ForeignKey(
+        to="netbox_ssl.CertificateAuthority",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="certificates",
+        help_text="Certificate Authority that issued this certificate",
+    )
+
     # Raw certificate data (PEM without private key)
     pem_content = models.TextField(
         blank=True,
         help_text="Certificate in PEM format (public certificate only)",
+    )
+
+    # Chain validation fields
+    chain_status = models.CharField(
+        max_length=20,
+        choices=ChainStatusChoices,
+        default=ChainStatusChoices.STATUS_UNKNOWN,
+        help_text="Status of certificate chain validation",
+    )
+    chain_validation_message = models.TextField(
+        blank=True,
+        help_text="Detailed message from chain validation",
+    )
+    chain_validated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When chain validation was last performed",
+    )
+    chain_depth = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text="Number of certificates in the chain",
     )
 
     # ACME certificate tracking
@@ -305,16 +357,20 @@ class Certificate(NetBoxModel):
         """Check if the certificate expires within warning threshold."""
         if self.days_remaining is None:
             return False
-        # Default warning threshold: 30 days
-        return 0 < self.days_remaining <= 30
+        from django.conf import settings
+
+        warning_days = settings.PLUGINS_CONFIG.get("netbox_ssl", {}).get("expiry_warning_days", 30)
+        return 0 < self.days_remaining <= warning_days
 
     @property
     def is_critical(self):
         """Check if the certificate is in critical expiry state."""
         if self.days_remaining is None:
             return False
-        # Default critical threshold: 14 days
-        return 0 < self.days_remaining <= 14
+        from django.conf import settings
+
+        critical_days = settings.PLUGINS_CONFIG.get("netbox_ssl", {}).get("expiry_critical_days", 14)
+        return 0 < self.days_remaining <= critical_days
 
     @property
     def expiry_status(self):
@@ -334,6 +390,18 @@ class Certificate(NetBoxModel):
         if self.is_expired and self.status == CertificateStatusChoices.STATUS_ACTIVE:
             self.status = CertificateStatusChoices.STATUS_EXPIRED
 
+        # Auto-detect issuing CA if not set
+        if not self.issuing_ca and self.issuer:
+            self.auto_detect_ca()
+
+    def auto_detect_ca(self):
+        """Try to auto-detect and set the issuing CA based on issuer string."""
+        from .certificate_authorities import CertificateAuthority
+
+        detected_ca = CertificateAuthority.auto_detect(self.issuer)
+        if detected_ca:
+            self.issuing_ca = detected_ca
+
     def get_assignments(self):
         """Get all certificate assignments."""
         return self.assignments.all()
@@ -341,6 +409,78 @@ class Certificate(NetBoxModel):
     def has_assignments(self):
         """Check if certificate has any assignments."""
         return self.assignments.exists()
+
+    def validate_chain(self, save: bool = True):
+        """
+        Validate the certificate chain.
+
+        Args:
+            save: If True, save the validation results to the model
+
+        Returns:
+            ChainValidationResult with detailed validation information
+        """
+        from ..utils import ChainValidationStatus, ChainValidator
+
+        if not self.pem_content:
+            self.chain_status = ChainStatusChoices.STATUS_UNKNOWN
+            self.chain_validation_message = "No PEM content available for validation"
+            self.chain_validated_at = timezone.now()
+            self.chain_depth = None
+            if save:
+                self.save(
+                    update_fields=[
+                        "chain_status",
+                        "chain_validation_message",
+                        "chain_validated_at",
+                        "chain_depth",
+                    ]
+                )
+            return None
+
+        result = ChainValidator.validate(self.pem_content, self.issuer_chain)
+
+        # Map validation status to chain status
+        status_mapping = {
+            ChainValidationStatus.VALID: ChainStatusChoices.STATUS_VALID,
+            ChainValidationStatus.SELF_SIGNED: ChainStatusChoices.STATUS_SELF_SIGNED,
+            ChainValidationStatus.NO_CHAIN: ChainStatusChoices.STATUS_NO_CHAIN,
+            ChainValidationStatus.INCOMPLETE: ChainStatusChoices.STATUS_INVALID,
+            ChainValidationStatus.INVALID_SIGNATURE: ChainStatusChoices.STATUS_INVALID,
+            ChainValidationStatus.EXPIRED: ChainStatusChoices.STATUS_INVALID,
+            ChainValidationStatus.NOT_YET_VALID: ChainStatusChoices.STATUS_INVALID,
+            ChainValidationStatus.PARSE_ERROR: ChainStatusChoices.STATUS_INVALID,
+        }
+
+        self.chain_status = status_mapping.get(result.status, ChainStatusChoices.STATUS_UNKNOWN)
+        self.chain_validation_message = result.message
+        self.chain_validated_at = result.validated_at
+        self.chain_depth = result.chain_depth
+
+        if save:
+            self.save(
+                update_fields=[
+                    "chain_status",
+                    "chain_validation_message",
+                    "chain_validated_at",
+                    "chain_depth",
+                ]
+            )
+
+        return result
+
+    @property
+    def chain_is_valid(self):
+        """Check if chain validation passed."""
+        return self.chain_status in [
+            ChainStatusChoices.STATUS_VALID,
+            ChainStatusChoices.STATUS_SELF_SIGNED,
+        ]
+
+    @property
+    def chain_needs_validation(self):
+        """Check if chain needs to be validated."""
+        return self.chain_status == ChainStatusChoices.STATUS_UNKNOWN
 
     @property
     def acme_renewal_due(self):

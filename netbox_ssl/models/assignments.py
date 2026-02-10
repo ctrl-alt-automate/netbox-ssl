@@ -90,7 +90,9 @@ class CertificateAssignment(NetBoxModel):
         obj_tenant = getattr(obj, "tenant", None)
 
         # For Services, check the parent device/VM tenant
-        if hasattr(obj, "device") and obj.device:
+        if hasattr(obj, "parent") and obj.parent:
+            obj_tenant = getattr(obj.parent, "tenant", None)
+        elif hasattr(obj, "device") and obj.device:
             obj_tenant = getattr(obj.device, "tenant", None)
         elif hasattr(obj, "virtual_machine") and obj.virtual_machine:
             obj_tenant = getattr(obj.virtual_machine, "tenant", None)
