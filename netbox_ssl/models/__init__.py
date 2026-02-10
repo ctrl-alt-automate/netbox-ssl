@@ -5,6 +5,8 @@ from .certificate_authorities import (
     CertificateAuthority,
 )
 from .certificates import (
+    ACMEChallengeTypeChoices,
+    ACMEProviderChoices,
     Certificate,
     CertificateAlgorithmChoices,
     CertificateStatusChoices,
@@ -24,6 +26,8 @@ __all__ = [
     "CertificateStatusChoices",
     "CertificateAlgorithmChoices",
     "ChainStatusChoices",
+    "ACMEProviderChoices",
+    "ACMEChallengeTypeChoices",
     "CertificateAssignment",
     "CertificateAuthority",
     "CATypeChoices",

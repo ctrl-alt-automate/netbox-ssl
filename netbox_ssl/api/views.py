@@ -382,6 +382,40 @@ class CertificateViewSet(NetBoxModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=["post"], url_path="detect-acme")
+    def detect_acme(self, request, pk=None):
+        """
+        Auto-detect if a certificate was issued via ACME protocol.
+
+        Analyzes the certificate issuer and updates is_acme and acme_provider
+        fields based on known ACME CA patterns (Let's Encrypt, ZeroSSL, etc.).
+
+        Returns the detection result and updated certificate data.
+        """
+        certificate = self.get_object()
+        result = certificate.auto_detect_acme(save=True)
+
+        if result:
+            is_acme, provider = result
+            output_serializer = CertificateSerializer(certificate, context={"request": request})
+            return Response(
+                {
+                    "detected": True,
+                    "is_acme": is_acme,
+                    "acme_provider": provider,
+                    "certificate": output_serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+        else:
+            return Response(
+                {
+                    "detected": False,
+                    "message": "Certificate issuer does not match any known ACME provider patterns.",
+                },
+                status=status.HTTP_200_OK,
+            )
+
     @action(detail=False, methods=["post"], url_path="bulk-validate-chain")
     def bulk_validate_chain(self, request):
         """
@@ -541,6 +575,83 @@ class CertificateViewSet(NetBoxModelViewSet):
         )
 
         return Response(results_summary, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="bulk-detect-acme")
+    def bulk_detect_acme(self, request):
+        """
+        Auto-detect ACME status for multiple certificates.
+
+        Accepts a list of certificate IDs and runs ACME detection on each.
+        Returns a summary of detection results.
+
+        Example payload:
+        {
+            "ids": [1, 2, 3, 4, 5]
+        }
+        """
+        ids = request.data.get("ids", [])
+
+        if not ids:
+            raise serializers.ValidationError({"detail": "No certificate IDs provided."})
+
+        if not isinstance(ids, list):
+            raise serializers.ValidationError({"detail": "Expected a list of certificate IDs."})
+
+        # Limit batch size
+        plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+        max_batch_size = plugin_settings.get("bulk_detect_max_batch_size", 100)
+        if len(ids) > max_batch_size:
+            raise serializers.ValidationError(
+                {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
+            )
+
+        certificates = list(Certificate.objects.filter(pk__in=ids))
+        found_ids = {cert.pk for cert in certificates}
+        missing_ids = set(ids) - found_ids
+
+        results = {
+            "total": len(ids),
+            "processed": 0,
+            "detected_acme": 0,
+            "not_acme": 0,
+            "missing_ids": list(missing_ids),
+            "detections": [],
+        }
+
+        # Collect certificates that need updating (avoid N+1 queries)
+        certs_to_update = []
+
+        for certificate in certificates:
+            result = certificate.auto_detect_acme(save=False)
+            results["processed"] += 1
+
+            if result:
+                _, provider = result
+                certs_to_update.append(certificate)
+                results["detected_acme"] += 1
+                results["detections"].append(
+                    {
+                        "id": certificate.pk,
+                        "common_name": certificate.common_name,
+                        "detected": True,
+                        "acme_provider": provider,
+                    }
+                )
+            else:
+                results["not_acme"] += 1
+                results["detections"].append(
+                    {
+                        "id": certificate.pk,
+                        "common_name": certificate.common_name,
+                        "detected": False,
+                    }
+                )
+
+        # Bulk update all detected certificates in a single query
+        if certs_to_update:
+            Certificate.objects.bulk_update(certs_to_update, ["is_acme", "acme_provider"])
+
+        return Response(results, status=status.HTTP_200_OK)
 
 
 class CertificateAssignmentViewSet(NetBoxModelViewSet):

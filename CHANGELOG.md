@@ -107,6 +107,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Detailed error reporting with failed certificate indices
   - Test fixtures with 15 sample certificates
 
+### Added
+
+- **ACME Certificate Tracking** ([#11](https://github.com/ctrl-alt-automate/netbox-ssl/issues/11)):
+  - New fields for tracking ACME-issued certificates (Let's Encrypt, ZeroSSL, etc.)
+  - `is_acme` - Boolean flag for ACME certificates
+  - `acme_provider` - Provider identification (letsencrypt, zerossl, buypass, google, digicert, sectigo)
+  - `acme_account_email` - Email associated with ACME account
+  - `acme_challenge_type` - Challenge type used (http-01, dns-01, tls-alpn-01)
+  - `acme_server_url` - ACME server directory URL
+  - `acme_auto_renewal` - Whether auto-renewal is configured
+  - `acme_last_renewed` - Last renewal timestamp
+  - `acme_renewal_days` - Days before expiry to attempt renewal
+  - Computed properties: `acme_renewal_due`, `acme_renewal_status`
+  - Auto-detection method `auto_detect_acme()` to identify ACME certificates from issuer
+  - REST API endpoints:
+    - `POST /certificates/{id}/detect-acme/` - Single certificate ACME detection
+    - `POST /certificates/bulk-detect-acme/` - Bulk ACME detection
+  - API filters for ACME fields (`is_acme`, `acme_provider`, `acme_auto_renewal`)
+  - Full documentation for ACME tracking in data-models.md and api.md
+
 ## [0.2.0] - 2025-01-20
 
 ### Added

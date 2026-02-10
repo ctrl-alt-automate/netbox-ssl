@@ -43,6 +43,8 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `GET` | `/certificates/{id}/export/` | Export single certificate |
 | `POST` | `/certificates/{id}/compliance-check/` | Run compliance check |
 | `POST` | `/certificates/bulk-compliance-check/` | Bulk compliance check |
+| `POST` | `/certificates/{id}/detect-acme/` | Auto-detect ACME provider |
+| `POST` | `/certificates/bulk-detect-acme/` | Bulk ACME detection |
 
 ### Certificate Authorities
 
@@ -354,6 +356,8 @@ Validate certificate chains to ensure they are complete and properly signed.
 
 Validates the chain for a specific certificate and updates its chain status fields.
 
+#### Example Request
+
 ```bash
 curl -X POST \
      -H "Authorization: Token $TOKEN" \
@@ -401,6 +405,7 @@ curl -X POST \
 `POST /api/plugins/netbox-ssl/certificates/bulk-validate-chain/`
 
 Validates chains for multiple certificates in a single request.
+
 ## Data Export
 
 Export certificates in multiple formats for integration, reporting, and backup purposes.
@@ -587,6 +592,66 @@ Run compliance checks on certificates against defined policies to ensure they me
 
 Run all enabled compliance policies against a single certificate.
 
+---
+
+## ACME Detection
+
+Automatically detect if certificates were issued via ACME protocol (Let's Encrypt, ZeroSSL, etc.) by analyzing the issuer field.
+
+### Single Certificate Detection
+
+`POST /api/plugins/netbox-ssl/certificates/{id}/detect-acme/`
+
+Analyzes a single certificate's issuer and updates `is_acme` and `acme_provider` fields based on known ACME CA patterns.
+
+#### Example Request
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/1/detect-acme/
+```
+
+#### Success Response (ACME Detected)
+
+```json
+{
+  "detected": true,
+  "is_acme": true,
+  "acme_provider": "letsencrypt",
+  "certificate": {
+    "id": 1,
+    "common_name": "example.com",
+    "issuer": "CN=R3, O=Let's Encrypt, C=US",
+    "is_acme": true,
+    "acme_provider": "letsencrypt"
+  }
+}
+```
+
+#### Response (Not ACME)
+
+```json
+{
+  "detected": false,
+  "message": "Certificate issuer does not match any known ACME provider patterns."
+}
+```
+
+### Bulk ACME Detection
+
+`POST /api/plugins/netbox-ssl/certificates/bulk-detect-acme/`
+
+Process multiple certificates for ACME detection in a single request.
+
+#### Request Format
+
+```json
+{
+  "ids": [1, 2, 3, 4, 5]
+}
+```
+
 #### Example Request
 
 ```bash
@@ -628,6 +693,17 @@ curl -X POST \
       "is_valid": false,
       "message": "Certificate requires a chain but none provided",
       "chain_depth": 1
+    }
+  ]
+}
+```
+
+#### Compliance Check Example Request
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
      -d '{}' \
      http://localhost:8000/api/plugins/netbox-ssl/certificates/1/compliance-check/
 ```
@@ -673,6 +749,47 @@ curl -X POST \
 }
 ```
 
+#### Bulk ACME Detection Example Request
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"ids": [1, 2, 3, 4, 5]}' \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-detect-acme/
+```
+
+#### Success Response
+
+```json
+{
+  "total": 5,
+  "processed": 5,
+  "detected_acme": 3,
+  "not_acme": 2,
+  "missing_ids": [],
+  "detections": [
+    {
+      "id": 1,
+      "common_name": "example.com",
+      "detected": true,
+      "acme_provider": "letsencrypt"
+    },
+    {
+      "id": 2,
+      "common_name": "internal.corp",
+      "detected": false
+    },
+    {
+      "id": 3,
+      "common_name": "api.example.com",
+      "detected": true,
+      "acme_provider": "zerossl"
+    }
+  ]
+}
+```
+
 ### Chain Status Values
 
 | Status | Description |
@@ -685,6 +802,7 @@ curl -X POST \
 | `expired` | One or more certificates in chain have expired |
 | `not_yet_valid` | One or more certificates are not yet valid |
 | `parse_error` | Failed to parse certificate or chain |
+
 ### Bulk Compliance Check
 
 `POST /api/plugins/netbox-ssl/certificates/bulk-compliance-check/`
@@ -813,6 +931,38 @@ curl -H "Authorization: Token $TOKEN" \
 # List all enabled policies
 curl -H "Authorization: Token $TOKEN" \
      "http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/?enabled=true"
+```
+
+### Supported ACME Providers
+
+The detection system recognizes these ACME providers:
+
+| Provider | Detection Pattern | Provider Value |
+|----------|-------------------|----------------|
+| Let's Encrypt | "Let's Encrypt", R3, R10, R11, E1, E5, E6 | `letsencrypt` |
+| Let's Encrypt Staging | "(STAGING)", "Fake LE" | `letsencrypt_staging` |
+| ZeroSSL | "ZeroSSL" | `zerossl` |
+| Buypass | "Buypass" | `buypass` |
+| Google Trust Services | "Google Trust Services", "GTS CA" | `google` |
+| Sectigo | "Sectigo" | `sectigo` |
+| DigiCert | "DigiCert" | `digicert` |
+
+### ACME Filters
+
+Filter certificates by ACME status:
+
+```bash
+# List all ACME certificates
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/certificates/?is_acme=true"
+
+# Filter by ACME provider
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/certificates/?acme_provider=letsencrypt"
+
+# Certificates due for renewal
+curl -H "Authorization: Token $TOKEN" \
+     "http://localhost:8000/api/plugins/netbox-ssl/certificates/?is_acme=true&acme_auto_renewal=true"
 ```
 
 ---
