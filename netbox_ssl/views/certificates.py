@@ -322,10 +322,7 @@ class CertificateRenewView(View):
                 if cross_tenant:
                     messages.error(
                         request,
-                        _(
-                            "Renewal blocked due to cross-tenant assignments: "
-                            f"{', '.join(cross_tenant[:5])}"
-                        ),
+                        _(f"Renewal blocked due to cross-tenant assignments: {', '.join(cross_tenant[:5])}"),
                     )
                     return redirect(reverse("plugins:netbox_ssl:certificate_import"))
 

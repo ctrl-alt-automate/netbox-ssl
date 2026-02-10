@@ -83,9 +83,7 @@ class CertificateAssignmentSerializer(NetBoxModelSerializer):
         obj_tenant = self._get_object_tenant(assigned_object)
 
         if obj_tenant and obj_tenant != certificate.tenant:
-            raise serializers.ValidationError(
-                "Certificate and assignment target must belong to the same tenant."
-            )
+            raise serializers.ValidationError("Certificate and assignment target must belong to the same tenant.")
 
         return data
 
