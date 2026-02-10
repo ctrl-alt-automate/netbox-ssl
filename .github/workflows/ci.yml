@@ -50,14 +50,18 @@ jobs:
           python -m pytest tests/test_parser.py tests/test_models.py -v -p no:django
 
   integration-tests:
-    name: Integration Tests (NetBox ${{ matrix.netbox_version }})
+    name: Integration Tests (NetBox ${{ matrix.netbox_major }})
     runs-on: ubuntu-latest
     needs: [lint, unit-tests]
-    timeout-minutes: 30  # Allow enough time for NetBox startup and migrations
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        netbox_version: ["v4.5", "v4.4"]
+        include:
+          - netbox_version: "v4.5-4.0.0"
+            netbox_major: "v4.5"
+          - netbox_version: "v4.4"
+            netbox_major: "v4.4"
     steps:
       - uses: actions/checkout@v4
 
@@ -66,10 +70,8 @@ jobs:
           mkdir -p env development/configuration
 
           # Create NetBox environment file (version-specific settings)
-          # v4.5 doesn't accept SUPERUSER_API_TOKEN via env (new v2 token system with different format)
-          if [[ "${{ matrix.netbox_version }}" == "v4.5" ]]; then
-            # v4.5: Skip automatic superuser creation due to incompatibility with new v2 token system
-            # We'll create the superuser manually after startup without API token
+          if [[ "${{ matrix.netbox_major }}" == "v4.5" ]]; then
+            # v4.5: Skip automatic superuser creation (v2 token incompatibility)
             printf '%s\n' \
               'CORS_ORIGIN_ALLOW_ALL=True' \
               'DB_HOST=postgres' \
@@ -93,6 +95,7 @@ jobs:
               'REDIS_SSL=false' \
               'SECRET_KEY=test-secret-key-for-ci-only-do-not-use-in-production' \
               'SKIP_SUPERUSER=true' \
+              'API_TOKEN_PEPPER_1=Eb_30LtX2Rz01aSiZ29i8IwRyrbyy-maTokgIzAzADCt78gtlu5jd6EY1wGlX7RJ4XvpjRdLsyc4jnwj' \
               > env/netbox.env
           else
             printf '%s\n' \
@@ -132,15 +135,12 @@ jobs:
             'POSTGRES_USER=netbox' \
             > env/postgres.env
 
-          # Create Redis environment files
+          # Create Redis/Valkey environment files
           echo "REDIS_PASSWORD=netbox" > env/redis.env
           echo "REDIS_PASSWORD=netbox" > env/redis-cache.env
 
           # Create plugins configuration with version-specific settings
-          # API_TOKEN_PEPPERS is only required in v4.5+ (new v2 token system)
-          if [[ "${{ matrix.netbox_version }}" == "v4.5" ]]; then
-            # NetBox 4.5: API_TOKEN_PEPPERS must be a dictionary with numeric keys
-            # Pepper must be at least 50 characters
+          if [[ "${{ matrix.netbox_major }}" == "v4.5" ]]; then
             printf '%s\n' \
               'PLUGINS = ["netbox_ssl"]' \
               'PLUGINS_CONFIG = {' \
@@ -156,7 +156,6 @@ jobs:
               '}' \
               > development/configuration/plugins.py
           else
-            # NetBox 4.4: No API_TOKEN_PEPPERS needed (v2 tokens not supported)
             printf '%s\n' \
               'PLUGINS = ["netbox_ssl"]' \
               'PLUGINS_CONFIG = {' \
@@ -170,29 +169,24 @@ jobs:
 
       - name: Start NetBox
         run: |
-          # Debug: show configuration files
-          echo "=== netbox.env contents ==="
+          echo "=== Configuration ==="
+          echo "NetBox version: ${{ matrix.netbox_version }}"
           cat env/netbox.env
-          echo "=== plugins.py contents ==="
           cat development/configuration/plugins.py
           echo "==========================="
 
-          # Start only the core services for testing (skip worker/housekeeping to avoid healthcheck delays)
-          # The worker and housekeeping services depend on netbox being healthy, but migrations take time
+          # Use Valkey 9 + PostgreSQL 18 for all versions (Valkey is Redis-compatible)
+          # Only override the NetBox image tag per matrix version
           echo "Starting core services..."
           NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d postgres redis redis-cache netbox
 
-          # Wait for NetBox to be healthy using our own loop (more patient than docker-compose healthcheck)
           echo "Waiting for NetBox to be healthy..."
           timeout 900 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting for NetBox..."; sleep 15; done'
           echo "NetBox is ready!"
-        env:
-          NETBOX_VERSION: ${{ matrix.netbox_version }}
 
       - name: Create superuser for v4.5
-        if: matrix.netbox_version == 'v4.5'
+        if: matrix.netbox_major == 'v4.5'
         run: |
-          # Create superuser manually for v4.5 (automatic creation is disabled due to v2 token incompatibility)
           docker compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "
           from django.contrib.auth import get_user_model
           User = get_user_model()

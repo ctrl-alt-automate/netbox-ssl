@@ -1,16 +1,19 @@
 # NetBox SSL Plugin - Development Environment
 #
+# Requires: netbox-docker 4.0.0+ (Granian, Valkey, PostgreSQL 18)
+#
 # Usage:
 #   docker-compose up -d        # Start NetBox
 #   docker-compose logs -f      # View logs
 #   docker-compose down         # Stop everything
 #
-# Switch NetBox version by setting NETBOX_VERSION:
-#   NETBOX_VERSION=v4.4 docker-compose up -d
+# First-time setup or after upgrade from 3.x:
+#   docker-compose down -v      # Remove old volumes (destroys data!)
+#   docker-compose up -d        # Fresh start with new stack
 
 services:
-  netbox:
-    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.5}
+  netbox: &netbox
+    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.5-4.0.0}
     depends_on:
       postgres:
         condition: service_healthy
@@ -38,7 +41,7 @@ services:
       - "8000:8080"
 
   netbox-worker:
-    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.5}
+    <<: *netbox
     depends_on:
       netbox:
         condition: service_healthy
@@ -46,81 +49,70 @@ services:
       - /opt/netbox/venv/bin/python
       - /opt/netbox/netbox/manage.py
       - rqworker
-    env_file: env/netbox.env
     healthcheck:
       test: ps -aux | grep -v grep | grep -q rqworker || exit 1
       start_period: 20s
       timeout: 3s
       interval: 15s
-    volumes:
-      - ./netbox_ssl:/opt/netbox/netbox/netbox_ssl:ro
-      - ./development/configuration/plugins.py:/etc/netbox/config/plugins.py:ro
-      - netbox-media-files:/opt/netbox/netbox/media
-      - netbox-reports-files:/opt/netbox/netbox/reports
-      - netbox-scripts-files:/opt/netbox/netbox/scripts
+    ports: []
 
   netbox-housekeeping:
-    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.5}
+    <<: *netbox
     depends_on:
       netbox:
         condition: service_healthy
     command:
       - /opt/netbox/housekeeping.sh
-    env_file: env/netbox.env
     healthcheck:
       test: ps -aux | grep -v grep | grep -q housekeeping || exit 1
       start_period: 20s
       timeout: 3s
       interval: 15s
-    volumes:
-      - ./netbox_ssl:/opt/netbox/netbox/netbox_ssl:ro
-      - ./development/configuration/plugins.py:/etc/netbox/config/plugins.py:ro
-      - netbox-media-files:/opt/netbox/netbox/media
-      - netbox-reports-files:/opt/netbox/netbox/reports
-      - netbox-scripts-files:/opt/netbox/netbox/scripts
+    ports: []
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     env_file: env/postgres.env
     volumes:
-      - netbox-postgres-data:/var/lib/postgresql/data
+      - netbox-postgres-data:/var/lib/postgresql
     healthcheck:
       test: pg_isready -q -t 2 -d $$POSTGRES_DB -U $$POSTGRES_USER
       start_period: 20s
-      timeout: 5s
+      timeout: 30s
       interval: 10s
+      retries: 5
 
   redis:
-    image: redis:7-alpine
+    image: valkey/valkey:9.0-alpine
     command:
       - sh
       - -c
-      - redis-server --appendonly yes --requirepass $$REDIS_PASSWORD
+      - valkey-server --appendonly yes --requirepass $$REDIS_PASSWORD
     env_file: env/redis.env
     volumes:
       - netbox-redis-data:/data
-    healthcheck:
-      test: '[ $$(redis-cli --pass "$${REDIS_PASSWORD}" ping) = "PONG" ]'
+    healthcheck: &valkey-healthcheck
+      test: '[ "$$(valkey-cli --pass "$${REDIS_PASSWORD}" ping)" = "PONG" ]'
       start_period: 5s
       timeout: 3s
-      interval: 5s
+      interval: 1s
+      retries: 5
 
   redis-cache:
-    image: redis:7-alpine
+    image: valkey/valkey:9.0-alpine
     command:
       - sh
       - -c
-      - redis-server --requirepass $$REDIS_PASSWORD
+      - valkey-server --requirepass $$REDIS_PASSWORD
     env_file: env/redis-cache.env
-    healthcheck:
-      test: '[ $$(redis-cli --pass "$${REDIS_PASSWORD}" ping) = "PONG" ]'
-      start_period: 5s
-      timeout: 3s
-      interval: 5s
+    volumes:
+      - netbox-redis-cache-data:/data
+    healthcheck: *valkey-healthcheck
 
 volumes:
   netbox-media-files:
   netbox-postgres-data:
   netbox-redis-data:
+  netbox-redis-cache-data:
   netbox-reports-files:
   netbox-scripts-files:
