@@ -10,6 +10,7 @@
   <a href="https://github.com/ctrl-alt-automate/netbox-ssl/actions/workflows/ci.yml"><img src="https://github.com/ctrl-alt-automate/netbox-ssl/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://github.com/netbox-community/netbox"><img src="https://img.shields.io/badge/NetBox-4.4%20%7C%204.5-blue.svg" alt="NetBox"></a>
+  <img src="https://img.shields.io/badge/Status-Beta-yellow.svg" alt="Beta">
 </p>
 
 <p align="center">
@@ -106,9 +107,30 @@ Just paste your PEM certificate — the plugin extracts everything automatically
 
 ### Janus Renewal Workflow
 When you import a renewed certificate (same CN as an existing one), the plugin offers to:
-- **Transfer all assignments** from the old certificate
+- **Preview assignments** that will be transferred in a detailed table
+- **Transfer all assignments** from the old certificate atomically
 - **Archive the old certificate** with "Replaced" status
 - **Link them together** for audit trail
+
+Start a renewal directly from the certificate detail page with the **Renew** button.
+
+### Certificate Authority Tracking
+Track your CAs (Let's Encrypt, DigiCert, Sectigo, internal CAs) with automatic detection based on issuer patterns.
+
+### Certificate Signing Requests (CSR)
+Track pending certificate requests through their lifecycle: Pending, Approved, Rejected, Issued.
+
+### Chain Validation
+Validate certificate chains for completeness, signature correctness, and expiry.
+
+### Compliance Reporting
+Define compliance policies (minimum key size, forbidden algorithms, max validity, etc.) and run checks across your certificate inventory. 10 built-in policy types with severity levels and scoring.
+
+### Data Export
+Export certificates in CSV, JSON, YAML, or PEM bundle format with configurable field selection.
+
+### ACME Certificate Tracking
+Track Let's Encrypt and other ACME-issued certificates with auto-detection, renewal status, and provider metadata.
 
 ### Certificate Assignments
 Link certificates to the objects that use them:
@@ -131,8 +153,8 @@ Add the widget to your NetBox dashboard to see:
 
 | NetBox Version | Plugin Version | Status |
 |:--------------:|:--------------:|:------:|
-| 4.5.x          | 0.1.x          | ✅ Primary |
-| 4.4.x          | 0.1.x          | ✅ Supported |
+| 4.5.x          | 0.4.x          | ✅ Primary |
+| 4.4.x          | 0.4.x          | ✅ Supported |
 | 4.3.x and older| —              | ❌ Unsupported |
 
 ## 📚 Documentation
