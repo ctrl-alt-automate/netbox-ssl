@@ -109,6 +109,17 @@
   </div>
 </div>
 
+{% if object.status == 'active' or object.status == 'expired' %}
+<div class="row mb-3">
+  <div class="col col-12">
+    <a href="{% url 'plugins:netbox_ssl:certificate_import' %}?renew_from={{ object.pk }}"
+       class="btn btn-warning">
+      <i class="mdi mdi-swap-horizontal"></i> Renew This Certificate
+    </a>
+  </div>
+</div>
+{% endif %}
+
 {% if object.sans %}
 <div class="row mb-3">
   <div class="col col-12">

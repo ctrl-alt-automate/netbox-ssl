@@ -4,6 +4,8 @@ Views for Certificate model.
 Includes Smart Paste import and Janus Renewal workflow views.
 """
 
+from datetime import datetime
+
 from django.conf import settings
 from django.contrib import messages
 from django.db import transaction
@@ -116,11 +118,23 @@ class CertificateImportView(View):
     def get(self, request):
         """Display the import form."""
         form = CertificateImportForm()
+
+        # Check for renew_from query parameter (from detail page "Renew" button)
+        renew_from = request.GET.get("renew_from")
+        renew_certificate = None
+        if renew_from:
+            try:
+                renew_certificate = Certificate.objects.get(pk=int(renew_from))
+                request.session["renew_from_id"] = renew_certificate.pk
+            except (ValueError, TypeError, Certificate.DoesNotExist):
+                pass
+
         return render(
             request,
             self.template_name,
             {
                 "form": form,
+                "renew_certificate": renew_certificate,
             },
         )
 
@@ -269,12 +283,23 @@ class CertificateRenewView(View):
 
         old_certificate = get_object_or_404(Certificate, pk=renewal_candidate_id)
 
+        # Parse ISO date strings into formatted dates for the template
+        pending_data = dict(pending_data)
+        pending_data["valid_from_formatted"] = datetime.fromisoformat(pending_data["valid_from"]).strftime(
+            "%Y-%m-%d %H:%M"
+        )
+        pending_data["valid_to_formatted"] = datetime.fromisoformat(pending_data["valid_to"]).strftime("%Y-%m-%d %H:%M")
+
+        # Get assignments for the old certificate
+        assignments = old_certificate.assignments.select_related("assigned_object_type").all()
+
         return render(
             request,
             self.template_name,
             {
                 "pending_certificate": pending_data,
                 "old_certificate": old_certificate,
+                "assignments": assignments,
             },
         )
 
@@ -296,8 +321,6 @@ class CertificateRenewView(View):
             tenant = Tenant.objects.filter(pk=pending_data["tenant_id"]).first()
 
         # Parse dates back from ISO format
-        from datetime import datetime
-
         valid_from = datetime.fromisoformat(pending_data["valid_from"])
         valid_to = datetime.fromisoformat(pending_data["valid_to"])
 

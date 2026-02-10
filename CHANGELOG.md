@@ -5,9 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - 2025-01-21
+## [0.4.0] - 2026-02-10
 
 ### Added
+
+- **Janus Renewal Workflow UI** ([#27](https://github.com/ctrl-alt-automate/netbox-ssl/issues/27)):
+  - Complete renewal confirmation page with side-by-side certificate comparison
+  - Formatted validity dates (no more raw ISO strings)
+  - Assignment transfer preview table showing type, target, primary status, and notes
+  - "Renew This Certificate" button on certificate detail page (active/expired only)
+  - Renewal context banner on import page when initiated from detail page
+  - Input validation on renewal query parameters
+
+### Changed
+
+- Project status upgraded from Alpha to **Beta**
+
+### Previously Added
 
 - **Certificate Chain Validation** ([#16](https://github.com/ctrl-alt-automate/netbox-ssl/issues/16)):
   - New `ChainValidator` utility for validating certificate chains

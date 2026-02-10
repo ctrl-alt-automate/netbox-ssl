@@ -22,6 +22,18 @@
         <form method="post" class="form">
           {% csrf_token %}
 
+          {% if renew_certificate %}
+          <div class="alert alert-warning">
+            <h6><i class="mdi mdi-swap-horizontal"></i> Renewal Mode</h6>
+            <p class="mb-0">
+              You are renewing certificate <strong>{{ renew_certificate.common_name }}</strong>
+              (Serial: {{ renew_certificate.serial_number|truncatechars:20 }}).
+              Paste the new PEM certificate below. If the Common Name matches, the system
+              will guide you through the Janus Renewal workflow.
+            </p>
+          </div>
+          {% endif %}
+
           <div class="alert alert-info">
             <h6><i class="mdi mdi-information"></i> Instructions</h6>
             <ul class="mb-0">

@@ -12,7 +12,7 @@ authors = [
     {name = "NetBox SSL Team"}
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Framework :: Django",
     "Intended Audience :: System Administrators",
     "License :: OSI Approved :: Apache Software License",
