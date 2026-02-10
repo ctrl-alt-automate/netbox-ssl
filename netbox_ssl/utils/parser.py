@@ -7,12 +7,13 @@ IMPORTANT: Private keys are rejected for security reasons.
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
 from cryptography.x509.oid import ExtensionOID, NameOID
+from django.utils import timezone
 
 
 class CertificateParseError(Exception):
@@ -217,7 +218,13 @@ class CertificateParser:
         return ":".join(f"{b:02X}" for b in fingerprint_bytes)
 
     @classmethod
-    def find_renewal_candidate(cls, common_name: str, certificate_model) -> object | None:
+    def find_renewal_candidate(
+        cls,
+        common_name: str,
+        certificate_model,
+        warning_days: int | None = None,
+        tenant=None,
+    ) -> object | None:
         """
         Find an existing certificate that this might be renewing.
 
@@ -227,6 +234,8 @@ class CertificateParser:
         Args:
             common_name: The CN of the new certificate
             certificate_model: The Certificate model class
+            warning_days: Optional days threshold to limit candidates to expiring soon
+            tenant: Optional tenant to scope the search
 
         Returns:
             An existing Certificate instance if found, None otherwise
@@ -235,7 +244,17 @@ class CertificateParser:
         candidates = certificate_model.objects.filter(
             common_name=common_name,
             status__in=["active", "expired"],
-        ).order_by("-valid_to")
+        )
+
+        if tenant is not None:
+            candidates = candidates.filter(tenant=tenant)
+
+        if warning_days is not None:
+            now = timezone.now()
+            warning_threshold = now + timedelta(days=warning_days)
+            candidates = candidates.filter(valid_to__lte=warning_threshold)
+
+        candidates = candidates.order_by("-valid_to")
 
         if candidates.exists():
             return candidates.first()

@@ -58,11 +58,13 @@ class CertificateAlgorithmChoices(ChoiceSet):
     ALGORITHM_RSA = "rsa"
     ALGORITHM_ECDSA = "ecdsa"
     ALGORITHM_ED25519 = "ed25519"
+    ALGORITHM_UNKNOWN = "unknown"
 
     CHOICES = [
         (ALGORITHM_RSA, "RSA", "blue"),
         (ALGORITHM_ECDSA, "ECDSA", "green"),
         (ALGORITHM_ED25519, "Ed25519", "purple"),
+        (ALGORITHM_UNKNOWN, "Unknown", "gray"),
     ]
 
 
