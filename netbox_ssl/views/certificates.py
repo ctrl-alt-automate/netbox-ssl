@@ -4,6 +4,7 @@ Views for Certificate model.
 Includes Smart Paste import and Janus Renewal workflow views.
 """
 
+from django.conf import settings
 from django.contrib import messages
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
@@ -27,6 +28,18 @@ from ..utils import (
     PrivateKeyDetectedError,
     detect_issuing_ca,
 )
+
+
+def _get_assigned_object_tenant(obj):
+    if obj is None:
+        return None
+    if hasattr(obj, "parent") and obj.parent:
+        return getattr(obj.parent, "tenant", None)
+    if hasattr(obj, "device") and obj.device:
+        return getattr(obj.device, "tenant", None)
+    if hasattr(obj, "virtual_machine") and obj.virtual_machine:
+        return getattr(obj.virtual_machine, "tenant", None)
+    return getattr(obj, "tenant", None)
 
 
 class CertificateListView(generic.ObjectListView):
@@ -152,9 +165,13 @@ class CertificateImportView(View):
                 )
 
             # Check for potential renewal candidate
+            plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+            warning_days = plugin_settings.get("expiry_warning_days", 30)
             renewal_candidate = CertificateParser.find_renewal_candidate(
                 parsed.common_name,
                 Certificate,
+                warning_days=warning_days,
+                tenant=tenant,
             )
 
             if renewal_candidate:
@@ -291,6 +308,24 @@ class CertificateRenewView(View):
             # Janus Renewal: Replace & Archive
             old_certificate = get_object_or_404(Certificate, pk=renewal_candidate_id)
 
+            # If the old certificate is tenant-scoped, carry it forward
+            if tenant is None and old_certificate.tenant:
+                tenant = old_certificate.tenant
+
+            # Ensure assignments respect tenant boundaries
+            if tenant:
+                cross_tenant = []
+                for assignment in old_certificate.assignments.all():
+                    obj_tenant = _get_assigned_object_tenant(assignment.assigned_object)
+                    if obj_tenant and obj_tenant != tenant:
+                        cross_tenant.append(str(assignment.assigned_object))
+                if cross_tenant:
+                    messages.error(
+                        request,
+                        _(f"Renewal blocked due to cross-tenant assignments: {', '.join(cross_tenant[:5])}"),
+                    )
+                    return redirect(reverse("plugins:netbox_ssl:certificate_import"))
+
             with transaction.atomic():
                 # Create new certificate
                 new_certificate = Certificate.objects.create(
@@ -315,13 +350,15 @@ class CertificateRenewView(View):
                 from ..models import CertificateAssignment
 
                 for assignment in old_certificate.assignments.all():
-                    CertificateAssignment.objects.create(
+                    new_assignment = CertificateAssignment(
                         certificate=new_certificate,
                         assigned_object_type=assignment.assigned_object_type,
                         assigned_object_id=assignment.assigned_object_id,
                         is_primary=assignment.is_primary,
                         notes=assignment.notes,
                     )
+                    new_assignment.full_clean()
+                    new_assignment.save()
 
                 # Archive old certificate
                 old_certificate.status = CertificateStatusChoices.STATUS_REPLACED
