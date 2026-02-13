@@ -1,0 +1,165 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'netbox_ssl/views/**'
+      - 'netbox_ssl/templates/**'
+      - 'netbox_ssl/forms/**'
+      - 'netbox_ssl/static/**'
+      - 'netbox_ssl/urls.py'
+      - 'netbox_ssl/navigation.py'
+      - 'tests/test_janus_renewal.py'
+      - 'tests/test_browser.py'
+      - 'tests/cert_factory.py'
+      - 'tests/conftest.py'
+      - '.github/workflows/e2e.yml'
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - 'netbox_ssl/views/**'
+      - 'netbox_ssl/templates/**'
+      - 'netbox_ssl/forms/**'
+      - 'netbox_ssl/static/**'
+      - 'netbox_ssl/urls.py'
+      - 'netbox_ssl/navigation.py'
+      - 'tests/test_janus_renewal.py'
+      - 'tests/test_browser.py'
+      - 'tests/cert_factory.py'
+      - 'tests/conftest.py'
+      - '.github/workflows/e2e.yml'
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  PYTHON_VERSION: "3.12"
+  NETBOX_VERSION: "v4.5-4.0.0"
+
+jobs:
+  e2e-tests:
+    name: Playwright E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies
+        run: pip install pytest requests cryptography playwright
+
+      - name: Install Playwright browsers
+        run: playwright install chromium --with-deps
+
+      - name: Create environment files
+        run: |
+          mkdir -p env development/configuration
+
+          printf '%s\n' \
+            'CORS_ORIGIN_ALLOW_ALL=True' \
+            'DB_HOST=postgres' \
+            'DB_NAME=netbox' \
+            'DB_PASSWORD=netbox' \
+            'DB_USER=netbox' \
+            'DB_WAIT_DEBUG=1' \
+            'GRAPHQL_ENABLED=true' \
+            'HOUSEKEEPING_INTERVAL=86400' \
+            'MEDIA_ROOT=/opt/netbox/netbox/media' \
+            'METRICS_ENABLED=false' \
+            'REDIS_CACHE_DATABASE=1' \
+            'REDIS_CACHE_HOST=redis-cache' \
+            'REDIS_CACHE_INSECURE_SKIP_TLS_VERIFY=false' \
+            'REDIS_CACHE_PASSWORD=netbox' \
+            'REDIS_CACHE_SSL=false' \
+            'REDIS_DATABASE=0' \
+            'REDIS_HOST=redis' \
+            'REDIS_INSECURE_SKIP_TLS_VERIFY=false' \
+            'REDIS_PASSWORD=netbox' \
+            'REDIS_SSL=false' \
+            'SECRET_KEY=test-secret-key-for-ci-only-do-not-use-in-production' \
+            'SKIP_SUPERUSER=true' \
+            'API_TOKEN_PEPPER_1=Eb_30LtX2Rz01aSiZ29i8IwRyrbyy-maTokgIzAzADCt78gtlu5jd6EY1wGlX7RJ4XvpjRdLsyc4jnwj' \
+            > env/netbox.env
+
+          printf '%s\n' \
+            'POSTGRES_DB=netbox' \
+            'POSTGRES_PASSWORD=netbox' \
+            'POSTGRES_USER=netbox' \
+            > env/postgres.env
+
+          echo "REDIS_PASSWORD=netbox" > env/redis.env
+          echo "REDIS_PASSWORD=netbox" > env/redis-cache.env
+
+          printf '%s\n' \
+            'PLUGINS = ["netbox_ssl"]' \
+            'PLUGINS_CONFIG = {' \
+            '    "netbox_ssl": {' \
+            '        "expiry_warning_days": 30,' \
+            '        "expiry_critical_days": 14,' \
+            '    },' \
+            '}' \
+            '' \
+            'API_TOKEN_PEPPERS = {' \
+            '    1: "Eb_30LtX2Rz01aSiZ29i8IwRyrbyy-maTokgIzAzADCt78gtlu5jd6EY1wGlX7RJ4XvpjRdLsyc4jnwj",' \
+            '}' \
+            > development/configuration/plugins.py
+
+      - name: Start NetBox
+        run: |
+          NETBOX_VERSION=${{ env.NETBOX_VERSION }} docker compose up -d postgres redis redis-cache netbox
+
+          echo "Waiting for NetBox to be healthy..."
+          timeout 900 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting for NetBox..."; sleep 15; done'
+          echo "NetBox is ready!"
+
+      - name: Create superuser and API token
+        id: token
+        run: |
+          # Create superuser
+          docker compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "
+          from django.contrib.auth import get_user_model
+          User = get_user_model()
+          if not User.objects.filter(username='admin').exists():
+              User.objects.create_superuser('admin', 'admin@example.com', 'admin')
+              print('Superuser created')
+          "
+
+          # Create v2 API token with known plaintext
+          TOKEN=$(docker compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "
+          import secrets
+          from users.models import Token, User
+          user = User.objects.get(username='admin')
+          plain_secret = ''.join(secrets.choice('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') for _ in range(40))
+          t = Token(user=user, description='E2E CI token')
+          t.token = plain_secret
+          t.save()
+          print(f'nbt_{t.key}.{plain_secret}', end='')
+          ")
+
+          echo "::add-mask::${TOKEN}"
+          echo "NETBOX_TOKEN=${TOKEN}" >> "$GITHUB_ENV"
+
+      - name: Run E2E tests
+        run: |
+          python -m pytest tests/test_janus_renewal.py tests/test_browser.py \
+            -m browser -v -p no:django \
+            --tb=short
+
+      - name: Upload Playwright traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs netbox --tail=100
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v
