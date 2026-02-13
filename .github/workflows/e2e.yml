@@ -128,6 +128,7 @@ jobs:
           "
 
           # Create v2 API token with known plaintext
+          # Filter with grep: manage.py shell emits '🧬 loaded config' lines to stdout
           TOKEN=$(docker compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "
           import secrets
           from users.models import Token, User
@@ -137,7 +138,7 @@ jobs:
           t.token = plain_secret
           t.save()
           print(f'nbt_{t.key}.{plain_secret}', end='')
-          ")
+          " | grep '^nbt_')
 
           echo "::add-mask::${TOKEN}"
           echo "NETBOX_TOKEN=${TOKEN}" >> "$GITHUB_ENV"
