@@ -1,0 +1,166 @@
+{% extends 'generic/object_list.html' %}
+{% load helpers %}
+{% load i18n %}
+
+{% block title %}Bulk Import Certificates (CSV/JSON){% endblock %}
+
+{% block tabs %}{% endblock %}
+{% block table %}{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col col-md-12">
+
+    {% if step == "preview" %}
+    {# ── Preview step ── #}
+    <div class="card mb-3">
+      <h5 class="card-header">Import Preview</h5>
+      <div class="card-body">
+        <p>
+          <strong>{{ new_count }}</strong> certificate(s) ready to import.
+          {% if duplicates %}
+            <span class="text-warning">{{ duplicates|length }} duplicate(s) skipped: {{ duplicates|join:", " }}</span>
+          {% endif %}
+        </p>
+
+        {% if errors %}
+        <div class="alert alert-warning">
+          <strong>Validation warnings ({{ errors|length }}):</strong>
+          <ul class="mb-0">
+            {% for err in errors %}
+            <li>Row {{ err.row }}{% if err.field %}, field <code>{{ err.field }}</code>{% endif %}: {{ err.message }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        {% if rows %}
+        <div class="table-responsive">
+          <table class="table table-hover table-sm">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Common Name</th>
+                <th>Issuer</th>
+                <th>Valid To</th>
+                <th>Algorithm</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+              <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ row.common_name }}</td>
+                <td>{{ row.issuer|truncatechars:40 }}</td>
+                <td>{{ row.valid_to|date:"Y-m-d" }}</td>
+                <td>{{ row.algorithm|upper }}</td>
+                <td>{{ row.status|default:"active" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="confirm" value="yes">
+          <button type="submit" class="btn btn-primary">
+            <i class="mdi mdi-check"></i> Confirm Import ({{ new_count }} certificates)
+          </button>
+          <a href="{% url 'plugins:netbox_ssl:certificate_bulk_import' %}" class="btn btn-secondary">Cancel</a>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    {% else %}
+    {# ── Input step ── #}
+    <div class="card mb-3">
+      <h5 class="card-header">Bulk Import Certificates</h5>
+      <div class="card-body">
+
+        {% if errors %}
+        <div class="alert alert-danger">
+          <strong>Parsing errors:</strong>
+          <ul class="mb-0">
+            {% for err in errors %}
+            <li>Row {{ err.row }}{% if err.field %}, field <code>{{ err.field }}</code>{% endif %}: {{ err.message }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label for="import_format" class="form-label">Format</label>
+            <select name="import_format" id="import_format" class="form-select" style="max-width: 200px;">
+              <option value="auto" selected>Auto-detect</option>
+              <option value="csv">CSV</option>
+              <option value="json">JSON</option>
+            </select>
+          </div>
+
+          <ul class="nav nav-tabs mb-3" role="tablist">
+            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#paste-tab">Paste Data</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#upload-tab">Upload File</a></li>
+          </ul>
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="paste-tab">
+              <div class="mb-3">
+                <textarea name="data_content" class="form-control font-monospace" rows="12"
+                          placeholder="Paste CSV or JSON data here...">{{ data_content|default:"" }}</textarea>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="upload-tab">
+              <div class="mb-3">
+                <input type="file" name="data_file" class="form-control" accept=".csv,.json,.txt">
+                <div class="form-text">Upload a CSV or JSON file.</div>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">
+            <i class="mdi mdi-file-import"></i> Parse &amp; Preview
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <h5 class="card-header">Format Reference</h5>
+      <div class="card-body">
+        <h6>CSV</h6>
+        <pre class="bg-light p-3 rounded"><code>common_name,serial_number,issuer,valid_from,valid_to,fingerprint_sha256,algorithm,key_size,status,sans
+example.com,01:AB:CD,DigiCert Inc,2025-01-01,2026-01-01,AA:BB:CC:...,rsa,2048,active,www.example.com;api.example.com</code></pre>
+
+        <h6 class="mt-3">JSON</h6>
+        <pre class="bg-light p-3 rounded"><code>[
+  {
+    "common_name": "example.com",
+    "serial_number": "01:AB:CD",
+    "issuer": "DigiCert Inc",
+    "valid_from": "2025-01-01",
+    "valid_to": "2026-01-01",
+    "fingerprint_sha256": "AA:BB:CC:...",
+    "algorithm": "rsa",
+    "key_size": 2048,
+    "status": "active",
+    "sans": ["www.example.com", "api.example.com"]
+  }
+]</code></pre>
+
+        <h6 class="mt-3">Required Fields</h6>
+        <p><code>common_name</code>, <code>serial_number</code>, <code>issuer</code>, <code>valid_from</code>, <code>valid_to</code>, <code>fingerprint_sha256</code>, <code>algorithm</code></p>
+
+        <h6>Optional Fields</h6>
+        <p><code>key_size</code>, <code>status</code>, <code>sans</code> (semicolon-separated in CSV), <code>tenant</code> (name or ID), <code>private_key_location</code>, <code>pem_content</code>, <code>issuer_chain</code></p>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock content %}

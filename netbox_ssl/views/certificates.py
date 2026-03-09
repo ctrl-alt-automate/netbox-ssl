@@ -30,6 +30,7 @@ from ..utils import (
     PrivateKeyDetectedError,
     detect_issuing_ca,
 )
+from ..utils.bulk_parser import parse as bulk_parse
 
 
 def _get_assigned_object_tenant(obj):
@@ -231,6 +232,9 @@ class CertificateImportView(View):
                 status=CertificateStatusChoices.STATUS_ACTIVE,
             )
 
+            # Auto-detect ACME provider
+            certificate.auto_detect_acme(save=True)
+
             # Show message with CA info if detected
             if issuing_ca:
                 messages.success(
@@ -383,6 +387,9 @@ class CertificateRenewView(View):
                     new_assignment.full_clean()
                     new_assignment.save()
 
+                # Auto-detect ACME provider
+                new_certificate.auto_detect_acme(save=True)
+
                 # Archive old certificate
                 old_certificate.status = CertificateStatusChoices.STATUS_REPLACED
                 old_certificate.replaced_by = new_certificate
@@ -428,3 +435,173 @@ class CertificateRenewView(View):
 
             messages.success(request, _(f"Certificate imported successfully: {certificate.common_name}"))
             return redirect(certificate.get_absolute_url())
+
+
+class CertificateBulkDataImportView(View):
+    """
+    Bulk import certificates from CSV or JSON data.
+
+    Two-step flow:
+    1. POST data -> parse and validate -> show preview
+    2. Confirm -> create certificates
+    """
+
+    template_name = "netbox_ssl/certificate_bulk_import.html"
+    MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5 MB
+    MAX_SESSION_ROWS = 500
+
+    def dispatch(self, request, *args, **kwargs):
+        """Check permissions before dispatching."""
+        if not request.user.has_perm("netbox_ssl.add_certificate"):
+            messages.error(request, _("You do not have permission to import certificates."))
+            return redirect(reverse("plugins:netbox_ssl:certificate_list"))
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request):
+        """Display the bulk import form."""
+        return render(request, self.template_name, {"step": "input"})
+
+    def post(self, request):
+        """Handle form submission for parse/preview or confirm."""
+        # Confirm step
+        if request.POST.get("confirm") == "yes":
+            return self._confirm_import(request)
+
+        # Parse step
+        content = ""
+        import_format = request.POST.get("import_format", "auto")
+
+        # Handle file upload or pasted content
+        if request.FILES.get("data_file"):
+            uploaded = request.FILES["data_file"]
+            if uploaded.size > self.MAX_UPLOAD_SIZE:
+                messages.error(request, _(f"File too large ({uploaded.size // 1024} KB). Maximum is 5 MB."))
+                return render(request, self.template_name, {"step": "input"})
+            content = uploaded.read().decode("utf-8-sig")
+        else:
+            content = request.POST.get("data_content", "")
+
+        if not content.strip():
+            messages.error(request, _("No data provided. Paste CSV/JSON or upload a file."))
+            return render(request, self.template_name, {"step": "input"})
+
+        result = bulk_parse(content, fmt=import_format)
+
+        if result.has_errors and not result.valid_rows:
+            return render(
+                request,
+                self.template_name,
+                {
+                    "step": "input",
+                    "errors": result.errors,
+                    "data_content": content,
+                },
+            )
+
+        # Check for duplicates against existing certificates
+        duplicates = []
+        new_rows = []
+        for row in result.valid_rows:
+            exists = Certificate.objects.filter(
+                serial_number=row["serial_number"],
+                issuer=row["issuer"],
+            ).exists()
+            if exists:
+                duplicates.append(row["common_name"])
+            else:
+                new_rows.append(row)
+
+        # Enforce session storage limit
+        if len(new_rows) > self.MAX_SESSION_ROWS:
+            messages.warning(
+                request,
+                _(
+                    f"Too many rows ({len(new_rows)}). Maximum is {self.MAX_SESSION_ROWS}. Please split into smaller batches."
+                ),
+            )
+            new_rows = new_rows[: self.MAX_SESSION_ROWS]
+
+        # Store validated data in session for confirm step
+        serializable_rows = []
+        for row in new_rows:
+            sr = dict(row)
+            sr["valid_from"] = sr["valid_from"].isoformat()
+            sr["valid_to"] = sr["valid_to"].isoformat()
+            serializable_rows.append(sr)
+        request.session["bulk_import_rows"] = serializable_rows
+
+        return render(
+            request,
+            self.template_name,
+            {
+                "step": "preview",
+                "rows": new_rows,
+                "errors": result.errors,
+                "duplicates": duplicates,
+                "total_parsed": len(result.valid_rows),
+                "new_count": len(new_rows),
+            },
+        )
+
+    def _confirm_import(self, request):
+        """Create certificates from session data."""
+        from tenancy.models import Tenant
+
+        rows = request.session.pop("bulk_import_rows", [])
+        if not rows:
+            messages.warning(request, _("No pending import data found."))
+            return redirect(reverse("plugins:netbox_ssl:certificate_bulk_import"))
+
+        # Build set of tenants this user can access
+        user_tenants = Tenant.objects.restrict(request.user, "view")
+
+        created = 0
+        errors = []
+
+        with transaction.atomic():
+            for idx, row in enumerate(rows, start=1):
+                try:
+                    # Resolve tenant (restricted to user's accessible tenants)
+                    tenant = None
+                    tenant_ref = row.pop("tenant_ref", None)
+                    if tenant_ref:
+                        try:
+                            tenant = user_tenants.get(pk=int(tenant_ref))
+                        except (ValueError, Tenant.DoesNotExist):
+                            tenant = user_tenants.filter(name=tenant_ref).first()
+
+                    # Parse dates back
+                    valid_from = datetime.fromisoformat(row["valid_from"])
+                    valid_to = datetime.fromisoformat(row["valid_to"])
+
+                    issuing_ca = detect_issuing_ca(row["issuer"])
+
+                    cert = Certificate.objects.create(
+                        common_name=row["common_name"],
+                        serial_number=row["serial_number"],
+                        fingerprint_sha256=row["fingerprint_sha256"],
+                        issuer=row["issuer"],
+                        issuing_ca=issuing_ca,
+                        valid_from=valid_from,
+                        valid_to=valid_to,
+                        sans=row.get("sans", []),
+                        key_size=row.get("key_size"),
+                        algorithm=row.get("algorithm", "unknown"),
+                        status=row.get("status", CertificateStatusChoices.STATUS_ACTIVE),
+                        private_key_location=row.get("private_key_location", ""),
+                        pem_content=row.get("pem_content", ""),
+                        issuer_chain=row.get("issuer_chain", ""),
+                        tenant=tenant,
+                    )
+                    cert.auto_detect_acme(save=True)
+                    created += 1
+                except Exception as e:
+                    errors.append(f"Row {idx}: {e}")
+
+        if created:
+            messages.success(request, _(f"Successfully imported {created} certificate(s)."))
+        if errors:
+            for err in errors[:5]:
+                messages.error(request, err)
+
+        return redirect(reverse("plugins:netbox_ssl:certificate_list"))

@@ -28,6 +28,7 @@ from ..models import (
     CompliancePolicy,
 )
 from ..utils import CertificateExporter, ComplianceChecker, ExportFormatChoices
+from ..utils.bulk_parser import parse as bulk_parse
 from .serializers import (
     BulkComplianceRunSerializer,
     CertificateAssignmentSerializer,
@@ -145,6 +146,116 @@ class CertificateViewSet(NetBoxModelViewSet):
             {
                 "created_count": len(created_certificates),
                 "certificates": output_serializer.data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=["post"], url_path="bulk-data-import")
+    def bulk_data_import(self, request):
+        """
+        Import certificates from CSV or JSON metadata.
+
+        Unlike bulk-import (which accepts PEM content), this endpoint accepts
+        pre-extracted certificate metadata in CSV or JSON format.
+
+        Example JSON payload:
+        {
+            "format": "json",
+            "content": "[{\"common_name\": \"example.com\", ...}]",
+            "on_duplicate": "skip"
+        }
+        """
+        content = request.data.get("content", "")
+        fmt = request.data.get("format", "auto")
+        on_duplicate = request.data.get("on_duplicate", "error")
+
+        if not content:
+            raise serializers.ValidationError({"content": "This field is required."})
+
+        result = bulk_parse(content, fmt=fmt)
+
+        if result.has_errors:
+            raise serializers.ValidationError(
+                {
+                    "detail": "Validation errors found.",
+                    "errors": [{"row": e.row, "field": e.field, "message": e.message} for e in result.errors],
+                }
+            )
+
+        # Check batch size limit
+        plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+        max_batch = plugin_settings.get("bulk_import_max_batch_size", 100)
+        if len(result.valid_rows) > max_batch:
+            raise serializers.ValidationError(
+                {"detail": f"Batch size ({len(result.valid_rows)}) exceeds maximum of {max_batch}."}
+            )
+
+        created_certs = []
+        skipped = 0
+
+        try:
+            with transaction.atomic():
+                for row in result.valid_rows:
+                    # Duplicate check
+                    exists = Certificate.objects.filter(
+                        serial_number=row["serial_number"],
+                        issuer=row["issuer"],
+                    ).exists()
+                    if exists:
+                        if on_duplicate == "skip":
+                            skipped += 1
+                            continue
+                        raise serializers.ValidationError(
+                            {
+                                "detail": f"Duplicate certificate: {row['common_name']} "
+                                f"(serial: {row['serial_number'][:20]})"
+                            }
+                        )
+
+                    # Resolve tenant (restricted to user's accessible tenants)
+                    tenant = None
+                    tenant_ref = row.pop("tenant_ref", None)
+                    if tenant_ref:
+                        from tenancy.models import Tenant
+
+                        user_tenants = Tenant.objects.restrict(request.user, "view")
+                        try:
+                            tenant = user_tenants.get(pk=int(tenant_ref))
+                        except (ValueError, Tenant.DoesNotExist):
+                            tenant = user_tenants.filter(name=tenant_ref).first()
+
+                    from ..utils import detect_issuing_ca
+
+                    issuing_ca = detect_issuing_ca(row["issuer"])
+
+                    cert = Certificate.objects.create(
+                        common_name=row["common_name"],
+                        serial_number=row["serial_number"],
+                        fingerprint_sha256=row["fingerprint_sha256"],
+                        issuer=row["issuer"],
+                        issuing_ca=issuing_ca,
+                        valid_from=row["valid_from"],
+                        valid_to=row["valid_to"],
+                        sans=row.get("sans", []),
+                        key_size=row.get("key_size"),
+                        algorithm=row.get("algorithm", "unknown"),
+                        status=row.get("status", "active"),
+                        private_key_location=row.get("private_key_location", ""),
+                        pem_content=row.get("pem_content", ""),
+                        issuer_chain=row.get("issuer_chain", ""),
+                        tenant=tenant,
+                    )
+                    cert.auto_detect_acme(save=True)
+                    created_certs.append(cert)
+        except IntegrityError as e:
+            raise serializers.ValidationError({"detail": f"Database error during import: {e}"}) from e
+
+        output = CertificateSerializer(created_certs, many=True, context={"request": request})
+        return Response(
+            {
+                "created_count": len(created_certs),
+                "skipped_count": skipped,
+                "certificates": output.data,
             },
             status=status.HTTP_201_CREATED,
         )

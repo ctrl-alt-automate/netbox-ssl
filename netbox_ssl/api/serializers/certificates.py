@@ -184,4 +184,7 @@ class CertificateImportSerializer(serializers.Serializer):
             status=CertificateStatusChoices.STATUS_ACTIVE,
         )
 
+        # Auto-detect ACME provider
+        certificate.auto_detect_acme(save=True)
+
         return certificate

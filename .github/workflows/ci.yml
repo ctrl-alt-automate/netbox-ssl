@@ -30,6 +30,53 @@ jobs:
       - name: Run ruff format check
         run: ruff format --check netbox_ssl/
 
+  package-check:
+    name: Package Contents
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Build package
+        run: |
+          pip install build
+          python -m build
+
+      - name: Verify package contains templates
+        run: |
+          python -c "
+          from pathlib import Path
+          import zipfile, sys
+
+          whl = next(Path('dist').glob('*.whl'))
+          with zipfile.ZipFile(whl) as z:
+              names = z.namelist()
+              templates = [n for n in names if '/templates/' in n and n.endswith('.html')]
+              print(f'Found {len(templates)} templates in {whl.name}:')
+              for t in sorted(templates):
+                  print(f'  {t}')
+
+              required = [
+                  'netbox_ssl/templates/netbox_ssl/certificate.html',
+                  'netbox_ssl/templates/netbox_ssl/certificate_list.html',
+                  'netbox_ssl/templates/netbox_ssl/certificate_import.html',
+                  'netbox_ssl/templates/netbox_ssl/certificate_bulk_import.html',
+                  'netbox_ssl/templates/netbox_ssl/certificateassignment.html',
+                  'netbox_ssl/templates/netbox_ssl/certificateassignment_list.html',
+                  'netbox_ssl/templates/netbox_ssl/email/expiry_report.html',
+                  'netbox_ssl/templates/netbox_ssl/email/expiry_report.txt',
+              ]
+              missing = [f for f in required if f not in names]
+              if missing:
+                  print(f'\nMISSING templates: {missing}', file=sys.stderr)
+                  sys.exit(1)
+              print('\nAll required templates present.')
+          "
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -52,7 +99,7 @@ jobs:
   integration-tests:
     name: Integration Tests (NetBox ${{ matrix.netbox_major }})
     runs-on: ubuntu-latest
-    needs: [lint, unit-tests]
+    needs: [lint, unit-tests, package-check]
     timeout-minutes: 30
     strategy:
       fail-fast: false
