@@ -5,6 +5,7 @@ These tests verify the email rendering and sending logic
 without requiring a running NetBox instance.
 """
 
+import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -15,11 +16,23 @@ _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-for mod in ("netbox", "netbox.plugins", "netbox.models",
-            "django.contrib.postgres.fields", "django.contrib.postgres.indexes",
-            "utilities.choices"):
-    if mod not in sys.modules:
-        sys.modules[mod] = MagicMock()
+try:
+    _spec = importlib.util.find_spec("netbox")
+    _NETBOX_AVAILABLE = _spec is not None and _spec.origin is not None
+except (ValueError, ModuleNotFoundError):
+    _NETBOX_AVAILABLE = False
+
+if not _NETBOX_AVAILABLE:
+    for mod in (
+        "netbox",
+        "netbox.plugins",
+        "netbox.models",
+        "django.contrib.postgres.fields",
+        "django.contrib.postgres.indexes",
+        "utilities.choices",
+    ):
+        if mod not in sys.modules:
+            sys.modules[mod] = MagicMock()
 
 # Configure Django settings minimally for these tests
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "test_settings")
@@ -30,12 +43,14 @@ if not settings.configured:
     settings.configure(
         PLUGINS_CONFIG={},
         DEFAULT_FROM_EMAIL="test@example.com",
-        TEMPLATES=[{
-            "BACKEND": "django.template.backends.django.DjangoTemplates",
-            "DIRS": [],
-            "APP_DIRS": False,
-            "OPTIONS": {"loaders": []},
-        }],
+        TEMPLATES=[
+            {
+                "BACKEND": "django.template.backends.django.DjangoTemplates",
+                "DIRS": [],
+                "APP_DIRS": False,
+                "OPTIONS": {"loaders": []},
+            }
+        ],
     )
 
 

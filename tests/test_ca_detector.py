@@ -4,6 +4,7 @@ Unit tests for Certificate Authority detection utilities.
 Tests the detect_issuing_ca function and helper functions.
 """
 
+import importlib.util
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -15,8 +16,14 @@ _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-# Mock netbox.plugins if not available
-if "netbox" not in sys.modules:
+# Mock netbox.plugins if not available (skip in Docker with real NetBox)
+try:
+    _spec = importlib.util.find_spec("netbox")
+    _NETBOX_AVAILABLE = _spec is not None and _spec.origin is not None
+except (ValueError, ModuleNotFoundError):
+    _NETBOX_AVAILABLE = False
+
+if not _NETBOX_AVAILABLE and "netbox" not in sys.modules:
     sys.modules["netbox"] = MagicMock()
     sys.modules["netbox.plugins"] = MagicMock()
 

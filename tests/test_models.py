@@ -34,6 +34,7 @@ if _in_netbox_env:
     import contextlib
 
     import django
+
     with contextlib.suppress(RuntimeError):
         django.setup()
     NETBOX_AVAILABLE = True
@@ -424,13 +425,13 @@ class TestMultiTenancyValidation:
                 CertificateAssignment, "assigned_object", new_callable=lambda: property(lambda s: mock_device)
             ),
         ):
-                # Test that clean raises ValidationError
-                with pytest.raises(ValidationError) as exc_info:
-                    assignment.clean()
+            # Test that clean raises ValidationError
+            with pytest.raises(ValidationError) as exc_info:
+                assignment.clean()
 
-                # Verify error message mentions tenant
-                error_msg = str(exc_info.value)
-                assert "tenant" in error_msg.lower()
+            # Verify error message mentions tenant
+            error_msg = str(exc_info.value)
+            assert "tenant" in error_msg.lower()
 
 
 class TestAssignmentModel:

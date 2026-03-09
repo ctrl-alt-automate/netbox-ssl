@@ -4,6 +4,7 @@ Unit tests for bulk CSV/JSON certificate import parser.
 These tests run without Django/NetBox — they only test the parsing logic.
 """
 
+import importlib.util
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -13,15 +14,33 @@ _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-for mod in ("netbox", "netbox.plugins", "netbox.models", "django", "django.conf",
-            "django.utils", "django.utils.timezone", "django.db", "django.db.models",
-            "django.contrib.postgres.fields", "django.contrib.postgres.indexes",
-            "django.urls", "utilities.choices"):
-    if mod not in sys.modules:
-        sys.modules[mod] = MagicMock()
+try:
+    _spec = importlib.util.find_spec("netbox")
+    _NETBOX_AVAILABLE = _spec is not None and _spec.origin is not None
+except (ValueError, ModuleNotFoundError):
+    _NETBOX_AVAILABLE = False
 
-# Patch timezone.make_aware to return the datetime as-is for testing
-sys.modules["django.utils.timezone"].make_aware = lambda dt: dt
+if not _NETBOX_AVAILABLE:
+    for mod in (
+        "netbox",
+        "netbox.plugins",
+        "netbox.models",
+        "django",
+        "django.conf",
+        "django.utils",
+        "django.utils.timezone",
+        "django.db",
+        "django.db.models",
+        "django.contrib.postgres.fields",
+        "django.contrib.postgres.indexes",
+        "django.urls",
+        "utilities.choices",
+    ):
+        if mod not in sys.modules:
+            sys.modules[mod] = MagicMock()
+
+    # Patch timezone.make_aware to return the datetime as-is for testing
+    sys.modules["django.utils.timezone"].make_aware = lambda dt: dt
 
 from netbox_ssl.utils.bulk_parser import (
     detect_format,
@@ -31,6 +50,7 @@ from netbox_ssl.utils.bulk_parser import (
 )
 
 # ─── Format Detection ────────────────────────────────────────────────
+
 
 class TestDetectFormat:
     def test_json_array(self):
@@ -60,11 +80,14 @@ VALID_ROW = {
     "status": "active",
 }
 
-VALID_CSV_HEADER = "common_name,serial_number,issuer,valid_from,valid_to,fingerprint_sha256,algorithm,key_size,status,sans"
-VALID_CSV_ROW = 'example.com,01:AB:CD:EF,DigiCert Inc,2025-01-01,2026-01-01,AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99,rsa,2048,active,www.example.com;api.example.com'
+VALID_CSV_HEADER = (
+    "common_name,serial_number,issuer,valid_from,valid_to,fingerprint_sha256,algorithm,key_size,status,sans"
+)
+VALID_CSV_ROW = "example.com,01:AB:CD:EF,DigiCert Inc,2025-01-01,2026-01-01,AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99,rsa,2048,active,www.example.com;api.example.com"
 
 
 # ─── CSV Parsing ─────────────────────────────────────────────────────
+
 
 class TestParseCSV:
     def test_valid_csv(self):
@@ -104,7 +127,7 @@ class TestParseCSV:
         assert any("valid_from" in e.field for e in result.errors)
 
     def test_csv_multiple_rows(self):
-        row2 = 'test.com,02:CD:EF,LetsEncrypt,2025-06-01,2025-09-01,BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA,ecdsa,256,active,'
+        row2 = "test.com,02:CD:EF,LetsEncrypt,2025-06-01,2025-09-01,BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA,ecdsa,256,active,"
         csv_content = f"{VALID_CSV_HEADER}\n{VALID_CSV_ROW}\n{row2}"
         result = parse_csv(csv_content)
         assert not result.has_errors
@@ -134,9 +157,11 @@ class TestParseCSV:
 
 # ─── JSON Parsing ────────────────────────────────────────────────────
 
+
 class TestParseJSON:
     def test_valid_json_array(self):
         import json
+
         content = json.dumps([VALID_ROW])
         result = parse_json(content)
         assert not result.has_errors
@@ -145,6 +170,7 @@ class TestParseJSON:
 
     def test_valid_json_single_object(self):
         import json
+
         content = json.dumps(VALID_ROW)
         result = parse_json(content)
         assert not result.has_errors
@@ -152,6 +178,7 @@ class TestParseJSON:
 
     def test_json_with_list_sans(self):
         import json
+
         row = dict(VALID_ROW, sans=["www.example.com", "api.example.com"])
         content = json.dumps([row])
         result = parse_json(content)
@@ -169,12 +196,14 @@ class TestParseJSON:
 
     def test_json_missing_required(self):
         import json
+
         content = json.dumps([{"common_name": "test.com"}])
         result = parse_json(content)
         assert result.has_errors
 
     def test_json_invalid_status(self):
         import json
+
         row = dict(VALID_ROW, status="invalid_status")
         content = json.dumps([row])
         result = parse_json(content)
@@ -183,6 +212,7 @@ class TestParseJSON:
 
     def test_json_tenant_ref(self):
         import json
+
         row = dict(VALID_ROW, tenant="My Tenant")
         content = json.dumps([row])
         result = parse_json(content)
@@ -191,6 +221,7 @@ class TestParseJSON:
 
 
 # ─── Auto-detect Parse ───────────────────────────────────────────────
+
 
 class TestParse:
     def test_auto_detect_csv(self):
@@ -201,21 +232,25 @@ class TestParse:
 
     def test_auto_detect_json(self):
         import json
+
         result = parse(json.dumps([VALID_ROW]), fmt="auto")
         assert not result.has_errors
         assert len(result.valid_rows) == 1
 
     def test_explicit_format(self):
         import json
+
         result = parse(json.dumps([VALID_ROW]), fmt="json")
         assert not result.has_errors
 
 
 # ─── Date Parsing ────────────────────────────────────────────────────
 
+
 class TestDateParsing:
     def test_iso_date(self):
         import json
+
         row = dict(VALID_ROW, valid_from="2025-01-15", valid_to="2026-01-15")
         result = parse_json(json.dumps([row]))
         assert not result.has_errors
@@ -223,18 +258,21 @@ class TestDateParsing:
 
     def test_iso_datetime(self):
         import json
+
         row = dict(VALID_ROW, valid_from="2025-01-15T10:30:00", valid_to="2026-01-15T10:30:00")
         result = parse_json(json.dumps([row]))
         assert not result.has_errors
 
     def test_iso_datetime_with_tz(self):
         import json
+
         row = dict(VALID_ROW, valid_from="2025-01-15T10:30:00+00:00", valid_to="2026-01-15T10:30:00+00:00")
         result = parse_json(json.dumps([row]))
         assert not result.has_errors
 
     def test_datetime_with_space(self):
         import json
+
         row = dict(VALID_ROW, valid_from="2025-01-15 10:30:00", valid_to="2026-01-15 10:30:00")
         result = parse_json(json.dumps([row]))
         assert not result.has_errors
