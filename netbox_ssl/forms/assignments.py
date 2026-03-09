@@ -41,9 +41,6 @@ class CertificateAssignmentForm(NetBoxModelForm):
         required=False,
         label=_("Device"),
         help_text=_("Select a device to see its services"),
-        query_params={
-            "tenant_id": "$tenant",
-        },
     )
 
     # VM selection - services are automatically filtered
@@ -52,9 +49,6 @@ class CertificateAssignmentForm(NetBoxModelForm):
         required=False,
         label=_("Virtual Machine"),
         help_text=_("Select a VM to see its services"),
-        query_params={
-            "tenant_id": "$tenant",
-        },
     )
 
     # Service selection (filtered by device/VM via HTMX)

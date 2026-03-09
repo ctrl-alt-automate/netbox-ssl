@@ -7,7 +7,7 @@ Provides a "Single Source of Truth" for certificate inventory and lifecycle mana
 
 from netbox.plugins import PluginConfig
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 
 class NetBoxSSLConfig(PluginConfig):
@@ -27,6 +27,10 @@ class NetBoxSSLConfig(PluginConfig):
         "expiry_warning_days": 30,
         "expiry_critical_days": 14,
         "bulk_import_max_batch_size": 100,
+        "max_export_size": 1000,
+        "bulk_validate_max_batch_size": 100,
+        "bulk_compliance_max_batch_size": 100,
+        "bulk_detect_max_batch_size": 100,
         "notification_email_enabled": False,
         "notification_email_recipients": [],
         "notification_email_subject_prefix": "[NetBox SSL]",
