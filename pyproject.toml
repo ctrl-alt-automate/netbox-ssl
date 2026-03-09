@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "netbox-ssl"
-version = "0.4.1"
+version = "0.4.2"
 description = "NetBox plugin for TLS/SSL certificate management - Project Janus"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -34,6 +34,12 @@ Repository = "https://github.com/ctrl-alt-automate/netbox-ssl"
 
 [tool.setuptools.packages.find]
 include = ["netbox_ssl*"]
+
+[tool.setuptools.package-data]
+netbox_ssl = [
+    "templates/**/*.html",
+    "static/**/*",
+]
 
 [tool.pytest.ini_options]
 markers = [
