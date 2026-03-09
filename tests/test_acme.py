@@ -5,40 +5,54 @@ Tests the ACME detection, provider identification, and renewal status tracking
 for certificates issued via ACME protocol (Let's Encrypt, ZeroSSL, etc.).
 """
 
+# Mock netbox/django modules for local testing without NetBox
+import importlib.util
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
-# Mock netbox/django modules for local testing without NetBox
 _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-for mod in ("netbox", "netbox.plugins", "netbox.models",
-            "django.contrib.contenttypes", "django.contrib.contenttypes.fields",
-            "django.contrib.contenttypes.models",
-            "django.contrib.postgres.fields", "django.contrib.postgres.indexes"):
-    if mod not in sys.modules:
-        sys.modules[mod] = MagicMock()
+try:
+    # Check if real netbox package is available (not a MagicMock)
+    _spec = importlib.util.find_spec("netbox")
+    _NETBOX_AVAILABLE = _spec is not None and _spec.origin is not None
+except (ValueError, ModuleNotFoundError):
+    _NETBOX_AVAILABLE = False
 
-# Provide a real ChoiceSet base class so model choice classes work
-_choices_mock = MagicMock()
+if not _NETBOX_AVAILABLE:
+    for mod in (
+        "netbox",
+        "netbox.plugins",
+        "netbox.models",
+        "django.contrib.contenttypes",
+        "django.contrib.contenttypes.fields",
+        "django.contrib.contenttypes.models",
+        "django.contrib.postgres.fields",
+        "django.contrib.postgres.indexes",
+    ):
+        if mod not in sys.modules:
+            sys.modules[mod] = MagicMock()
 
+    # Provide a real ChoiceSet base class so model choice classes work
+    _choices_mock = MagicMock()
 
-class _FakeChoiceSet:
-    """Minimal stand-in for utilities.choices.ChoiceSet."""
-    CHOICES = []
+    class _FakeChoiceSet:
+        """Minimal stand-in for utilities.choices.ChoiceSet."""
 
+        CHOICES = []
 
-_choices_mock.ChoiceSet = _FakeChoiceSet
-sys.modules["utilities.choices"] = _choices_mock
+    _choices_mock.ChoiceSet = _FakeChoiceSet
+    sys.modules["utilities.choices"] = _choices_mock
 
-# Force re-import of model modules with our ChoiceSet mock
-for mod in list(sys.modules):
-    if mod.startswith("netbox_ssl.models"):
-        del sys.modules[mod]
+    # Force re-import of model modules with our ChoiceSet mock
+    for mod in list(sys.modules):
+        if mod.startswith("netbox_ssl.models"):
+            del sys.modules[mod]
 
 # Mark all tests in this module as unit tests
 pytestmark = pytest.mark.unit
