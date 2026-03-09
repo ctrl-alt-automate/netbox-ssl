@@ -70,7 +70,8 @@ def build_certificate_event_payload(
             for a in assignments
         ]
         payload["assignment_count"] = len(payload["assigned_objects"])
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to retrieve assignments for certificate %s: %s", certificate.pk, e)
         payload["assigned_objects"] = []
         payload["assignment_count"] = 0
 
@@ -107,6 +108,17 @@ def fire_certificate_event(
         threshold_days=threshold_days,
         extra=extra,
     )
+
+    # Touch the certificate's last_updated to trigger NetBox's object_updated Event Rules.
+    # This causes the ChangeLogging middleware to create an ObjectChange record,
+    # which in turn fires any matching Event Rules (webhooks, scripts, etc.).
+    try:
+        from django.utils import timezone as dj_timezone
+
+        type(certificate).objects.filter(pk=certificate.pk).update(last_updated=dj_timezone.now())
+    except Exception as e:
+        # Don't fail the entire operation if the update fails (e.g., in tests)
+        logger.warning("Could not update last_updated for certificate %s: %s", certificate.pk, e)
 
     logger.info(
         "Certificate event fired: %s for %s (id=%s, days_remaining=%s)",

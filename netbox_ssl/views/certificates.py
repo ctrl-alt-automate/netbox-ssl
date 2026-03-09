@@ -276,6 +276,15 @@ class CertificateRenewView(View):
 
     template_name = "netbox_ssl/certificate_renew.html"
 
+    def dispatch(self, request, *args, **kwargs):
+        """Check permissions before dispatching."""
+        if not request.user.has_perm("netbox_ssl.add_certificate") or not request.user.has_perm(
+            "netbox_ssl.change_certificate"
+        ):
+            messages.error(request, _("You do not have permission to renew certificates."))
+            return redirect(reverse("plugins:netbox_ssl:certificate_list"))
+        return super().dispatch(request, *args, **kwargs)
+
     def get(self, request):
         """Display the renewal confirmation page."""
         pending_data = request.session.get("pending_certificate")

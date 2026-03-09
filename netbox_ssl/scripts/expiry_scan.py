@@ -138,27 +138,25 @@ class CertificateExpiryScan(Script):
         if expired_certs.exists():
             self.log_failure(f"  Expired: {expired_certs.count()} certificates")
 
-        # Process each threshold (widest first, assign to smallest matching threshold)
-        for threshold in thresholds:
-            threshold_date = now + timedelta(days=threshold)
-            certs_in_window = queryset.filter(
-                valid_to__gte=now,
-                valid_to__lte=threshold_date,
-            )
+        # Fetch all expiring certificates in a single query (widest threshold)
+        # then categorize in Python to minimize database round-trips
+        expiring_certs_by_threshold: dict[int, list] = {t: [] for t in thresholds}
+        if thresholds:
+            max_threshold = thresholds[0]  # thresholds sorted descending
+            threshold_date = now + timedelta(days=max_threshold)
+            expiring_certs = queryset.filter(valid_to__gte=now, valid_to__lte=threshold_date)
 
-            count = 0
-            for cert in certs_in_window:
-                # Find the smallest threshold this cert falls into
-                smallest_threshold = threshold
-                for t in sorted(thresholds):
+            sorted_thresholds = sorted(thresholds)  # ascending for smallest-match
+            for cert in expiring_certs:
+                for t in sorted_thresholds:
                     if cert.valid_to <= now + timedelta(days=t):
-                        smallest_threshold = t
+                        expiring_certs_by_threshold[t].append(cert)
                         break
 
-                # Only fire for the smallest matching threshold to avoid duplicates
-                if smallest_threshold != threshold:
-                    continue
-
+        for threshold in thresholds:
+            certs = expiring_certs_by_threshold[threshold]
+            count = 0
+            for cert in certs:
                 if not ignore_cooldown and CertificateEventLog.was_recently_fired(
                     cert.pk, EVENT_CERTIFICATE_EXPIRING_SOON, threshold, cooldown_hours
                 ):
