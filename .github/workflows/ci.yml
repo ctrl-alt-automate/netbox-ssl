@@ -43,7 +43,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytest cryptography django
+          pip install pytest cryptography django requests
 
       - name: Run unit tests
         run: |
