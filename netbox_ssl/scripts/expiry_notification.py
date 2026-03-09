@@ -178,8 +178,9 @@ class CertificateExpiryNotification(Script):
         self.log_info(f"\n{'=' * 60}")
 
         # Build report data for return and email
-        report_data = self._build_report_data(expired, critical, warning, now, warning_days, critical_days, tenant,
-                                              active_only, include_expired)
+        report_data = self._build_report_data(
+            expired, critical, warning, now, warning_days, critical_days, tenant, active_only, include_expired
+        )
 
         # Send email notification if requested
         send_email_flag = data.get("send_email", False)
@@ -205,8 +206,9 @@ class CertificateExpiryNotification(Script):
 
         return report_data
 
-    def _build_report_data(self, expired, critical, warning, now, warning_days, critical_days, tenant, active_only,
-                           include_expired):
+    def _build_report_data(
+        self, expired, critical, warning, now, warning_days, critical_days, tenant, active_only, include_expired
+    ):
         """Build the structured report data dict."""
         # Return structured data for webhook consumption
         return {

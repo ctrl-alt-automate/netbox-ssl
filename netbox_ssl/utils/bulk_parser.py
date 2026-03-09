@@ -12,7 +12,15 @@ from datetime import datetime
 
 from django.utils import timezone
 
-REQUIRED_FIELDS = {"common_name", "serial_number", "issuer", "valid_from", "valid_to", "fingerprint_sha256", "algorithm"}
+REQUIRED_FIELDS = {
+    "common_name",
+    "serial_number",
+    "issuer",
+    "valid_from",
+    "valid_to",
+    "fingerprint_sha256",
+    "algorithm",
+}
 VALID_STATUSES = {"active", "expired", "replaced", "revoked", "pending"}
 VALID_ALGORITHMS = {"rsa", "ecdsa", "ed25519", "unknown"}
 DATE_FORMATS = ["%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]
@@ -89,16 +97,26 @@ def _validate_row(data: dict, row_index: int) -> tuple[dict, list[RowError]]:
     # Algorithm
     algo = data["algorithm"].strip().lower()
     if algo not in VALID_ALGORITHMS:
-        errors.append(RowError(row=row_index, field="algorithm",
-                               message=f"Invalid algorithm '{algo}'. Must be one of: {', '.join(sorted(VALID_ALGORITHMS))}"))
+        errors.append(
+            RowError(
+                row=row_index,
+                field="algorithm",
+                message=f"Invalid algorithm '{algo}'. Must be one of: {', '.join(sorted(VALID_ALGORITHMS))}",
+            )
+        )
     else:
         cleaned["algorithm"] = algo
 
     # Status
     status = data.get("status", "active").strip().lower()
     if status not in VALID_STATUSES:
-        errors.append(RowError(row=row_index, field="status",
-                               message=f"Invalid status '{status}'. Must be one of: {', '.join(sorted(VALID_STATUSES))}"))
+        errors.append(
+            RowError(
+                row=row_index,
+                field="status",
+                message=f"Invalid status '{status}'. Must be one of: {', '.join(sorted(VALID_STATUSES))}",
+            )
+        )
     else:
         cleaned["status"] = status
 
@@ -107,8 +125,13 @@ def _validate_row(data: dict, row_index: int) -> tuple[dict, list[RowError]]:
         raw = data[date_field].strip() if isinstance(data[date_field], str) else str(data[date_field])
         parsed = _parse_date(raw)
         if parsed is None:
-            errors.append(RowError(row=row_index, field=date_field,
-                                   message=f"Cannot parse date '{raw}'. Use ISO 8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)"))
+            errors.append(
+                RowError(
+                    row=row_index,
+                    field=date_field,
+                    message=f"Cannot parse date '{raw}'. Use ISO 8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)",
+                )
+            )
         else:
             cleaned[date_field] = parsed
 
@@ -118,7 +141,9 @@ def _validate_row(data: dict, row_index: int) -> tuple[dict, list[RowError]]:
         try:
             cleaned["key_size"] = int(key_size)
         except (ValueError, TypeError):
-            errors.append(RowError(row=row_index, field="key_size", message=f"Invalid key_size '{key_size}' — must be integer"))
+            errors.append(
+                RowError(row=row_index, field="key_size", message=f"Invalid key_size '{key_size}' — must be integer")
+            )
 
     # SANs (optional, semicolon-separated in CSV, list in JSON)
     sans = data.get("sans", "")

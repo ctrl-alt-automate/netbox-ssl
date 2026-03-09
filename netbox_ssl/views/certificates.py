@@ -475,11 +475,15 @@ class CertificateBulkDataImportView(View):
         result = bulk_parse(content, fmt=import_format)
 
         if result.has_errors and not result.valid_rows:
-            return render(request, self.template_name, {
-                "step": "input",
-                "errors": result.errors,
-                "data_content": content,
-            })
+            return render(
+                request,
+                self.template_name,
+                {
+                    "step": "input",
+                    "errors": result.errors,
+                    "data_content": content,
+                },
+            )
 
         # Check for duplicates against existing certificates
         duplicates = []
@@ -503,14 +507,18 @@ class CertificateBulkDataImportView(View):
             serializable_rows.append(sr)
         request.session["bulk_import_rows"] = serializable_rows
 
-        return render(request, self.template_name, {
-            "step": "preview",
-            "rows": new_rows,
-            "errors": result.errors,
-            "duplicates": duplicates,
-            "total_parsed": len(result.valid_rows),
-            "new_count": len(new_rows),
-        })
+        return render(
+            request,
+            self.template_name,
+            {
+                "step": "preview",
+                "rows": new_rows,
+                "errors": result.errors,
+                "duplicates": duplicates,
+                "total_parsed": len(result.valid_rows),
+                "new_count": len(new_rows),
+            },
+        )
 
     def _confirm_import(self, request):
         """Create certificates from session data."""
@@ -530,6 +538,7 @@ class CertificateBulkDataImportView(View):
                     tenant_ref = row.pop("tenant_ref", None)
                     if tenant_ref:
                         from tenancy.models import Tenant
+
                         try:
                             tenant = Tenant.objects.get(pk=int(tenant_ref))
                         except (ValueError, Tenant.DoesNotExist):

@@ -38,6 +38,7 @@ include = ["netbox_ssl*"]
 [tool.setuptools.package-data]
 netbox_ssl = [
     "templates/**/*.html",
+    "templates/**/*.txt",
     "static/**/*",
 ]
 

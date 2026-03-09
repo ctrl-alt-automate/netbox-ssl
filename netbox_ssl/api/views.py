@@ -175,10 +175,12 @@ class CertificateViewSet(NetBoxModelViewSet):
         result = bulk_parse(content, fmt=fmt)
 
         if result.has_errors:
-            raise serializers.ValidationError({
-                "detail": "Validation errors found.",
-                "errors": [{"row": e.row, "field": e.field, "message": e.message} for e in result.errors],
-            })
+            raise serializers.ValidationError(
+                {
+                    "detail": "Validation errors found.",
+                    "errors": [{"row": e.row, "field": e.field, "message": e.message} for e in result.errors],
+                }
+            )
 
         # Check batch size limit
         plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
@@ -203,22 +205,26 @@ class CertificateViewSet(NetBoxModelViewSet):
                         if on_duplicate == "skip":
                             skipped += 1
                             continue
-                        raise serializers.ValidationError({
-                            "detail": f"Duplicate certificate: {row['common_name']} "
-                                      f"(serial: {row['serial_number'][:20]})"
-                        })
+                        raise serializers.ValidationError(
+                            {
+                                "detail": f"Duplicate certificate: {row['common_name']} "
+                                f"(serial: {row['serial_number'][:20]})"
+                            }
+                        )
 
                     # Resolve tenant
                     tenant = None
                     tenant_ref = row.pop("tenant_ref", None)
                     if tenant_ref:
                         from tenancy.models import Tenant
+
                         try:
                             tenant = Tenant.objects.get(pk=int(tenant_ref))
                         except (ValueError, Tenant.DoesNotExist):
                             tenant = Tenant.objects.filter(name=tenant_ref).first()
 
                     from ..utils import detect_issuing_ca
+
                     issuing_ca = detect_issuing_ca(row["issuer"])
 
                     cert = Certificate.objects.create(
@@ -241,16 +247,17 @@ class CertificateViewSet(NetBoxModelViewSet):
                     cert.auto_detect_acme(save=True)
                     created_certs.append(cert)
         except IntegrityError as e:
-            raise serializers.ValidationError(
-                {"detail": f"Database error during import: {e}"}
-            ) from e
+            raise serializers.ValidationError({"detail": f"Database error during import: {e}"}) from e
 
         output = CertificateSerializer(created_certs, many=True, context={"request": request})
-        return Response({
-            "created_count": len(created_certs),
-            "skipped_count": skipped,
-            "certificates": output.data,
-        }, status=status.HTTP_201_CREATED)
+        return Response(
+            {
+                "created_count": len(created_certs),
+                "skipped_count": skipped,
+                "certificates": output.data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["post"], url_path="validate-chain")
     def validate_chain(self, request, pk=None):
