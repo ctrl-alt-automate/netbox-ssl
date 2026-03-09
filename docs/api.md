@@ -45,6 +45,7 @@ Base URL: `/api/plugins/netbox-ssl/`
 | `POST` | `/certificates/bulk-compliance-check/` | Bulk compliance check |
 | `POST` | `/certificates/{id}/detect-acme/` | Auto-detect ACME provider |
 | `POST` | `/certificates/bulk-detect-acme/` | Bulk ACME detection |
+| `POST` | `/certificates/bulk-data-import/` | Bulk import from CSV/JSON metadata |
 
 ### Certificate Authorities
 
@@ -342,6 +343,125 @@ if response.status_code == 201:
     print(f"Imported {result['created_count']} certificates")
 else:
     print(f"Error: {response.json()}")
+```
+
+---
+
+## Bulk CSV/JSON Import
+
+Import certificate metadata from CSV or JSON content via the API. Unlike `bulk-import` (which accepts PEM content), this endpoint accepts pre-extracted certificate metadata.
+
+### Endpoint
+
+`POST /api/plugins/netbox-ssl/certificates/bulk-data-import/`
+
+### Request Format
+
+```json
+{
+  "format": "json",
+  "content": "[{\"common_name\": \"example.com\", \"serial_number\": \"01:23:45\", ...}]",
+  "on_duplicate": "skip"
+}
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `content` | String | (required) | CSV or JSON content as a string |
+| `format` | String | `auto` | Format: `csv`, `json`, or `auto` (auto-detect) |
+| `on_duplicate` | String | `error` | Duplicate handling: `error` (reject) or `skip` (silently skip) |
+
+### Required Fields
+
+`common_name`, `serial_number`, `issuer`, `valid_from`, `valid_to`, `fingerprint_sha256`, `algorithm`
+
+### Optional Fields
+
+`key_size`, `status`, `sans`, `tenant`, `private_key_location`, `pem_content`, `issuer_chain`
+
+### Example Request (JSON)
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "format": "json",
+       "content": "[{\"common_name\":\"example.com\",\"serial_number\":\"01:23:45:67:89\",\"issuer\":\"CN=DigiCert CA\",\"valid_from\":\"2024-01-01\",\"valid_to\":\"2025-01-01\",\"fingerprint_sha256\":\"AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99\",\"algorithm\":\"rsa\",\"key_size\":2048}]",
+       "on_duplicate": "skip"
+     }' \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-data-import/
+```
+
+### Example Request (CSV)
+
+```bash
+curl -X POST \
+     -H "Authorization: Token $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "format": "csv",
+       "content": "common_name,serial_number,issuer,valid_from,valid_to,fingerprint_sha256,algorithm,key_size\nexample.com,01:23:45:67:89,CN=DigiCert CA,2024-01-01,2025-01-01,AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99,rsa,2048"
+     }' \
+     http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-data-import/
+```
+
+### Success Response (201 Created)
+
+```json
+{
+  "created_count": 2,
+  "skipped_count": 0,
+  "certificates": [
+    {
+      "id": 10,
+      "common_name": "example.com",
+      "serial_number": "01:23:45:67:89",
+      "status": "active"
+    }
+  ]
+}
+```
+
+### Validation Error Response (400 Bad Request)
+
+```json
+{
+  "detail": "Validation errors found.",
+  "errors": [
+    {
+      "row": 2,
+      "field": "algorithm",
+      "message": "Invalid algorithm 'dsa'. Must be one of: ecdsa, ed25519, rsa, unknown"
+    }
+  ]
+}
+```
+
+### Python Example
+
+```python
+import requests
+from pathlib import Path
+
+# Import from CSV file
+csv_content = Path("certificates.csv").read_text()
+
+response = requests.post(
+    "http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-data-import/",
+    headers={"Authorization": "Token YOUR_TOKEN"},
+    json={
+        "format": "csv",
+        "content": csv_content,
+        "on_duplicate": "skip",
+    }
+)
+
+if response.status_code == 201:
+    result = response.json()
+    print(f"Created {result['created_count']}, skipped {result['skipped_count']}")
+else:
+    print(f"Errors: {response.json()}")
 ```
 
 ---

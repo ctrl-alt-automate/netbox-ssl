@@ -36,8 +36,22 @@ The `CertificateExpiryNotification` script checks for certificates that are expi
 | `tenant` | Tenant | None | Filter results by tenant |
 | `include_expired` | Boolean | True | Include expired certificates in report |
 | `active_only` | Boolean | True | Only check Active certificates |
+| `send_email` | Boolean | False | Send email notification after script completes |
+| `email_recipients` | String | "" | Comma-separated email addresses (overrides plugin setting) |
 
 *Default values are taken from plugin configuration.
+
+### Email Notifications
+
+The script can send an HTML + plain-text email report with the expiry results. There are two ways to enable this:
+
+**Option 1: Always send via plugin settings** — Set `notification_email_enabled: True` in your plugin configuration (see [Configuration](configuration.md)). The script will automatically send email after every run.
+
+**Option 2: On-demand via script option** — Check the **Send Email** option when running the script manually, or pass `send_email: true` via the API. This overrides the plugin setting for a single run.
+
+You can override the default recipients by entering comma-separated email addresses in the **Email Recipients** field.
+
+> **Prerequisites:** Django's email backend must be configured on the NetBox server. See [Configuration — Email Notifications](configuration.md#email-notifications).
 
 ---
 

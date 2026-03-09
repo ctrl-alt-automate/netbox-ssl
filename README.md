@@ -72,6 +72,9 @@ PLUGINS_CONFIG = {
 |--------|------|---------|-------------|
 | `expiry_warning_days` | Integer | 30 | Certificates expiring within this many days show warning status |
 | `expiry_critical_days` | Integer | 14 | Certificates expiring within this many days show critical status |
+| `notification_email_enabled` | Boolean | False | Enable email notifications for expiry reports |
+| `notification_email_recipients` | List | [] | Default email recipients for notifications |
+| `bulk_import_max_batch_size` | Integer | 100 | Maximum certificates per bulk import request |
 
 See [Configuration](docs/configuration.md) for more options including custom fields, permissions, and webhooks.
 
@@ -129,8 +132,14 @@ Define compliance policies (minimum key size, forbidden algorithms, max validity
 ### Data Export
 Export certificates in CSV, JSON, YAML, or PEM bundle format with configurable field selection.
 
-### ACME Certificate Tracking
-Track Let's Encrypt and other ACME-issued certificates with auto-detection, renewal status, and provider metadata.
+### Bulk CSV/JSON Import
+Import certificate metadata from CSV or JSON files — paste content or upload a file. Two-step workflow with preview and validation before creating certificates. Also available via API.
+
+### ACME Certificate Monitoring
+Track Let's Encrypt and other ACME-issued certificates with auto-detection, renewal status, and provider metadata. Supports 7+ ACME providers.
+
+### Email Notifications
+Receive email alerts when certificates are expiring. Configurable recipients, thresholds, and subject prefix. Sends HTML + plain-text reports.
 
 ### Certificate Assignments
 Link certificates to the objects that use them:
@@ -153,8 +162,8 @@ Add the widget to your NetBox dashboard to see:
 
 | NetBox Version | Plugin Version | Status |
 |:--------------:|:--------------:|:------:|
-| 4.5.x          | 0.4.x          | ✅ Primary |
-| 4.4.x          | 0.4.x          | ✅ Supported |
+| 4.5.x          | 0.5.x          | ✅ Primary |
+| 4.4.x          | 0.5.x          | ✅ Supported |
 | 4.3.x and older| —              | ❌ Unsupported |
 
 ## 📚 Documentation
@@ -165,6 +174,7 @@ Full documentation is available in the [docs/](docs/index.md) folder:
 - **[Configuration](docs/configuration.md)** — Customize expiry thresholds and more
 - **[Usage Guide](docs/usage.md)** — Learn the workflows
 - **[API Reference](docs/api.md)** — REST API and GraphQL
+- **[Custom Scripts](docs/scripts.md)** — Expiry notifications and scheduling
 - **[Data Models](docs/data-models.md)** — Database schema details
 - **[Contributing](CONTRIBUTING.md)** — Contribution guidelines
 

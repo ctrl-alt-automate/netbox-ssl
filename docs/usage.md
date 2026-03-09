@@ -176,12 +176,74 @@ This prevents accidentally linking Production certificates to Development infras
 
 ## Bulk Operations
 
-### Bulk Import
+### Bulk PEM Import
 
-Import multiple certificates at once:
+Import multiple PEM certificates at once:
 1. Concatenate your PEM certificates in a single text block
 2. Paste into the import form
 3. Each certificate is imported separately
+
+### Bulk CSV/JSON Import
+
+Import certificate metadata from CSV or JSON files — ideal for migrations from spreadsheets or other systems.
+
+1. Navigate to **Plugins > SSL Certificates > Bulk Import**
+2. Paste CSV or JSON content, or upload a file (max 5 MB)
+3. The plugin auto-detects the format and validates all rows
+4. Review the preview table with validation results
+5. Click **Confirm Import** to create the certificates
+
+#### CSV Format
+
+```csv
+common_name,serial_number,issuer,valid_from,valid_to,fingerprint_sha256,algorithm,key_size,status,sans,tenant
+example.com,01:23:45:67:89,CN=DigiCert CA,2024-01-01,2025-01-01,AA:BB:CC:DD:...,rsa,2048,active,example.com;www.example.com,Production
+```
+
+#### JSON Format
+
+```json
+[
+  {
+    "common_name": "example.com",
+    "serial_number": "01:23:45:67:89",
+    "issuer": "CN=DigiCert CA",
+    "valid_from": "2024-01-01",
+    "valid_to": "2025-01-01",
+    "fingerprint_sha256": "AA:BB:CC:DD:...",
+    "algorithm": "rsa",
+    "key_size": 2048,
+    "status": "active",
+    "sans": ["example.com", "www.example.com"]
+  }
+]
+```
+
+#### Required Fields
+
+| Field | Description |
+|-------|-------------|
+| `common_name` | Certificate Common Name |
+| `serial_number` | Serial number (hex with colons) |
+| `issuer` | Issuer Distinguished Name |
+| `valid_from` | Start date (ISO 8601) |
+| `valid_to` | End date (ISO 8601) |
+| `fingerprint_sha256` | SHA256 fingerprint |
+| `algorithm` | `rsa`, `ecdsa`, `ed25519`, or `unknown` |
+
+#### Optional Fields
+
+| Field | Description |
+|-------|-------------|
+| `key_size` | Key size in bits |
+| `status` | `active`, `expired`, `replaced`, `revoked`, `pending` (default: `active`) |
+| `sans` | SANs — semicolon-separated in CSV, array in JSON |
+| `tenant` | Tenant name or ID |
+| `private_key_location` | Key storage location hint |
+| `pem_content` | Certificate PEM content |
+| `issuer_chain` | Chain of intermediate certificates |
+
+> **Tip:** Duplicate detection uses the `serial_number` + `issuer` combination. Duplicate rows are rejected by default. Via the API, you can use `on_duplicate: "skip"` to silently skip duplicates.
 
 ### Bulk Edit
 
@@ -457,6 +519,52 @@ curl -X POST \
 - SANs (comma-separated in CSV)
 - Chain validation status
 - Assignment count
+
+---
+
+## ACME Certificate Monitoring
+
+Track certificates issued via the ACME protocol (Let's Encrypt, ZeroSSL, Buypass, etc.).
+
+### Auto-Detection
+
+The plugin automatically detects ACME-issued certificates by analyzing the issuer field:
+
+- Import a certificate via Smart Paste or API
+- If the issuer matches a known ACME provider pattern, `is_acme` and `acme_provider` are set automatically
+- You can also trigger detection on existing certificates via the API
+
+### ACME Fields
+
+Each certificate can track:
+
+| Field | Description |
+|-------|-------------|
+| **Provider** | Let's Encrypt, ZeroSSL, Buypass, Google, etc. |
+| **Account Email** | ACME account email address |
+| **Challenge Type** | HTTP-01, DNS-01, or TLS-ALPN-01 |
+| **Server URL** | ACME server directory URL |
+| **Auto-Renewal** | Whether auto-renewal is configured |
+| **Last Renewed** | When the certificate was last renewed via ACME |
+| **Renewal Days** | Days before expiry to attempt renewal |
+
+### Filtering ACME Certificates
+
+In the certificate list view:
+- Use the **Is ACME** filter to show only ACME certificates
+- Use the **ACME Provider** filter to narrow down by provider
+- Use the **Auto-Renewal** filter to find certificates without auto-renewal
+
+### Renewal Status
+
+The plugin calculates a renewal status for ACME certificates:
+
+| Status | Description |
+|--------|-------------|
+| **OK** | Certificate valid, renewal not yet needed |
+| **Due** | Certificate is within its renewal window |
+| **Expired** | Certificate has already expired |
+| **Manual** | Auto-renewal is not configured |
 
 ---
 

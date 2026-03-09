@@ -31,6 +31,10 @@ Control when certificates show warning/critical status:
 |--------|------|---------|-------------|
 | `expiry_warning_days` | Integer | **30** | Days before expiry → Warning status |
 | `expiry_critical_days` | Integer | **14** | Days before expiry → Critical status |
+| `bulk_import_max_batch_size` | Integer | **100** | Maximum certificates per bulk import request |
+| `notification_email_enabled` | Boolean | **False** | Enable email notifications for expiry reports |
+| `notification_email_recipients` | List | **[]** | Default email recipients for notifications |
+| `notification_email_subject_prefix` | String | **[NetBox SSL]** | Subject line prefix for notification emails |
 
 **Example:** Alert earlier for production certificates:
 
@@ -39,6 +43,39 @@ PLUGINS_CONFIG = {
     "netbox_ssl": {
         "expiry_warning_days": 60,   # 2 months warning
         "expiry_critical_days": 30,  # 1 month critical
+    },
+}
+```
+
+### Email Notifications
+
+Send email alerts when certificates are expiring. Requires Django `EMAIL_*` settings to be configured on your NetBox server.
+
+```python
+PLUGINS_CONFIG = {
+    "netbox_ssl": {
+        "notification_email_enabled": True,
+        "notification_email_recipients": [
+            "infra-team@example.com",
+            "security@example.com",
+        ],
+        "notification_email_subject_prefix": "[NetBox SSL]",
+    },
+}
+```
+
+The email notification is triggered by the **Certificate Expiry Notification** script (see [Scripts](scripts.md)). When `notification_email_enabled` is `True`, the script automatically sends an HTML + plain-text email report after each run.
+
+> **Prerequisites:** Django's email backend must be configured. At minimum, set `EMAIL_HOST`, `EMAIL_PORT`, and `DEFAULT_FROM_EMAIL` in your NetBox `configuration.py`.
+
+### Bulk Import
+
+Control the batch size limit for CSV/JSON bulk imports:
+
+```python
+PLUGINS_CONFIG = {
+    "netbox_ssl": {
+        "bulk_import_max_batch_size": 200,  # Allow up to 200 certificates per import
     },
 }
 ```
