@@ -75,6 +75,8 @@ PLUGINS_CONFIG = {
 | `notification_email_enabled` | Boolean | False | Enable email notifications for expiry reports |
 | `notification_email_recipients` | List | [] | Default email recipients for notifications |
 | `bulk_import_max_batch_size` | Integer | 100 | Maximum certificates per bulk import request |
+| `expiry_scan_thresholds` | List | [14, 30, 60, 90] | Days-before-expiry thresholds for the expiry scan script |
+| `expiry_scan_cooldown_hours` | Integer | 24 | Minimum hours between duplicate event notifications |
 
 See [Configuration](docs/configuration.md) for more options including custom fields, permissions, and webhooks.
 
@@ -162,8 +164,8 @@ Add the widget to your NetBox dashboard to see:
 
 | NetBox Version | Plugin Version | Status |
 |:--------------:|:--------------:|:------:|
-| 4.5.x          | 0.5.x          | ✅ Primary |
-| 4.4.x          | 0.5.x          | ✅ Supported |
+| 4.5.x          | 0.6.x          | ✅ Primary |
+| 4.4.x          | 0.6.x          | ✅ Supported |
 | 4.3.x and older| —              | ❌ Unsupported |
 
 ## 📚 Documentation
