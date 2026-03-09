@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added dev optional-dependencies for contributor setup
 - Updated CHANGELOG for v0.5.0 release
 - CI now tests against Python 3.10, 3.11, and 3.12
+- Added undeclared plugin settings to `default_settings`: `max_export_size`, `bulk_validate_max_batch_size`, `bulk_compliance_max_batch_size`, `bulk_detect_max_batch_size`
 
 ## [0.5.0] - 2026-03-09
 
