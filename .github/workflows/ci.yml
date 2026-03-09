@@ -98,7 +98,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          python -m pytest tests/test_parser.py tests/test_models.py -v -p no:django
+          python -m pytest tests/test_parser.py tests/test_models.py tests/test_events.py tests/test_expiry_scan.py -v -p no:django
 
   integration-tests:
     name: Integration Tests (NetBox ${{ matrix.netbox_major }})

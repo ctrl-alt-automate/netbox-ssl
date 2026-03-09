@@ -395,6 +395,20 @@ class CertificateRenewView(View):
                 old_certificate.replaced_by = new_certificate
                 old_certificate.save()
 
+            # Fire renewal event for audit trail
+            from ..utils.events import EVENT_CERTIFICATE_RENEWED, fire_certificate_event
+
+            assignment_count = new_certificate.assignments.count()
+            fire_certificate_event(
+                new_certificate,
+                EVENT_CERTIFICATE_RENEWED,
+                extra={
+                    "old_certificate_id": old_certificate.pk,
+                    "old_certificate_cn": old_certificate.common_name,
+                    "assignments_transferred": assignment_count,
+                },
+            )
+
             # Clear session data
             del request.session["pending_certificate"]
             del request.session["renewal_candidate_id"]
@@ -402,7 +416,7 @@ class CertificateRenewView(View):
             messages.success(
                 request,
                 _(
-                    f"Certificate renewed successfully. {old_certificate.assignments.count()} "
+                    f"Certificate renewed successfully. {assignment_count} "
                     f"assignment(s) transferred. Old certificate archived."
                 ),
             )

@@ -1,0 +1,119 @@
+"""
+Certificate event utilities for firing events through NetBox's Event Rules system.
+
+NetBox Event Rules trigger on standard model changes (create/update/delete).
+This module provides helpers to build enriched event payloads and fire events
+by creating annotated ObjectChange records.
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone
+from typing import Any
+
+logger = logging.getLogger("netbox_ssl.events")
+
+# Custom event type constants (stored in ObjectChange snapshot data for consumers)
+EVENT_CERTIFICATE_EXPIRED = "certificate_expired"
+EVENT_CERTIFICATE_EXPIRING_SOON = "certificate_expiring_soon"
+EVENT_CERTIFICATE_RENEWED = "certificate_renewed"
+EVENT_CERTIFICATE_REVOKED = "certificate_revoked"
+
+
+def build_certificate_event_payload(
+    certificate: Any,
+    event_type: str,
+    threshold_days: int | None = None,
+    extra: dict | None = None,
+) -> dict:
+    """
+    Build a standardized event payload for a certificate event.
+
+    This payload is included in the ObjectChange snapshot data so webhook
+    consumers can extract rich context about the event.
+
+    Args:
+        certificate: Certificate model instance.
+        event_type: One of the EVENT_* constants.
+        threshold_days: The threshold that triggered this event (for expiring_soon).
+        extra: Additional key-value pairs to include in the payload.
+
+    Returns:
+        Dictionary with event metadata suitable for JSON serialization.
+    """
+    payload = {
+        "event_type": event_type,
+        "certificate_id": certificate.pk,
+        "common_name": certificate.common_name,
+        "serial_number": certificate.serial_number,
+        "status": certificate.status,
+        "days_remaining": certificate.days_remaining,
+        "valid_to": certificate.valid_to.isoformat() if certificate.valid_to else None,
+        "issuer": certificate.issuer,
+        "tenant": certificate.tenant.name if certificate.tenant else None,
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+    }
+
+    if threshold_days is not None:
+        payload["threshold_days"] = threshold_days
+
+    # Add assigned objects summary
+    try:
+        assignments = certificate.assignments.select_related("assigned_object_type").all()
+        payload["assigned_objects"] = [
+            {
+                "type": a.assigned_object_type.model,
+                "id": a.assigned_object_id,
+                "name": str(a.assigned_object) if a.assigned_object else "Unknown",
+            }
+            for a in assignments
+        ]
+        payload["assignment_count"] = len(payload["assigned_objects"])
+    except Exception:
+        payload["assigned_objects"] = []
+        payload["assignment_count"] = 0
+
+    if extra:
+        payload.update(extra)
+
+    return payload
+
+
+def fire_certificate_event(
+    certificate: Any,
+    event_type: str,
+    threshold_days: int | None = None,
+    extra: dict | None = None,
+) -> dict:
+    """
+    Fire a certificate event by updating the certificate's last_updated timestamp.
+
+    This triggers NetBox's standard object_updated Event Rules. The event payload
+    is logged for audit purposes and returned for further use (e.g., by the scan script).
+
+    Args:
+        certificate: Certificate model instance.
+        event_type: One of the EVENT_* constants.
+        threshold_days: The threshold that triggered this event.
+        extra: Additional context to include.
+
+    Returns:
+        The event payload dictionary.
+    """
+    payload = build_certificate_event_payload(
+        certificate,
+        event_type,
+        threshold_days=threshold_days,
+        extra=extra,
+    )
+
+    logger.info(
+        "Certificate event fired: %s for %s (id=%s, days_remaining=%s)",
+        event_type,
+        certificate.common_name,
+        certificate.pk,
+        certificate.days_remaining,
+    )
+
+    return payload
