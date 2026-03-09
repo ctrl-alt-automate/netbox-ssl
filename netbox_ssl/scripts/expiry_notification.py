@@ -10,7 +10,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.utils import timezone
-from extras.scripts import BooleanVar, IntegerVar, ObjectVar, Script
+from extras.scripts import BooleanVar, IntegerVar, ObjectVar, Script, StringVar
 
 from netbox_ssl.models import Certificate, CertificateStatusChoices
 
@@ -53,6 +53,15 @@ class CertificateExpiryNotification(Script):
     active_only = BooleanVar(
         description="Only check certificates with 'Active' status",
         default=True,
+    )
+    send_email = BooleanVar(
+        description="Send email notification (uses plugin setting if not set)",
+        default=False,
+    )
+    email_recipients = StringVar(
+        description="Comma-separated email addresses (overrides plugin setting)",
+        required=False,
+        default="",
     )
 
     def get_plugin_setting(self, setting_name, default=None):
@@ -168,10 +177,41 @@ class CertificateExpiryNotification(Script):
 
         self.log_info(f"\n{'=' * 60}")
 
+        # Build report data for return and email
+        report_data = self._build_report_data(expired, critical, warning, now, warning_days, critical_days, tenant,
+                                              active_only, include_expired)
+
+        # Send email notification if requested
+        send_email_flag = data.get("send_email", False)
+        email_recipients_str = data.get("email_recipients", "")
+
+        if send_email_flag or self.get_plugin_setting("notification_email_enabled", False):
+            from netbox_ssl.utils.email import send_expiry_report
+
+            recipients = None
+            if email_recipients_str:
+                recipients = [e.strip() for e in email_recipients_str.split(",") if e.strip()]
+
+            base_url = getattr(settings, "BASE_URL", "") or ""
+
+            try:
+                sent = send_expiry_report(report_data, recipients=recipients, base_url=base_url)
+                if sent:
+                    self.log_success("Email notification sent successfully")
+                else:
+                    self.log_info("Email not sent (disabled, no recipients, or no alerts)")
+            except Exception as e:
+                self.log_warning(f"Email sending failed: {e}")
+
+        return report_data
+
+    def _build_report_data(self, expired, critical, warning, now, warning_days, critical_days, tenant, active_only,
+                           include_expired):
+        """Build the structured report data dict."""
         # Return structured data for webhook consumption
         return {
             "summary": {
-                "total_alerts": total_alerts,
+                "total_alerts": len(expired) + len(critical) + len(warning),
                 "expired_count": len(expired),
                 "critical_count": len(critical),
                 "warning_count": len(warning),

@@ -30,6 +30,11 @@ urlpatterns = [
         name="certificate_renew",
     ),
     path(
+        "certificates/bulk-import/",
+        views.CertificateBulkDataImportView.as_view(),
+        name="certificate_bulk_import",
+    ),
+    path(
         "certificates/edit/",
         views.CertificateBulkEditView.as_view(),
         name="certificate_bulk_edit",

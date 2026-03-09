@@ -64,8 +64,11 @@ jobs:
                   'netbox_ssl/templates/netbox_ssl/certificate.html',
                   'netbox_ssl/templates/netbox_ssl/certificate_list.html',
                   'netbox_ssl/templates/netbox_ssl/certificate_import.html',
+                  'netbox_ssl/templates/netbox_ssl/certificate_bulk_import.html',
                   'netbox_ssl/templates/netbox_ssl/certificateassignment.html',
                   'netbox_ssl/templates/netbox_ssl/certificateassignment_list.html',
+                  'netbox_ssl/templates/netbox_ssl/email/expiry_report.html',
+                  'netbox_ssl/templates/netbox_ssl/email/expiry_report.txt',
               ]
               missing = [f for f in required if f not in names]
               if missing:

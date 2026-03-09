@@ -6,7 +6,7 @@ Tests the detect_issuing_ca function and helper functions.
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -23,7 +23,6 @@ if "netbox" not in sys.modules:
 from netbox_ssl.utils.ca_detector import (
     _extract_cn_from_issuer,
     _guess_ca_type,
-    detect_issuing_ca,
 )
 
 

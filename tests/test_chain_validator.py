@@ -25,11 +25,9 @@ if "netbox" not in sys.modules:
     sys.modules["utilities.choices"] = MagicMock()
 
 from netbox_ssl.utils.chain_validator import (
-    ChainValidationResult,
     ChainValidationStatus,
     ChainValidator,
 )
-
 
 # Self-signed test certificate
 SELF_SIGNED_CERT = """-----BEGIN CERTIFICATE-----
@@ -174,7 +172,7 @@ class TestValidationTimestamp:
     @pytest.mark.unit
     def test_validated_at_is_recent(self):
         """Test that validated_at is a recent timestamp."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
 
         result = ChainValidator.validate(SELF_SIGNED_CERT, "")
 

@@ -12,6 +12,7 @@ from utilities.forms.fields import CommentField, DynamicModelChoiceField, TagFil
 from utilities.forms.rendering import FieldSet
 
 from ..models import (
+    ACMEProviderChoices,
     Certificate,
     CertificateAlgorithmChoices,
     CertificateAuthority,
@@ -67,6 +68,16 @@ class CertificateForm(NetBoxModelForm):
             name=_("Certificate Data"),
         ),
         FieldSet(
+            "is_acme",
+            "acme_provider",
+            "acme_account_email",
+            "acme_challenge_type",
+            "acme_server_url",
+            "acme_auto_renewal",
+            "acme_renewal_days",
+            name=_("ACME"),
+        ),
+        FieldSet(
             "tags",
             name=_("Tags"),
         ),
@@ -90,6 +101,13 @@ class CertificateForm(NetBoxModelForm):
             "private_key_location",
             "tenant",
             "pem_content",
+            "is_acme",
+            "acme_provider",
+            "acme_account_email",
+            "acme_challenge_type",
+            "acme_server_url",
+            "acme_auto_renewal",
+            "acme_renewal_days",
             "tags",
             "comments",
         ]
@@ -201,6 +219,11 @@ class CertificateFilterForm(NetBoxModelFilterSetForm):
             "tenant_id",
             name=_("Tenant"),
         ),
+        FieldSet(
+            "is_acme",
+            "acme_provider",
+            name=_("ACME"),
+        ),
     )
 
     common_name = forms.CharField(
@@ -234,6 +257,15 @@ class CertificateFilterForm(NetBoxModelFilterSetForm):
         queryset=Tenant.objects.all(),
         required=False,
         label=_("Tenant"),
+    )
+    is_acme = forms.NullBooleanField(
+        required=False,
+        label=_("ACME Managed"),
+    )
+    acme_provider = forms.MultipleChoiceField(
+        choices=ACMEProviderChoices,
+        required=False,
+        label=_("ACME Provider"),
     )
     tag = TagFilterField(model)
 

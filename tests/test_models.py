@@ -31,13 +31,11 @@ _in_netbox_env = os.path.exists("/opt/netbox/netbox/netbox/settings.py") or "DJA
 if _in_netbox_env:
     # Running in Docker with NetBox: set up Django first
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "netbox.settings")
-    import django
+    import contextlib
 
-    try:
+    import django
+    with contextlib.suppress(RuntimeError):
         django.setup()
-    except RuntimeError:
-        # Already set up
-        pass
     NETBOX_AVAILABLE = True
 else:
     # Local testing: mock netbox modules
@@ -65,7 +63,7 @@ from django.utils import timezone
 # Try to import real NetBox models (only if NETBOX_AVAILABLE)
 if NETBOX_AVAILABLE:
     try:
-        from netbox_ssl.models import Certificate, CertificateAssignment
+        from netbox_ssl.models import Certificate, CertificateAssignment  # noqa: F401
     except (ImportError, ModuleNotFoundError) as e:
         print(f"Warning: Could not import netbox_ssl models: {e}")
         NETBOX_AVAILABLE = False
@@ -420,10 +418,12 @@ class TestMultiTenancyValidation:
         assignment.certificate_id = 1  # Set a fake ID
 
         # Patch the properties to return our mocks
-        with patch.object(CertificateAssignment, "certificate", new_callable=lambda: property(lambda s: mock_cert)):
-            with patch.object(
+        with (
+            patch.object(CertificateAssignment, "certificate", new_callable=lambda: property(lambda s: mock_cert)),
+            patch.object(
                 CertificateAssignment, "assigned_object", new_callable=lambda: property(lambda s: mock_device)
-            ):
+            ),
+        ):
                 # Test that clean raises ValidationError
                 with pytest.raises(ValidationError) as exc_info:
                     assignment.clean()

@@ -48,6 +48,12 @@ class CertificateTable(NetBoxTable):
         accessor="assignments__count",
         orderable=False,
     )
+    is_acme = columns.BooleanColumn(
+        verbose_name="ACME",
+    )
+    acme_provider = columns.ChoiceFieldColumn(
+        verbose_name="ACME Provider",
+    )
     tags = columns.TagColumn(
         url_name="plugins:netbox_ssl:certificate_list",
     )
@@ -68,6 +74,8 @@ class CertificateTable(NetBoxTable):
             "key_size",
             "tenant",
             "assignment_count",
+            "is_acme",
+            "acme_provider",
             "tags",
         )
         default_columns = (

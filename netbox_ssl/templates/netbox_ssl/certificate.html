@@ -109,6 +109,72 @@
   </div>
 </div>
 
+{% if object.is_acme %}
+<div class="row mb-3">
+  <div class="col col-12">
+    <div class="card">
+      <h5 class="card-header">ACME / Auto-Renewal</h5>
+      <div class="card-body">
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">ACME Provider</th>
+            <td>{% badge object.get_acme_provider_display bg_color="green" %}</td>
+          </tr>
+          {% if object.acme_challenge_type %}
+          <tr>
+            <th scope="row">Challenge Type</th>
+            <td>{% badge object.get_acme_challenge_type_display %}</td>
+          </tr>
+          {% endif %}
+          {% if object.acme_account_email %}
+          <tr>
+            <th scope="row">Account Email</th>
+            <td>{{ object.acme_account_email }}</td>
+          </tr>
+          {% endif %}
+          {% if object.acme_server_url %}
+          <tr>
+            <th scope="row">ACME Server</th>
+            <td><code class="small">{{ object.acme_server_url }}</code></td>
+          </tr>
+          {% endif %}
+          <tr>
+            <th scope="row">Auto Renewal</th>
+            <td>{% checkmark object.acme_auto_renewal %}</td>
+          </tr>
+          {% if object.acme_last_renewed %}
+          <tr>
+            <th scope="row">Last Renewed</th>
+            <td>{{ object.acme_last_renewed|date:"Y-m-d H:i" }}</td>
+          </tr>
+          {% endif %}
+          {% if object.acme_renewal_days %}
+          <tr>
+            <th scope="row">Renewal Window</th>
+            <td>{{ object.acme_renewal_days }} days before expiry</td>
+          </tr>
+          {% endif %}
+          <tr>
+            <th scope="row">Renewal Status</th>
+            <td>
+              {% if object.acme_renewal_status == "ok" %}
+                <span class="badge text-bg-success">OK</span>
+              {% elif object.acme_renewal_status == "due" %}
+                <span class="badge text-bg-warning">Renewal Due</span>
+              {% elif object.acme_renewal_status == "expired" %}
+                <span class="badge text-bg-danger">Expired</span>
+              {% elif object.acme_renewal_status == "manual" %}
+                <span class="badge text-bg-info">Manual</span>
+              {% endif %}
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% if object.status == 'active' or object.status == 'expired' %}
 <div class="row mb-3">
   <div class="col col-12">

@@ -5,10 +5,40 @@ Tests the ACME detection, provider identification, and renewal status tracking
 for certificates issued via ACME protocol (Let's Encrypt, ZeroSSL, etc.).
 """
 
-from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
+import sys
+from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
+
+# Mock netbox/django modules for local testing without NetBox
+_project_root = Path(__file__).parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+for mod in ("netbox", "netbox.plugins", "netbox.models",
+            "django.contrib.contenttypes", "django.contrib.contenttypes.fields",
+            "django.contrib.contenttypes.models",
+            "django.contrib.postgres.fields", "django.contrib.postgres.indexes"):
+    if mod not in sys.modules:
+        sys.modules[mod] = MagicMock()
+
+# Provide a real ChoiceSet base class so model choice classes work
+_choices_mock = MagicMock()
+
+
+class _FakeChoiceSet:
+    """Minimal stand-in for utilities.choices.ChoiceSet."""
+    CHOICES = []
+
+
+_choices_mock.ChoiceSet = _FakeChoiceSet
+sys.modules["utilities.choices"] = _choices_mock
+
+# Force re-import of model modules with our ChoiceSet mock
+for mod in list(sys.modules):
+    if mod.startswith("netbox_ssl.models"):
+        del sys.modules[mod]
 
 # Mark all tests in this module as unit tests
 pytestmark = pytest.mark.unit
@@ -48,17 +78,7 @@ class TestACMEProviderDetection:
     def test_detect_acme_provider(self, issuer, expected_provider):
         """Test that ACME providers are correctly detected from issuer strings."""
         # Import the actual model and patterns
-        from netbox_ssl.models.certificates import (
-            ACMEProviderChoices,
-            Certificate,
-            _ACME_PATTERNS,
-        )
-
-        # Create a mock certificate with the issuer
-        cert = MagicMock(spec=Certificate)
-        cert.issuer = issuer
-        cert.is_acme = False
-        cert.acme_provider = ""
+        from netbox_ssl.models.certificates import _ACME_PATTERNS
 
         # Call the actual detection logic
         issuer_lower = issuer.lower()
@@ -273,7 +293,7 @@ class TestACMEPatterns:
 
     def test_acme_patterns_contains_all_providers(self):
         """Test that _ACME_PATTERNS contains patterns for all providers."""
-        from netbox_ssl.models.certificates import ACMEProviderChoices, _ACME_PATTERNS
+        from netbox_ssl.models.certificates import _ACME_PATTERNS, ACMEProviderChoices
 
         # All providers except 'other' should have at least one pattern
         providers_with_patterns = set(_ACME_PATTERNS.values())
@@ -432,7 +452,7 @@ class TestACMEIntegrationScenarios:
 
     def test_staging_certificate_identification(self):
         """Test that staging certificates are correctly identified."""
-        from netbox_ssl.models.certificates import ACMEProviderChoices, _ACME_PATTERNS
+        from netbox_ssl.models.certificates import _ACME_PATTERNS, ACMEProviderChoices
 
         staging_issuers = [
             "CN=(STAGING) Pretend Pear X1",
@@ -473,7 +493,7 @@ class TestACMEIntegrationScenarios:
 
     def test_digicert_detection(self):
         """Test that DigiCert ACME certificates are detected."""
-        from netbox_ssl.models.certificates import ACMEProviderChoices, _ACME_PATTERNS
+        from netbox_ssl.models.certificates import _ACME_PATTERNS, ACMEProviderChoices
 
         issuer = "CN=DigiCert TLS RSA SHA256 2020 CA1, O=DigiCert Inc"
         issuer_lower = issuer.lower()

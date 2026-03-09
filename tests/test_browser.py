@@ -457,10 +457,6 @@ class TestMultiTenancyUI:
         page.wait_for_load_state("networkidle")
 
         # Should have tenant field
-        content = page.content().lower()
-        # Look for tenant in the page (field or label)
-        has_tenant = "tenant" in content
-
         # Page should at least load without errors
         assert "Server Error" not in page.content()
 
@@ -479,9 +475,6 @@ class TestMultiTenancyUI:
         page.goto(f"{NETBOX_BASE_URL}/plugins/ssl/certificates/")
 
         page.wait_for_load_state("networkidle")
-
-        # Filter form should be accessible
-        content = page.content().lower()
 
         # Page should load - tenant filter may or may not be visible
         assert "Server Error" not in page.content()

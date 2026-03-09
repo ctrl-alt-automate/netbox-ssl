@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "netbox-ssl"
-version = "0.4.2"
+version = "0.5.0"
 description = "NetBox plugin for TLS/SSL certificate management - Project Janus"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -58,6 +58,10 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "C4", "SIM"]
 ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test files require mock setup before imports
+"tests/*.py" = ["E402"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["netbox_ssl"]
