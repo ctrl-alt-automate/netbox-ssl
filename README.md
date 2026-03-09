@@ -32,7 +32,7 @@ Managing SSL certificates across your infrastructure shouldn't be a scavenger hu
 - 🔒 **Security first** — Private keys are never stored, only location hints for your secret management system
 - 🎯 **Deep integration** — Certificates link directly to NetBox Services, Devices, and VMs
 
-## 🚀 Quick Start
+## Installation
 
 ```bash
 pip install netbox-ssl
@@ -100,7 +100,7 @@ See [Configuration](docs/configuration.md) for more options including custom fie
   </tr>
 </table>
 
-## 🎯 Key Features
+## Features
 
 ### Smart Paste Import
 Just paste your PEM certificate — the plugin extracts everything automatically: Common Name, SANs, validity dates, issuer chain, fingerprints, and more.
@@ -153,8 +153,8 @@ Add the widget to your NetBox dashboard to see:
 
 | NetBox Version | Plugin Version | Status |
 |:--------------:|:--------------:|:------:|
-| 4.5.x          | 0.4.x          | ✅ Primary |
-| 4.4.x          | 0.4.x          | ✅ Supported |
+| 4.5.x          | 0.5.x          | ✅ Primary |
+| 4.4.x          | 0.5.x          | ✅ Supported |
 | 4.3.x and older| —              | ❌ Unsupported |
 
 ## 📚 Documentation
