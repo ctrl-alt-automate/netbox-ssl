@@ -7,7 +7,7 @@ Provides a "Single Source of Truth" for certificate inventory and lifecycle mana
 
 from netbox.plugins import PluginConfig
 
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 
 
 class NetBoxSSLConfig(PluginConfig):
@@ -34,6 +34,8 @@ class NetBoxSSLConfig(PluginConfig):
         "notification_email_enabled": False,
         "notification_email_recipients": [],
         "notification_email_subject_prefix": "[NetBox SSL]",
+        "expiry_scan_thresholds": [14, 30, 60, 90],
+        "expiry_scan_cooldown_hours": 24,
     }
 
     def ready(self):

@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-03-09
+
+### Added
+
+- **NetBox Event Rules Integration** ([#41](https://github.com/ctrl-alt-automate/netbox-ssl/issues/41)):
+  - Certificate status transitions (expired, revoked, replaced) are logged with enriched context
+  - Renewal events include old certificate reference and assignment transfer count
+  - Event payloads contain: certificate ID, common_name, days_remaining, status, assigned objects
+  - Documentation with Slack, Microsoft Teams, and PagerDuty webhook examples
+
+- **Scheduled Certificate Expiry Scan** ([#42](https://github.com/ctrl-alt-automate/netbox-ssl/issues/42)):
+  - New `CertificateExpiryScan` NetBox Script for periodic expiry scanning
+  - Configurable thresholds via `expiry_scan_thresholds` setting (default: 14, 30, 60, 90 days)
+  - Idempotent: cooldown window prevents duplicate events (default: 24 hours)
+  - New `CertificateEventLog` model for tracking fired events and audit trail
+  - Per-tenant filtering support
+  - Dry-run mode for testing without firing events
+  - Automatic cleanup of old event log entries (90 days)
+  - Plugin settings: `expiry_scan_thresholds`, `expiry_scan_cooldown_hours`
+
+- **Certificate Changelog Enrichment** ([#43](https://github.com/ctrl-alt-automate/netbox-ssl/issues/43)):
+  - Changelog snapshots include computed fields: `days_remaining`, `expiry_status`, `assignment_count`
+  - Status transitions produce clear "before → after" diffs in the changelog
+  - Renewal events create enriched changelog entries for both old and new certificates
+  - Assignment changes (add/remove) update the parent certificate's changelog
+
 ## [0.5.1] - 2026-03-09
 
 ### Fixed
@@ -273,6 +299,7 @@ Initial release of NetBox SSL Plugin.
 - NetBox 4.4.0 - 4.5.x
 - Python 3.10+
 
+[0.6.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.4.0...v0.4.1

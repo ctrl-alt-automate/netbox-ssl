@@ -5,6 +5,7 @@ This model represents a unique certificate as a "Library Item" that can be
 assigned to multiple services, devices, or virtual machines.
 """
 
+import logging
 from datetime import date
 
 from django.contrib.postgres.fields import ArrayField
@@ -14,6 +15,8 @@ from django.urls import reverse
 from django.utils import timezone
 from netbox.models import NetBoxModel
 from utilities.choices import ChoiceSet
+
+logger = logging.getLogger("netbox_ssl.models")
 
 
 class CertificateStatusChoices(ChoiceSet):
@@ -323,6 +326,46 @@ class Certificate(NetBoxModel):
         indexes = [
             GinIndex(fields=["sans"], name="netbox_ssl_cert_sans_gin"),
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Track original status for change detection in save()
+        self._original_status = self.status if self.pk else None
+
+    def save(self, *args, **kwargs):
+        """Save with status transition detection and event logging."""
+        status_changed = self.pk and self._original_status and self._original_status != self.status
+
+        super().save(*args, **kwargs)
+
+        # Log status transitions for changelog/audit
+        if status_changed:
+            logger.info(
+                "Certificate %s (id=%s) status changed: %s → %s",
+                self.common_name,
+                self.pk,
+                self._original_status,
+                self.status,
+            )
+
+        # Update tracked status after save
+        self._original_status = self.status
+
+    def snapshot(self):
+        """
+        Enrich the changelog snapshot with computed fields.
+
+        NetBox calls this method to capture object state for changelog diffs.
+        By adding computed fields, the changelog shows more useful information.
+        """
+        data = super().snapshot()
+        # Add computed fields to the snapshot for richer changelog diffs
+        data["days_remaining"] = self.days_remaining
+        data["expiry_status"] = self.expiry_status
+        data["assignment_count"] = self.assignments.count() if self.pk else 0
+        if self.replaced_by_id:
+            data["replaced_by_name"] = str(self.replaced_by) if self.replaced_by else None
+        return data
 
     def __str__(self):
         if self.valid_to:

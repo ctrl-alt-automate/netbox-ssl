@@ -276,6 +276,15 @@ class CertificateRenewView(View):
 
     template_name = "netbox_ssl/certificate_renew.html"
 
+    def dispatch(self, request, *args, **kwargs):
+        """Check permissions before dispatching."""
+        if not request.user.has_perm("netbox_ssl.add_certificate") or not request.user.has_perm(
+            "netbox_ssl.change_certificate"
+        ):
+            messages.error(request, _("You do not have permission to renew certificates."))
+            return redirect(reverse("plugins:netbox_ssl:certificate_list"))
+        return super().dispatch(request, *args, **kwargs)
+
     def get(self, request):
         """Display the renewal confirmation page."""
         pending_data = request.session.get("pending_certificate")
@@ -395,6 +404,20 @@ class CertificateRenewView(View):
                 old_certificate.replaced_by = new_certificate
                 old_certificate.save()
 
+            # Fire renewal event for audit trail
+            from ..utils.events import EVENT_CERTIFICATE_RENEWED, fire_certificate_event
+
+            assignment_count = new_certificate.assignments.count()
+            fire_certificate_event(
+                new_certificate,
+                EVENT_CERTIFICATE_RENEWED,
+                extra={
+                    "old_certificate_id": old_certificate.pk,
+                    "old_certificate_cn": old_certificate.common_name,
+                    "assignments_transferred": assignment_count,
+                },
+            )
+
             # Clear session data
             del request.session["pending_certificate"]
             del request.session["renewal_candidate_id"]
@@ -402,7 +425,7 @@ class CertificateRenewView(View):
             messages.success(
                 request,
                 _(
-                    f"Certificate renewed successfully. {old_certificate.assignments.count()} "
+                    f"Certificate renewed successfully. {assignment_count} "
                     f"assignment(s) transferred. Old certificate archived."
                 ),
             )
