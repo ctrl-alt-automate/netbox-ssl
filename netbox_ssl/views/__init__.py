@@ -14,6 +14,7 @@ from .certificate_authorities import (
     CertificateAuthorityView,
 )
 from .certificates import (
+    CertificateBulkDataImportView,
     CertificateBulkDeleteView,
     CertificateBulkEditView,
     CertificateDeleteView,
@@ -43,6 +44,7 @@ __all__ = [
     "CertificateBulkDeleteView",
     "CertificateImportView",
     "CertificateRenewView",
+    "CertificateBulkDataImportView",
     # CSR views
     "CertificateSigningRequestListView",
     "CertificateSigningRequestView",

@@ -208,7 +208,7 @@ class TestCSVExport:
         writer = csv.DictWriter(output, fieldnames=fieldnames)
         writer.writeheader()
 
-        for cert in certs:
+        for _cert in certs:
             writer.writerow({})
 
         csv_content = output.getvalue()

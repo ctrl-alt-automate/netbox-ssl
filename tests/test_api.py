@@ -14,7 +14,7 @@ import pytest
 def parser_available():
     """Check if the CertificateParser can be imported."""
     try:
-        from netbox_ssl.utils.parser import CertificateParser
+        from netbox_ssl.utils.parser import CertificateParser  # noqa: F401
 
         return True
     except (ImportError, ModuleNotFoundError):

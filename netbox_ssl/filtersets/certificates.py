@@ -8,6 +8,7 @@ from netbox.filtersets import NetBoxModelFilterSet
 from tenancy.models import Tenant
 
 from ..models import (
+    ACMEProviderChoices,
     Certificate,
     CertificateAlgorithmChoices,
     CertificateAuthority,
@@ -96,6 +97,16 @@ class CertificateFilterSet(NetBoxModelFilterSet):
     has_assignments = django_filters.BooleanFilter(
         method="filter_has_assignments",
         label="Has Assignments",
+    )
+    is_acme = django_filters.BooleanFilter(
+        label="ACME Managed",
+    )
+    acme_provider = django_filters.MultipleChoiceFilter(
+        choices=ACMEProviderChoices,
+        label="ACME Provider",
+    )
+    acme_auto_renewal = django_filters.BooleanFilter(
+        label="ACME Auto Renewal",
     )
 
     class Meta:

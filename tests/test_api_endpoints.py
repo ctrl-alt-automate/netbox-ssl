@@ -315,8 +315,7 @@ class TestCertificateAPI:
         """Test POST /certificates/import/ rejects PEM with private key."""
 
         pem_with_key = (
-            TEST_CERTIFICATE_PEM
-            + "\n-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0B\n-----END PRIVATE KEY-----"
+            TEST_CERTIFICATE_PEM + "\n-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0B\n-----END PRIVATE KEY-----"
         )
         import_data = {"pem_content": pem_with_key}
 
@@ -458,9 +457,7 @@ class TestCertificateComplianceAPI:
         """Test POST /certificates/bulk-compliance-check/ runs bulk compliance."""
         cert_ids = [test_certificate["id"]]
 
-        resp = api_client.post(
-            f"{API_BASE}/certificates/bulk-compliance-check/", json={"certificate_ids": cert_ids}
-        )
+        resp = api_client.post(f"{API_BASE}/certificates/bulk-compliance-check/", json={"certificate_ids": cert_ids})
         assert resp.status_code == 200
         data = resp.json()
         assert "total_certificates" in data

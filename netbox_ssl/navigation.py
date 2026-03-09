@@ -29,6 +29,11 @@ menu = PluginMenu(
                     permissions=["netbox_ssl.add_certificate"],
                 ),
                 PluginMenuItem(
+                    link="plugins:netbox_ssl:certificate_bulk_import",
+                    link_text="Bulk Import (CSV/JSON)",
+                    permissions=["netbox_ssl.add_certificate"],
+                ),
+                PluginMenuItem(
                     link="plugins:netbox_ssl:certificateassignment_list",
                     link_text="Assignments",
                     permissions=["netbox_ssl.view_certificateassignment"],

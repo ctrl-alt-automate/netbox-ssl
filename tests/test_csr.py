@@ -4,6 +4,7 @@ Unit tests for the CSR parser utility and CSR model.
 These tests verify CSR PEM parsing and attribute extraction.
 """
 
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -15,8 +16,14 @@ _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-# Mock netbox.plugins if not available (for local testing without NetBox)
-if "netbox" not in sys.modules:
+# Mock netbox.plugins if not available (skip in Docker with real NetBox)
+try:
+    _spec = importlib.util.find_spec("netbox")
+    _NETBOX_AVAILABLE = _spec is not None and _spec.origin is not None
+except (ValueError, ModuleNotFoundError):
+    _NETBOX_AVAILABLE = False
+
+if not _NETBOX_AVAILABLE and "netbox" not in sys.modules:
     from unittest.mock import MagicMock
 
     sys.modules["netbox"] = MagicMock()
