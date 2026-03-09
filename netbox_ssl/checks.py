@@ -171,10 +171,11 @@ def check_templates(app_configs, **kwargs):
                 get_template(template_name)
             except TemplateDoesNotExist:
                 errors.append(
-                    Error(
+                    Warning(
                         f"Required template not found: {template_name}",
-                        hint=f"Create the template at templates/{template_name}",
-                        id="netbox_ssl.E007",
+                        hint=f"Ensure the plugin is installed with package data intact. "
+                        f"Expected template at templates/{template_name}",
+                        id="netbox_ssl.W010",
                     )
                 )
 
