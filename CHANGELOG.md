@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-03-09
+
+### Fixed
+
+- Removed dead `$tenant` query_params from assignment form fields
+- Added missing Issues and Changelog URLs to pyproject.toml
+- Added dev optional-dependencies for contributor setup
+- Updated CHANGELOG for v0.5.0 release
+- CI now tests against Python 3.10, 3.11, and 3.12
+- Added undeclared plugin settings to `default_settings`: `max_export_size`, `bulk_validate_max_batch_size`, `bulk_compliance_max_batch_size`, `bulk_detect_max_batch_size`
+
+## [0.5.0] - 2026-03-09
+
+### Added
+
+- **Email Notifications** for certificate expiry reports:
+  - HTML + plain-text email templates
+  - Configurable recipients, subject prefix
+  - Triggered by Certificate Expiry Notification script
+  - Plugin settings: `notification_email_enabled`, `notification_email_recipients`, `notification_email_subject_prefix`
+
+- **Bulk CSV/JSON Import** for certificate metadata:
+  - Web UI with two-step preview/confirm workflow
+  - Auto-detection of CSV vs JSON format
+  - Row-level validation with error reporting
+  - `POST /certificates/bulk-data-import/` API endpoint
+  - File upload support (max 5 MB)
+  - Duplicate detection with skip option
+
+- **ACME Certificate Monitoring** improvements:
+  - Auto-detection of ACME providers from issuer field
+  - Support for 7+ providers (Let's Encrypt, ZeroSSL, Buypass, Google, Sectigo, DigiCert)
+  - Renewal status tracking (ok, due, expired, manual)
+  - `send_email` and `email_recipients` options on expiry notification script
+
+### Fixed
+
+- `total_alerts` undefined bug in expiry notification script
+- Security fixes from code review: permission checks, tenant IDOR protection, upload size limits
+- Test isolation: `find_spec` guard in all test files to prevent mocking real NetBox in Docker
+
+### Changed
+
+- Updated documentation for all v0.5.0 features
+- Updated compatibility table to v0.5.x
+
 ## [0.4.1] - 2026-02-10
 
 ### Fixed
@@ -227,6 +273,8 @@ Initial release of NetBox SSL Plugin.
 - NetBox 4.4.0 - 4.5.x
 - Python 3.10+
 
+[0.5.1]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.2.0...v0.3.0
