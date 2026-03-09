@@ -447,6 +447,15 @@ class CertificateBulkDataImportView(View):
     """
 
     template_name = "netbox_ssl/certificate_bulk_import.html"
+    MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5 MB
+    MAX_SESSION_ROWS = 500
+
+    def dispatch(self, request, *args, **kwargs):
+        """Check permissions before dispatching."""
+        if not request.user.has_perm("netbox_ssl.add_certificate"):
+            messages.error(request, _("You do not have permission to import certificates."))
+            return redirect(reverse("plugins:netbox_ssl:certificate_list"))
+        return super().dispatch(request, *args, **kwargs)
 
     def get(self, request):
         """Display the bulk import form."""
@@ -464,7 +473,11 @@ class CertificateBulkDataImportView(View):
 
         # Handle file upload or pasted content
         if request.FILES.get("data_file"):
-            content = request.FILES["data_file"].read().decode("utf-8-sig")
+            uploaded = request.FILES["data_file"]
+            if uploaded.size > self.MAX_UPLOAD_SIZE:
+                messages.error(request, _(f"File too large ({uploaded.size // 1024} KB). Maximum is 5 MB."))
+                return render(request, self.template_name, {"step": "input"})
+            content = uploaded.read().decode("utf-8-sig")
         else:
             content = request.POST.get("data_content", "")
 
@@ -498,6 +511,16 @@ class CertificateBulkDataImportView(View):
             else:
                 new_rows.append(row)
 
+        # Enforce session storage limit
+        if len(new_rows) > self.MAX_SESSION_ROWS:
+            messages.warning(
+                request,
+                _(
+                    f"Too many rows ({len(new_rows)}). Maximum is {self.MAX_SESSION_ROWS}. Please split into smaller batches."
+                ),
+            )
+            new_rows = new_rows[: self.MAX_SESSION_ROWS]
+
         # Store validated data in session for confirm step
         serializable_rows = []
         for row in new_rows:
@@ -522,10 +545,15 @@ class CertificateBulkDataImportView(View):
 
     def _confirm_import(self, request):
         """Create certificates from session data."""
+        from tenancy.models import Tenant
+
         rows = request.session.pop("bulk_import_rows", [])
         if not rows:
             messages.warning(request, _("No pending import data found."))
             return redirect(reverse("plugins:netbox_ssl:certificate_bulk_import"))
+
+        # Build set of tenants this user can access
+        user_tenants = Tenant.objects.restrict(request.user, "view")
 
         created = 0
         errors = []
@@ -533,16 +561,14 @@ class CertificateBulkDataImportView(View):
         with transaction.atomic():
             for idx, row in enumerate(rows, start=1):
                 try:
-                    # Resolve tenant
+                    # Resolve tenant (restricted to user's accessible tenants)
                     tenant = None
                     tenant_ref = row.pop("tenant_ref", None)
                     if tenant_ref:
-                        from tenancy.models import Tenant
-
                         try:
-                            tenant = Tenant.objects.get(pk=int(tenant_ref))
+                            tenant = user_tenants.get(pk=int(tenant_ref))
                         except (ValueError, Tenant.DoesNotExist):
-                            tenant = Tenant.objects.filter(name=tenant_ref).first()
+                            tenant = user_tenants.filter(name=tenant_ref).first()
 
                     # Parse dates back
                     valid_from = datetime.fromisoformat(row["valid_from"])

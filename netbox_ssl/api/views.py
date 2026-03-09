@@ -212,16 +212,17 @@ class CertificateViewSet(NetBoxModelViewSet):
                             }
                         )
 
-                    # Resolve tenant
+                    # Resolve tenant (restricted to user's accessible tenants)
                     tenant = None
                     tenant_ref = row.pop("tenant_ref", None)
                     if tenant_ref:
                         from tenancy.models import Tenant
 
+                        user_tenants = Tenant.objects.restrict(request.user, "view")
                         try:
-                            tenant = Tenant.objects.get(pk=int(tenant_ref))
+                            tenant = user_tenants.get(pk=int(tenant_ref))
                         except (ValueError, Tenant.DoesNotExist):
-                            tenant = Tenant.objects.filter(name=tenant_ref).first()
+                            tenant = user_tenants.filter(name=tenant_ref).first()
 
                     from ..utils import detect_issuing_ca
 
