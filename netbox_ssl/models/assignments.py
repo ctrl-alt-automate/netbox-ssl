@@ -111,9 +111,9 @@ class CertificateAssignment(NetBoxModel):
         if self.certificate_id:
             from django.utils import timezone
 
-            type(self).certificate.field.related_model.objects.filter(
-                pk=self.certificate_id
-            ).update(last_updated=timezone.now())
+            type(self).certificate.field.related_model.objects.filter(pk=self.certificate_id).update(
+                last_updated=timezone.now()
+            )
 
     def delete(self, *args, **kwargs):
         """Delete and touch parent certificate to update its changelog."""

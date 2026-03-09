@@ -165,9 +165,7 @@ class CertificateExpiryScan(Script):
                     events_skipped += 1
                     continue
 
-                payload = fire_certificate_event(
-                    cert, EVENT_CERTIFICATE_EXPIRING_SOON, threshold_days=threshold
-                )
+                payload = fire_certificate_event(cert, EVENT_CERTIFICATE_EXPIRING_SOON, threshold_days=threshold)
 
                 if not dry_run and commit:
                     CertificateEventLog.objects.create(
