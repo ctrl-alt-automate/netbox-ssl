@@ -7,6 +7,14 @@ from .chain_validator import (
 )
 from .compliance_checker import CheckResult, ComplianceChecker
 from .csr_parser import CSRParseError, CSRParser
+from .events import (
+    EVENT_CERTIFICATE_EXPIRED,
+    EVENT_CERTIFICATE_EXPIRING_SOON,
+    EVENT_CERTIFICATE_RENEWED,
+    EVENT_CERTIFICATE_REVOKED,
+    build_certificate_event_payload,
+    fire_certificate_event,
+)
 from .export import CertificateExporter, ExportFormatChoices
 from .parser import CertificateParseError, CertificateParser, PrivateKeyDetectedError
 
@@ -26,4 +34,10 @@ __all__ = [
     "ChainValidationError",
     "detect_issuing_ca",
     "get_or_create_ca_from_issuer",
+    "EVENT_CERTIFICATE_EXPIRED",
+    "EVENT_CERTIFICATE_EXPIRING_SOON",
+    "EVENT_CERTIFICATE_RENEWED",
+    "EVENT_CERTIFICATE_REVOKED",
+    "build_certificate_event_payload",
+    "fire_certificate_event",
 ]

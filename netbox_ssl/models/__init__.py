@@ -20,6 +20,7 @@ from .compliance import (
     ComplianceSeverityChoices,
 )
 from .csr import CertificateSigningRequest, CSRStatusChoices
+from .event_log import CertificateEventLog
 
 __all__ = [
     "Certificate",
@@ -39,4 +40,5 @@ __all__ = [
     "CompliancePolicyTypeChoices",
     "ComplianceSeverityChoices",
     "ComplianceResultChoices",
+    "CertificateEventLog",
 ]

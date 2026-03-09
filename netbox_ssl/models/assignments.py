@@ -104,6 +104,30 @@ class CertificateAssignment(NetBoxModel):
                 "are not allowed."
             )
 
+    def save(self, *args, **kwargs):
+        """Save and touch parent certificate to update its changelog."""
+        super().save(*args, **kwargs)
+        # Touch the parent certificate so its changelog reflects assignment changes
+        if self.certificate_id:
+            from django.utils import timezone
+
+            from .certificates import Certificate
+
+            Certificate.objects.filter(pk=self.certificate_id).update(last_updated=timezone.now())
+
+    def delete(self, *args, **kwargs):
+        """Delete and touch parent certificate to update its changelog."""
+        certificate_id = self.certificate_id
+        result = super().delete(*args, **kwargs)
+        # Touch the parent certificate so its changelog reflects assignment removal
+        if certificate_id:
+            from django.utils import timezone
+
+            from .certificates import Certificate
+
+            Certificate.objects.filter(pk=certificate_id).update(last_updated=timezone.now())
+        return result
+
     @property
     def assigned_object_name(self):
         """Get a display name for the assigned object."""
