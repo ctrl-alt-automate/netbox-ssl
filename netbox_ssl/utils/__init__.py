@@ -15,10 +15,12 @@ from .events import (
     build_certificate_event_payload,
     fire_certificate_event,
 )
+from .analytics import CertificateAnalytics
 from .export import CertificateExporter, ExportFormatChoices
 from .parser import CertificateParseError, CertificateParser, PrivateKeyDetectedError
 
 __all__ = [
+    "CertificateAnalytics",
     "CertificateParser",
     "CertificateParseError",
     "PrivateKeyDetectedError",

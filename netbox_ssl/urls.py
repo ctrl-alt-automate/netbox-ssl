@@ -6,6 +6,7 @@ from django.urls import path
 from netbox.views.generic import ObjectChangeLogView
 
 from . import models, views
+from .views.analytics import CertificateAnalyticsDashboardView
 
 urlpatterns = [
     # Certificate URLs
@@ -64,6 +65,12 @@ urlpatterns = [
         ObjectChangeLogView.as_view(),
         name="certificate_changelog",
         kwargs={"model": models.Certificate},
+    ),
+    # Analytics / Insights URLs
+    path(
+        "analytics/",
+        CertificateAnalyticsDashboardView.as_view(),
+        name="analytics_dashboard",
     ),
     # CertificateSigningRequest URLs
     path(

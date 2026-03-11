@@ -1,0 +1,23 @@
+{% comment %}
+Reusable horizontal bar chart using Bootstrap progress bars.
+
+Context: bars - list of dicts with keys: label, count, pct, color
+{% endcomment %}
+{% if bars %}
+{% for bar in bars %}
+<div class="d-flex align-items-center mb-2">
+  <span class="text-end me-2" style="min-width: 120px; font-size: 0.875rem;">{{ bar.label }}</span>
+  <div class="flex-grow-1">
+    <div class="progress" style="height: 22px;">
+      <div class="progress-bar" role="progressbar" style="width: {{ bar.pct }}%; background-color: {{ bar.color }};"
+           aria-valuenow="{{ bar.count }}" aria-valuemin="0" aria-valuemax="100">
+        {% if bar.pct > 15 %}{{ bar.count }}{% endif %}
+      </div>
+    </div>
+  </div>
+  {% if bar.pct <= 15 %}<span class="ms-2 fw-bold" style="font-size: 0.875rem;">{{ bar.count }}</span>{% endif %}
+</div>
+{% endfor %}
+{% else %}
+<p class="text-muted mb-0">No data available.</p>
+{% endif %}
