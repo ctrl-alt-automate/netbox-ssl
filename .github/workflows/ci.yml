@@ -100,10 +100,30 @@ jobs:
         run: |
           python -m pytest tests/test_parser.py tests/test_models.py tests/test_events.py tests/test_expiry_scan.py -v -p no:django
 
+  build-package:
+    name: Build Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build package
+        run: python -m build
+
+      - name: Validate package
+        run: twine check dist/*
+
   integration-tests:
     name: Integration Tests (NetBox ${{ matrix.netbox_major }})
     runs-on: ubuntu-latest
-    needs: [lint, unit-tests, package-check]
+    needs: [lint, unit-tests, package-check, build-package]
     timeout-minutes: 30
     strategy:
       fail-fast: false

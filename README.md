@@ -32,6 +32,15 @@ Managing SSL certificates across your infrastructure shouldn't be a scavenger hu
 - 🔒 **Security first** — Private keys are never stored, only location hints for your secret management system
 - 🎯 **Deep integration** — Certificates link directly to NetBox Services, Devices, and VMs
 
+## Requirements
+
+| Dependency | Version |
+|------------|---------|
+| NetBox     | 4.4.0 - 4.5.x |
+| Python     | 3.10+ |
+
+The plugin uses the Python [`cryptography`](https://cryptography.io/) library for X.509 certificate parsing (installed automatically as a dependency).
+
 ## Installation
 
 ```bash
