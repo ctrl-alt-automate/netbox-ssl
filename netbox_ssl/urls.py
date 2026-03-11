@@ -7,6 +7,7 @@ from netbox.views.generic import ObjectChangeLogView
 
 from . import models, views
 from .views.analytics import CertificateAnalyticsDashboardView
+from .views.compliance_report import ComplianceReportView
 
 urlpatterns = [
     # Certificate URLs
@@ -71,6 +72,11 @@ urlpatterns = [
         "analytics/",
         CertificateAnalyticsDashboardView.as_view(),
         name="analytics_dashboard",
+    ),
+    path(
+        "compliance-report/",
+        ComplianceReportView.as_view(),
+        name="compliance_report",
     ),
     # CertificateSigningRequest URLs
     path(
