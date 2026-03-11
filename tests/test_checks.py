@@ -32,6 +32,7 @@ if not _NETBOX_AVAILABLE:
             "django.conf",
             "django.db",
             "django.db.models",
+            "django.db.models.functions",
             "django.utils",
             "django.utils.timezone",
             "django.utils.translation",

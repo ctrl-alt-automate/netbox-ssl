@@ -44,9 +44,7 @@ class CertificateMapView(TemplateView):
 
         # Stats
         total_devices = sum(len(t["devices"]) for t in tree)
-        total_certs = sum(
-            len(d["certificates"]) for t in tree for d in t["devices"]
-        )
+        total_certs = sum(len(d["certificates"]) for t in tree for d in t["devices"])
         context["total_tenants"] = len(tree)
         context["total_devices"] = total_devices
         context["total_certs"] = total_certs
