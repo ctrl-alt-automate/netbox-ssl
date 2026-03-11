@@ -12,7 +12,7 @@ import json
 from datetime import date, timedelta
 from typing import Any
 
-from django.db.models import Count
+from django.db.models import Count, F
 
 
 class ComplianceReporter:
@@ -51,7 +51,8 @@ class ComplianceReporter:
         # Breakdown by severity
         severity_breakdown = list(
             checks_qs.filter(result="fail")
-            .values(severity="policy__severity")
+            .annotate(severity=F("policy__severity"))
+            .values("severity")
             .annotate(count=Count("id"))
             .order_by("severity")
         )
@@ -59,7 +60,8 @@ class ComplianceReporter:
         # Breakdown by policy type
         policy_breakdown = list(
             checks_qs.filter(result="fail")
-            .values(policy_type="policy__policy_type")
+            .annotate(policy_type=F("policy__policy_type"))
+            .values("policy_type")
             .annotate(count=Count("id"))
             .order_by("-count")
         )
