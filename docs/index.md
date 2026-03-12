@@ -20,13 +20,13 @@ Track certificates, monitor expiration dates, and never lose sight of where your
 
 ## Quick Navigation
 
-| Getting Started | Daily Usage | Reference |
-|:---------------:|:-----------:|:---------:|
-| [Installation](installation.md) | [Usage Guide](usage.md) | [API](api.md) |
-| [Configuration](configuration.md) | [Janus Renewal](usage.md#janus-renewal-workflow) | [Data Models](data-models.md) |
-| | [CSR Management](usage.md#certificate-signing-requests-csrs) | |
-| | [Compliance](usage.md#compliance-policies) | |
-| | [Scripts](scripts.md) | |
+| Getting Started | Daily Usage | Insights | Reference |
+|:---------------:|:-----------:|:--------:|:---------:|
+| [Installation](installation.md) | [Usage Guide](usage.md) | [Analytics Dashboard](usage.md#analytics-dashboard) | [API](api.md) |
+| [Configuration](configuration.md) | [Janus Renewal](usage.md#janus-renewal-workflow) | [Compliance Report](usage.md#compliance-report) | [Data Models](data-models.md) |
+| | [CSR Management](usage.md#certificate-signing-requests-csrs) | [Certificate Map](usage.md#certificate-map) | [Webhooks](webhooks.md) |
+| | [Compliance](usage.md#compliance-policies) | | |
+| | [Scripts](scripts.md) | | |
 
 ## What Can You Do?
 
@@ -97,6 +97,12 @@ Export certificates for reporting and integration:
 - CSV for spreadsheets and reporting
 - PEM for deployment verification
 
+### Insights & Analytics (v0.7)
+
+- **Analytics Dashboard** — Status distribution, key algorithms, expiry forecast, CA and ACME coverage
+- **Compliance Report** — Score overview, failure breakdowns, 90-day trend, CSV/JSON export
+- **Certificate Map** — Visual topology: Tenant → Device/VM → Service → Certificate with expiry colors
+
 ## Security Philosophy
 
 NetBox SSL is designed with **Passive Administration** in mind:
@@ -110,8 +116,8 @@ NetBox SSL is designed with **Passive Administration** in mind:
 
 | NetBox Version | Plugin Version | Status |
 |:--------------:|:--------------:|:------:|
-| 4.5.x          | 0.1.x          | Primary |
-| 4.4.x          | 0.1.x          | Supported |
+| 4.5.x          | 0.7.x          | Primary |
+| 4.4.x          | 0.7.x          | Supported |
 | 4.3.x and older| —              | Unsupported |
 
 ## Documentation

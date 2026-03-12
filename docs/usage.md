@@ -568,6 +568,66 @@ The plugin calculates a renewal status for ACME certificates:
 
 ---
 
+## Analytics Dashboard
+
+Navigate to **SSL Certificates > Insights > Analytics Dashboard**.
+
+The dashboard provides a visual overview of your certificate landscape:
+
+- **Summary cards** — Active certificates, unassigned count, average days remaining, ACME managed count
+- **Certificate Status** — Horizontal bar chart of active, expired, replaced, revoked certificates
+- **Key Algorithms** — Distribution of RSA, ECDSA, Ed25519 across your inventory
+- **Expiry Forecast** — 12-month forecast with contextual colors:
+  - Red = first month (immediate attention)
+  - Yellow = months 2-3 (upcoming)
+  - Blue = months 4-12 (future planning)
+- **Certificate Authorities** — Top CAs by certificate count
+- **ACME Distribution** — ACME vs non-ACME certificate split
+
+> **Tip:** Use the tenant filter in the URL (`?tenant=<id>`) to scope the dashboard to a specific tenant.
+
+---
+
+## Compliance Report
+
+Navigate to **SSL Certificates > Insights > Compliance Report**.
+
+The compliance report aggregates results from your compliance policies:
+
+- **Score card** — Overall compliance score with progress bar (green ≥80%, orange ≥50%, red <50%)
+- **Certificates / Passed / Failed** — Quick counts
+- **Failures by Severity** — Breakdown of critical, warning, info failures
+- **Failures by Policy Type** — Which policies cause the most failures
+- **Compliance Trend** — 90-day trend chart from snapshots
+
+### Exporting Reports
+
+Click **Export CSV** or **Export JSON** in the top-right to download the current report.
+
+> **Note:** Trend data requires compliance check snapshots. Run compliance checks periodically (via the API or custom script) to build up trend history.
+
+---
+
+## Certificate Map
+
+Navigate to **SSL Certificates > Insights > Certificate Map**.
+
+The certificate map shows a visual topology of your certificate deployments:
+
+```
+Tenant → Device/VM → Service → Certificate(s)
+```
+
+- **Summary cards** — Tenant groups, devices/services, total assignments
+- **Color legend** — Green (>30 days), Yellow (14-30 days), Red (<14 days / expired)
+- **Accordion layout** — One section per tenant, expandable with lazy loading (HTMX)
+- **Parent device** — Service assignments show the parent device/VM name (e.g., "HTTPS (TCP/443) on web-server-01")
+- **Orphan certificates** — Certificates without assignments are grouped under "Unassigned Certificates"
+
+> **Tip:** Tenants with many devices use HTMX lazy loading — content loads only when you expand the accordion section.
+
+---
+
 ## Keyboard Shortcuts
 
 NetBox SSL inherits NetBox's keyboard shortcuts:

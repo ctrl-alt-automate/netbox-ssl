@@ -149,6 +149,15 @@ Import certificate metadata from CSV or JSON files — paste content or upload a
 ### ACME Certificate Monitoring
 Track Let's Encrypt and other ACME-issued certificates with auto-detection, renewal status, and provider metadata. Supports 7+ ACME providers.
 
+### Analytics Dashboard
+Visual overview of your certificate landscape: status distribution, key algorithms, expiry forecast with contextual colors, CA distribution, and ACME coverage. Tenant-filterable with dark mode support.
+
+### Compliance Report
+Score overview with progress indicator, failure breakdowns by severity and policy type, 90-day trend chart, and CSV/JSON export.
+
+### Certificate Map
+Interactive topology view showing certificates per Tenant → Device/VM → Service, with color-coded expiry status and HTMX lazy loading for performance.
+
 ### Email Notifications
 Receive email alerts when certificates are expiring. Configurable recipients, thresholds, and subject prefix. Sends HTML + plain-text reports.
 
@@ -173,8 +182,8 @@ Add the widget to your NetBox dashboard to see:
 
 | NetBox Version | Plugin Version | Status |
 |:--------------:|:--------------:|:------:|
-| 4.5.x          | 0.6.x          | ✅ Primary |
-| 4.4.x          | 0.6.x          | ✅ Supported |
+| 4.5.x          | 0.7.x          | ✅ Primary |
+| 4.4.x          | 0.7.x          | ✅ Supported |
 | 4.3.x and older| —              | ❌ Unsupported |
 
 ## 📚 Documentation
@@ -186,6 +195,7 @@ Full documentation is available in the [docs/](docs/index.md) folder:
 - **[Usage Guide](docs/usage.md)** — Learn the workflows
 - **[API Reference](docs/api.md)** — REST API and GraphQL
 - **[Custom Scripts](docs/scripts.md)** — Expiry notifications and scheduling
+- **[Webhooks](docs/webhooks.md)** — Event Rules with Slack, Teams, PagerDuty templates
 - **[Data Models](docs/data-models.md)** — Database schema details
 - **[Contributing](CONTRIBUTING.md)** — Contribution guidelines
 
