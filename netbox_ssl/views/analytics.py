@@ -11,19 +11,23 @@ from django.views.generic import TemplateView
 from ..utils.analytics import CertificateAnalytics
 
 STATUS_COLORS: dict[str, str] = {
-    "active": "#28a745",
-    "expired": "#dc3545",
-    "replaced": "#6c757d",
-    "revoked": "#fd7e14",
-    "pending": "#007bff",
+    "active": "bg-success",
+    "expired": "bg-danger",
+    "replaced": "bg-secondary",
+    "revoked": "bg-warning",
+    "pending": "bg-primary",
 }
 
 ALGORITHM_COLORS: dict[str, str] = {
-    "rsa": "#007bff",
-    "ecdsa": "#28a745",
-    "ed25519": "#6f42c1",
-    "unknown": "#6c757d",
+    "rsa": "bg-primary",
+    "ecdsa": "bg-success",
+    "ed25519": "bg-purple",
+    "unknown": "bg-secondary",
 }
+
+# Forecast chart color band thresholds (month index)
+_FORECAST_CRITICAL_MONTHS = 1  # first month = red
+_FORECAST_WARNING_MONTHS = 3  # months 1-2 = yellow
 
 
 def _prepare_bar_data(
@@ -39,7 +43,7 @@ def _prepare_bar_data(
             "label": (d[label_key] or "unknown").replace("_", " ").title(),
             "count": d[count_key],
             "pct": round(d[count_key] / max_val * 100) if max_val else 0,
-            "color": colors.get(d[label_key], "#6c757d"),
+            "color": colors.get(d[label_key], "bg-secondary"),
         }
         for d in items
     ]
@@ -50,12 +54,13 @@ class CertificateAnalyticsDashboardView(TemplateView):
 
     template_name = "netbox_ssl/analytics_dashboard.html"
 
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
 
         tenant_id = self.request.GET.get("tenant")
         tenant = None
         if tenant_id:
+            # Deferred import: tenancy is a NetBox core app, avoid circular import at module load
             from tenancy.models import Tenant
 
             tenant = Tenant.objects.filter(pk=tenant_id).first()
@@ -70,16 +75,25 @@ class CertificateAnalyticsDashboardView(TemplateView):
             dashboard["algorithm_distribution"], "algorithm", "count", ALGORITHM_COLORS
         )
 
-        # Prepare forecast bars
+        # Prepare forecast bars with contextual colors
         forecast = dashboard["expiry_forecast"]
         max_fc = max((d["count"] for d in forecast), default=1)
-        context["forecast_bars"] = [
-            {
-                "label": d["month"].strftime("%b %Y"),
-                "count": d["count"],
-                "pct": round(d["count"] / max_fc * 100) if max_fc else 0,
-            }
-            for d in forecast
-        ]
+        forecast_bars: list[dict[str, Any]] = []
+        for i, d in enumerate(forecast):
+            if i < _FORECAST_CRITICAL_MONTHS:
+                color = "bg-danger"
+            elif i < _FORECAST_WARNING_MONTHS:
+                color = "bg-warning"
+            else:
+                color = "bg-info"
+            forecast_bars.append(
+                {
+                    "label": d["month"].strftime("%b %Y"),
+                    "count": d["count"],
+                    "pct": round(d["count"] / max_fc * 100) if max_fc else 0,
+                    "color": color,
+                }
+            )
+        context["forecast_bars"] = forecast_bars
 
         return context

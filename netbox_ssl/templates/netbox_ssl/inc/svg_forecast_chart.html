@@ -1,21 +1,22 @@
 {% comment %}
 Expiry forecast chart using Bootstrap progress bars.
 
-Context: forecast_bars - list of dicts with keys: label, count, pct
+Context: forecast_bars - list of dicts with keys: label, count, pct, color
 {% endcomment %}
+{% load static %}
 {% if forecast_bars %}
 {% for bar in forecast_bars %}
 <div class="d-flex align-items-center mb-2">
-  <span class="text-end me-2" style="min-width: 80px; font-size: 0.875rem;">{{ bar.label }}</span>
+  <span class="text-end me-2 ssl-chart-label-sm">{{ bar.label }}</span>
   <div class="flex-grow-1">
-    <div class="progress" style="height: 22px;">
-      <div class="progress-bar bg-warning" role="progressbar" style="width: {{ bar.pct }}%;"
+    <div class="progress ssl-chart-bar">
+      <div class="progress-bar {{ bar.color }}" role="progressbar" style="width: {{ bar.pct }}%;"
            aria-valuenow="{{ bar.count }}" aria-valuemin="0" aria-valuemax="100">
         {% if bar.pct > 15 %}{{ bar.count }}{% endif %}
       </div>
     </div>
   </div>
-  {% if bar.pct <= 15 %}<span class="ms-2 fw-bold" style="font-size: 0.875rem;">{{ bar.count }}</span>{% endif %}
+  {% if bar.pct <= 15 %}<span class="ms-2 fw-bold ssl-chart-value">{{ bar.count }}</span>{% endif %}
 </div>
 {% endfor %}
 {% else %}

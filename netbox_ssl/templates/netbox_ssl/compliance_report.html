@@ -1,7 +1,11 @@
 {% extends 'base/layout.html' %}
-{% load i18n %}
+{% load i18n l10n static %}
 
 {% block title %}Compliance Report{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="{% static 'netbox_ssl/css/charts.css' %}">
+{% endblock head %}
 
 {% block breadcrumbs %}
   <li class="breadcrumb-item">
@@ -27,16 +31,21 @@
   <div class="col-md-3">
     <div class="card text-center">
       <div class="card-body py-3">
-        <h2 class="mb-0 {% if report.compliance_score >= 80 %}text-success{% elif report.compliance_score >= 50 %}text-warning{% else %}text-danger{% endif %}">
-          {{ report.compliance_score }}%
-        </h2>
+        <i class="mdi mdi-shield-check fs-1 {% if report.compliance_score >= 80 %}text-success{% elif report.compliance_score >= 50 %}text-warning{% else %}text-danger{% endif %}"></i>
+        <h2 class="mb-0 {% if report.compliance_score >= 80 %}text-success{% elif report.compliance_score >= 50 %}text-warning{% else %}text-danger{% endif %}">{{ report.compliance_score }}%</h2>
         <small class="text-muted">Compliance Score</small>
+      </div>
+      <div class="card-footer p-0">
+        <div class="progress" style="height: 4px; border-radius: 0 0 4px 4px;">
+          <div class="progress-bar {% if report.compliance_score >= 80 %}bg-success{% elif report.compliance_score >= 50 %}bg-warning{% else %}bg-danger{% endif %}" style="width: {{ report.compliance_score|unlocalize }}%;"></div>
+        </div>
       </div>
     </div>
   </div>
   <div class="col-md-3">
     <div class="card text-center">
       <div class="card-body py-3">
+        <i class="mdi mdi-certificate fs-1 text-primary"></i>
         <h2 class="mb-0">{{ report.total_certificates }}</h2>
         <small class="text-muted">Certificates</small>
       </div>
@@ -45,6 +54,7 @@
   <div class="col-md-3">
     <div class="card text-center">
       <div class="card-body py-3">
+        <i class="mdi mdi-check-circle fs-1 text-success"></i>
         <h2 class="mb-0 text-success">{{ report.passed_checks }}</h2>
         <small class="text-muted">Passed</small>
       </div>
@@ -53,6 +63,7 @@
   <div class="col-md-3">
     <div class="card text-center">
       <div class="card-body py-3">
+        <i class="mdi mdi-close-circle fs-1 text-danger"></i>
         <h2 class="mb-0 text-danger">{{ report.failed_checks }}</h2>
         <small class="text-muted">Failed</small>
       </div>
@@ -69,7 +80,7 @@
         {% if report.severity_breakdown %}
         {% for item in report.severity_breakdown %}
         <div class="d-flex align-items-center mb-2">
-          <span class="text-end me-2" style="min-width: 80px;">
+          <span class="text-end me-2 ssl-chart-label-sm">
             <span class="badge {% if item.severity == 'critical' %}text-bg-danger{% elif item.severity == 'warning' %}text-bg-warning{% else %}text-bg-info{% endif %}">
               {{ item.severity|capfirst }}
             </span>
@@ -118,16 +129,16 @@
         {% if trend_bars %}
         {% for bar in trend_bars %}
         <div class="d-flex align-items-center mb-1">
-          <span class="text-end me-2" style="min-width: 60px; font-size: 0.8rem;">{{ bar.label }}</span>
+          <span class="text-end me-2 ssl-chart-label-xs">{{ bar.label }}</span>
           <div class="flex-grow-1">
-            <div class="progress" style="height: 20px;">
+            <div class="progress ssl-chart-bar-sm">
               <div class="progress-bar {% if bar.score >= 80 %}bg-success{% elif bar.score >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
                    role="progressbar" style="width: {{ bar.pct }}%;">
                 {% if bar.pct > 20 %}{{ bar.score|floatformat:0 }}%{% endif %}
               </div>
             </div>
           </div>
-          {% if bar.pct <= 20 %}<span class="ms-1" style="font-size: 0.8rem;">{{ bar.score|floatformat:0 }}%</span>{% endif %}
+          {% if bar.pct <= 20 %}<span class="ms-1 ssl-chart-value-sm">{{ bar.score|floatformat:0 }}%</span>{% endif %}
         </div>
         {% endfor %}
         {% else %}

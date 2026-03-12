@@ -1,7 +1,11 @@
 {% extends 'base/layout.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block title %}Certificate Analytics{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="{% static 'netbox_ssl/css/charts.css' %}">
+{% endblock head %}
 
 {% block breadcrumbs %}
   <li class="breadcrumb-item">
@@ -17,6 +21,7 @@
   <div class="col-md-3">
     <div class="card text-center">
       <div class="card-body py-3">
+        <i class="mdi mdi-certificate fs-1 text-primary"></i>
         <h2 class="mb-0">{{ total_active }}</h2>
         <small class="text-muted">Active Certificates</small>
       </div>
@@ -25,6 +30,7 @@
   <div class="col-md-3">
     <div class="card text-center">
       <div class="card-body py-3">
+        <i class="mdi mdi-link-off fs-1 text-warning"></i>
         <h2 class="mb-0">{{ orphan_count }}</h2>
         <small class="text-muted">Unassigned</small>
       </div>
@@ -33,6 +39,7 @@
   <div class="col-md-3">
     <div class="card text-center">
       <div class="card-body py-3">
+        <i class="mdi mdi-calendar-clock fs-1 text-info"></i>
         <h2 class="mb-0">{% if avg_remaining_days != None %}{{ avg_remaining_days|floatformat:0 }}d{% else %}&mdash;{% endif %}</h2>
         <small class="text-muted">Avg Days Remaining</small>
       </div>
@@ -41,6 +48,7 @@
   <div class="col-md-3">
     <div class="card text-center">
       <div class="card-body py-3">
+        <i class="mdi mdi-autorenew fs-1 text-success"></i>
         <h2 class="mb-0">{{ acme_distribution.acme }}</h2>
         <small class="text-muted">ACME Managed</small>
       </div>
@@ -127,5 +135,16 @@
     </div>
   </div>
 </div>
+
+{# Empty state #}
+{% if not status_bars and not algo_bars %}
+<div class="text-center py-5 text-muted">
+  <i class="mdi mdi-chart-bar fs-1"></i>
+  <p class="mt-2 mb-1">No certificate data to display.</p>
+  <a href="{% url 'plugins:netbox_ssl:certificate_import' %}" class="btn btn-sm btn-primary mt-2">
+    <i class="mdi mdi-upload"></i> Import Certificate
+  </a>
+</div>
+{% endif %}
 
 {% endblock content %}
