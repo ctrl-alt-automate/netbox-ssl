@@ -4,8 +4,10 @@ Analytics dashboard views for certificate landscape insights.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
 
 from ..utils.analytics import CertificateAnalytics
@@ -25,9 +27,9 @@ ALGORITHM_COLORS: dict[str, str] = {
     "unknown": "bg-secondary",
 }
 
-# Forecast chart color band thresholds (month index)
-_FORECAST_CRITICAL_MONTHS = 1  # first month = red
-_FORECAST_WARNING_MONTHS = 3  # months 1-2 = yellow
+# Forecast chart color band thresholds (calendar days from today)
+_FORECAST_CRITICAL_DAYS = 30  # within 30 days = red
+_FORECAST_WARNING_DAYS = 90  # within 90 days = yellow
 
 
 def _prepare_bar_data(
@@ -49,7 +51,7 @@ def _prepare_bar_data(
     ]
 
 
-class CertificateAnalyticsDashboardView(TemplateView):
+class CertificateAnalyticsDashboardView(LoginRequiredMixin, TemplateView):
     """Dashboard with aggregated certificate statistics and charts."""
 
     template_name = "netbox_ssl/analytics_dashboard.html"
@@ -59,11 +61,10 @@ class CertificateAnalyticsDashboardView(TemplateView):
 
         tenant_id = self.request.GET.get("tenant")
         tenant = None
-        if tenant_id:
-            # Deferred import: tenancy is a NetBox core app, avoid circular import at module load
+        if tenant_id and tenant_id.isdigit():
             from tenancy.models import Tenant
 
-            tenant = Tenant.objects.filter(pk=tenant_id).first()
+            tenant = Tenant.objects.restrict(self.request.user, "view").filter(pk=tenant_id).first()
 
         analytics = CertificateAnalytics()
         dashboard = analytics.get_dashboard_context(tenant)
@@ -75,14 +76,16 @@ class CertificateAnalyticsDashboardView(TemplateView):
             dashboard["algorithm_distribution"], "algorithm", "count", ALGORITHM_COLORS
         )
 
-        # Prepare forecast bars with contextual colors
+        # Prepare forecast bars with contextual colors based on calendar date
         forecast = dashboard["expiry_forecast"]
         max_fc = max((d["count"] for d in forecast), default=1)
+        today = date.today()
         forecast_bars: list[dict[str, Any]] = []
-        for i, d in enumerate(forecast):
-            if i < _FORECAST_CRITICAL_MONTHS:
+        for d in forecast:
+            days_away = (d["month"].date() - today).days if hasattr(d["month"], "date") else (d["month"] - today).days
+            if days_away <= _FORECAST_CRITICAL_DAYS:
                 color = "bg-danger"
-            elif i < _FORECAST_WARNING_MONTHS:
+            elif days_away <= _FORECAST_WARNING_DAYS:
                 color = "bg-warning"
             else:
                 color = "bg-info"

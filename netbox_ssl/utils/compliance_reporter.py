@@ -12,7 +12,7 @@ import json
 from datetime import date, timedelta
 from typing import Any
 
-from django.db.models import Count, F
+from django.db.models import Count, F, Q
 
 
 class ComplianceReporter:
@@ -41,10 +41,16 @@ class ComplianceReporter:
             certs_qs = certs_qs.filter(tenant=tenant)
 
         total_certs = certs_qs.count()
-        total_checks = checks_qs.count()
-        passed = checks_qs.filter(result="pass").count()
-        failed = checks_qs.filter(result="fail").count()
-        errors = checks_qs.filter(result="error").count()
+        counts = checks_qs.aggregate(
+            total=Count("id"),
+            passed=Count("id", filter=Q(result="pass")),
+            failed=Count("id", filter=Q(result="fail")),
+            errors=Count("id", filter=Q(result="error")),
+        )
+        total_checks = counts["total"]
+        passed = counts["passed"]
+        failed = counts["failed"]
+        errors = counts["errors"]
 
         score = (passed / total_checks * 100) if total_checks > 0 else 100.0
 
@@ -117,11 +123,11 @@ class ComplianceReporter:
             )
         )
 
-    def export_report(self, tenant: Any | None = None, format: str = "csv") -> str:
+    def export_report(self, tenant: Any | None = None, export_format: str = "csv") -> str:
         """Export compliance report as CSV or JSON string."""
         report = self.generate_report(tenant)
 
-        if format == "json":
+        if export_format == "json":
             # Make date serializable
             report["snapshot_date"] = report["snapshot_date"].isoformat()
             return json.dumps(report, indent=2)

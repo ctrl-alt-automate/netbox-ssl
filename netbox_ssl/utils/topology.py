@@ -7,9 +7,12 @@ with expiry color coding.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from django.contrib.contenttypes.models import ContentType
+
+logger = logging.getLogger(__name__)
 
 
 def _expiry_color(days_remaining: int | None) -> str:
@@ -59,8 +62,8 @@ class CertificateTopologyBuilder:
         if ca_filter:
             assignments_qs = assignments_qs.filter(certificate__issuing_ca_id=ca_filter)
 
-        # Batch-resolve GenericForeignKey objects per ContentType
-        assignments = list(assignments_qs)
+        # Batch-resolve GenericForeignKey objects per ContentType (cap at 1000)
+        assignments = list(assignments_qs[:1000])
         resolved_objects = self._batch_resolve_gfk(assignments)
 
         # Build tree: tenant -> device/VM -> service -> certificates
@@ -113,7 +116,7 @@ class CertificateTopologyBuilder:
                     "certificates": [],
                 }
 
-            days = cert.days_remaining if hasattr(cert, "days_remaining") else None
+            days = cert.days_remaining
             tree[tenant_key]["devices"][device_key]["certificates"].append(
                 {
                     "id": cert.pk,
@@ -128,13 +131,14 @@ class CertificateTopologyBuilder:
             )
 
         # Also add orphan certificates (no assignments)
-        orphan_qs = self.Certificate.objects.filter(status="active").exclude(
-            pk__in=[a.certificate_id for a in assignments]
+        # Use status_filter if provided, otherwise default to "active"
+        orphan_status = status_filter if status_filter else "active"
+        assigned_pks = self.CertificateAssignment.objects.values_list("certificate_id", flat=True)
+        orphan_qs = self.Certificate.objects.filter(status=orphan_status).exclude(
+            pk__in=assigned_pks,
         )
         if tenant is not None:
             orphan_qs = orphan_qs.filter(tenant=tenant)
-        if status_filter:
-            orphan_qs = orphan_qs.filter(status=status_filter)
         if ca_filter:
             orphan_qs = orphan_qs.filter(issuing_ca_id=ca_filter)
 
@@ -153,7 +157,7 @@ class CertificateTopologyBuilder:
                 },
             }
             for cert in orphans:
-                days = cert.days_remaining if hasattr(cert, "days_remaining") else None
+                days = cert.days_remaining
                 tree[orphan_tenant_key]["devices"]["__orphan__"]["certificates"].append(
                     {
                         "id": cert.pk,
@@ -202,7 +206,8 @@ class CertificateTopologyBuilder:
                     objects = model_class.objects.filter(pk__in=set(obj_ids))
                     for obj in objects:
                         resolved[(ct_id, obj.pk)] = obj
-            except Exception:
+            except (ContentType.DoesNotExist, AttributeError, LookupError) as exc:
+                logger.debug("Failed to resolve content type %s: %s", ct_id, exc)
                 continue
 
         return resolved

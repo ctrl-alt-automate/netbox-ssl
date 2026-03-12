@@ -72,8 +72,18 @@ class TestComplianceReporter:
     def _setup_checks_qs(self, reporter, total=20, passed=15, failed=4, errors=1):
         """Configure the check queryset mocks."""
         checks_qs = reporter.ComplianceCheck.objects.all.return_value
-        checks_qs.count.return_value = total
-        checks_qs.filter.return_value.count.side_effect = [passed, failed, errors]
+        checks_qs.aggregate.return_value = {
+            "total": total,
+            "passed": passed,
+            "failed": failed,
+            "errors": errors,
+        }
+        checks_qs.filter.return_value.aggregate.return_value = {
+            "total": total,
+            "passed": passed,
+            "failed": failed,
+            "errors": errors,
+        }
         checks_qs.filter.return_value.values.return_value.annotate.return_value.order_by.return_value = []
         return checks_qs
 
@@ -159,7 +169,7 @@ class TestComplianceReporter:
         reporter.Certificate.objects.filter.return_value.count.return_value = 5
         self._setup_checks_qs(reporter, total=10, passed=8, failed=2, errors=0)
 
-        result = reporter.export_report(format="json")
+        result = reporter.export_report(export_format="json")
         parsed = json.loads(result)
         assert parsed["compliance_score"] == 80.0
         assert parsed["snapshot_date"] == "2026-03-11"
@@ -172,7 +182,7 @@ class TestComplianceReporter:
         reporter.Certificate.objects.filter.return_value.count.return_value = 5
         self._setup_checks_qs(reporter, total=10, passed=8, failed=2, errors=0)
 
-        result = reporter.export_report(format="csv")
+        result = reporter.export_report(export_format="csv")
         lines = result.strip().split("\n")
         assert len(lines) == 2  # header + data
         assert "date" in lines[0]
@@ -187,8 +197,12 @@ class TestComplianceReporter:
 
         checks_qs = reporter.ComplianceCheck.objects.all.return_value
         filtered_checks = checks_qs.filter.return_value
-        filtered_checks.count.return_value = 5
-        filtered_checks.filter.return_value.count.side_effect = [4, 1, 0]
+        filtered_checks.aggregate.return_value = {
+            "total": 5,
+            "passed": 4,
+            "failed": 1,
+            "errors": 0,
+        }
         filtered_checks.filter.return_value.values.return_value.annotate.return_value.order_by.return_value = []
 
         certs_qs = reporter.Certificate.objects.filter.return_value

@@ -4,26 +4,33 @@ Compliance report view for certificate compliance overview and trends.
 
 from __future__ import annotations
 
-from django.http import HttpResponse
+from typing import Any
+
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import HttpRequest, HttpResponse
 from django.views.generic import TemplateView
 
 from ..utils.compliance_reporter import ComplianceReporter
 
 
-class ComplianceReportView(TemplateView):
+class ComplianceReportView(LoginRequiredMixin, TemplateView):
     """Compliance report with current scores and historical trends."""
 
     template_name = "netbox_ssl/compliance_report.html"
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-
-        tenant_id = self.request.GET.get("tenant")
-        tenant = None
-        if tenant_id:
+    def _get_tenant(self, request: HttpRequest) -> Any | None:
+        """Resolve tenant from query parameter with permission check."""
+        tenant_id = request.GET.get("tenant")
+        if tenant_id and tenant_id.isdigit():
             from tenancy.models import Tenant
 
-            tenant = Tenant.objects.filter(pk=tenant_id).first()
+            return Tenant.objects.restrict(request.user, "view").filter(pk=tenant_id).first()
+        return None
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+
+        tenant = self._get_tenant(self.request)
 
         reporter = ComplianceReporter()
         report = reporter.generate_report(tenant)
@@ -50,19 +57,14 @@ class ComplianceReportView(TemplateView):
 
         return context
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         # Handle export requests
         export_format = request.GET.get("export")
         if export_format in ("csv", "json"):
-            tenant_id = request.GET.get("tenant")
-            tenant = None
-            if tenant_id:
-                from tenancy.models import Tenant
-
-                tenant = Tenant.objects.filter(pk=tenant_id).first()
+            tenant = self._get_tenant(request)
 
             reporter = ComplianceReporter()
-            data = reporter.export_report(tenant, format=export_format)
+            data = reporter.export_report(tenant, export_format=export_format)
 
             content_type = "application/json" if export_format == "json" else "text/csv"
             response = HttpResponse(data, content_type=content_type)

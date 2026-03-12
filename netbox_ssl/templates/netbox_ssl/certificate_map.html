@@ -77,47 +77,7 @@
           <span class="text-muted ms-2">Loading...</span>
         </div>
         {% else %}
-        {% for device in node.devices %}
-        <div class="border-bottom px-3 py-2">
-          <div class="fw-bold mb-1">
-            {% if device.type == "service" %}
-              <i class="mdi mdi-server me-1"></i>
-            {% elif device.type == "device" %}
-              <i class="mdi mdi-desktop-classic me-1"></i>
-            {% elif device.type == "virtualmachine" %}
-              <i class="mdi mdi-monitor me-1"></i>
-            {% else %}
-              <i class="mdi mdi-help-circle-outline me-1"></i>
-            {% endif %}
-            {% if device.url %}
-              <a href="{{ device.url }}">{{ device.name }}</a>
-            {% else %}
-              {{ device.name }}
-            {% endif %}
-            {% if device.parent_name %}
-              <small class="text-muted">on
-                {% if device.parent_url %}<a href="{{ device.parent_url }}" class="text-muted">{{ device.parent_name }}</a>{% else %}{{ device.parent_name }}{% endif %}
-              </small>
-            {% endif %}
-          </div>
-          <div class="ms-4">
-            {% for cert in device.certificates %}
-            <div class="d-flex align-items-center mb-1">
-              <span class="text-{{ cert.color }} me-2">&#9679;</span>
-              <a href="{{ cert.url }}">{{ cert.common_name }}</a>
-              {% if cert.is_primary %}<span class="badge text-bg-primary ms-1">Primary</span>{% endif %}
-              {% if cert.days_remaining != None %}
-                {% if cert.days_remaining >= 0 %}
-                  <small class="text-muted ms-2">{{ cert.days_remaining }}d remaining</small>
-                {% else %}
-                  <small class="text-danger ms-2">expired</small>
-                {% endif %}
-              {% endif %}
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-        {% endfor %}
+        {% include "netbox_ssl/inc/certificate_map_devices.html" with devices=node.devices %}
         {% endif %}
       </div>
     </div>
