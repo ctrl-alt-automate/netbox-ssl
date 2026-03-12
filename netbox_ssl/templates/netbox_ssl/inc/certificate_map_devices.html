@@ -20,6 +20,11 @@ Context: devices - list of device dicts from CertificateTopologyBuilder
     {% else %}
       {{ device.name }}
     {% endif %}
+    {% if device.parent_name %}
+      <small class="text-muted">on
+        {% if device.parent_url %}<a href="{{ device.parent_url }}" class="text-muted">{{ device.parent_name }}</a>{% else %}{{ device.parent_name }}{% endif %}
+      </small>
+    {% endif %}
   </div>
   <div class="ms-4">
     {% for cert in device.certificates %}

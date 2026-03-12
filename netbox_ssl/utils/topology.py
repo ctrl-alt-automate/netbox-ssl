@@ -93,11 +93,23 @@ class CertificateTopologyBuilder:
 
             if device_key not in tree[tenant_key]["devices"]:
                 obj_url = getattr(assigned_obj, "get_absolute_url", lambda: None)()
+                obj_type = assignment.assigned_object_type.model if assignment.assigned_object_type else "unknown"
+
+                # For services, resolve the parent device/VM
+                parent_name = None
+                parent_url = None
+                if obj_type == "service":
+                    parent = getattr(assigned_obj, "parent", None)
+                    if parent is not None:
+                        parent_name = str(parent)
+                        parent_url = getattr(parent, "get_absolute_url", lambda: None)()
 
                 tree[tenant_key]["devices"][device_key] = {
                     "name": device_name,
                     "url": obj_url,
-                    "type": assignment.assigned_object_type.model if assignment.assigned_object_type else "unknown",
+                    "type": obj_type,
+                    "parent_name": parent_name,
+                    "parent_url": parent_url,
                     "certificates": [],
                 }
 
