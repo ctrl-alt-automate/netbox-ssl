@@ -20,7 +20,7 @@
 ---
 
 <p align="center">
-  <img src="docs/images/certificate-list.png" alt="NetBox SSL Certificate List" width="800">
+  <img src="docs/images/carousel-dark.gif" alt="NetBox SSL Plugin — Certificate List, Analytics, Detail, Compliance, Map" width="800">
 </p>
 
 ## ✨ Why NetBox SSL?
@@ -94,21 +94,31 @@ See [Configuration](docs/configuration.md) for more options including custom fie
 <table>
   <tr>
     <td align="center">
-      <img src="docs/images/certificate-detail.png" alt="Certificate Detail" width="400"><br>
-      <em>Certificate details with validity and assignments</em>
+      <img src="docs/images/analytics-dashboard-dark.png" alt="Analytics Dashboard" width="400"><br>
+      <em>Analytics dashboard with expiry forecast</em>
     </td>
     <td align="center">
-      <img src="docs/images/certificate-import.png" alt="Smart Import" width="400"><br>
-      <em>Smart Paste import with automatic X.509 parsing</em>
+      <img src="docs/images/certificate-detail-dark.png" alt="Certificate Detail" width="400"><br>
+      <em>Certificate detail with tabbed layout</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/images/dashboard-widget.png" alt="Dashboard Widget" width="400"><br>
-      <em>Dashboard widget showing certificate health</em>
+      <img src="docs/images/compliance-report-dark.png" alt="Compliance Report" width="400"><br>
+      <em>Compliance report with score and trend</em>
     </td>
     <td align="center">
-      <img src="docs/images/assignments-list.png" alt="Assignments" width="400"><br>
+      <img src="docs/images/certificate-map-dark.png" alt="Certificate Map" width="400"><br>
+      <em>Certificate map topology per tenant</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/images/certificate-import-dark.png" alt="Smart Import" width="400"><br>
+      <em>Smart Paste import with X.509 parsing</em>
+    </td>
+    <td align="center">
+      <img src="docs/images/assignments-list-dark.png" alt="Assignments" width="400"><br>
       <em>Track which certificates are assigned where</em>
     </td>
   </tr>
