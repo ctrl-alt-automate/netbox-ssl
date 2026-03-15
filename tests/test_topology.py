@@ -143,10 +143,14 @@ class TestCertificateTopologyBuilder:
         builder = self._make_builder()
         assignment = self._make_assignment("example.com", "Acme Corp", days=45)
 
-        # Mock select_related chain
+        # Mock select_related chain — must handle [:1000] slicing
         qs = builder.CertificateAssignment.objects.select_related.return_value
-        qs.__iter__ = MagicMock(return_value=iter([assignment]))
-        qs.__len__ = MagicMock(return_value=1)
+        sliced_qs = MagicMock()
+        sliced_qs.__iter__ = MagicMock(return_value=iter([assignment]))
+        qs.__getitem__ = MagicMock(return_value=sliced_qs)
+
+        # Mock values_list for orphan exclusion subquery
+        builder.CertificateAssignment.objects.values_list.return_value = []
 
         # Mock ContentType resolution
         mock_obj = MagicMock()

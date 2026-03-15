@@ -159,38 +159,33 @@ class TestCheckDatabaseTables:
 class TestCheckPluginReady:
     """Tests for fresh-install-friendly check_plugin_ready."""
 
-    def _get_models_module(self):
-        """Get the mocked netbox_ssl.models module from sys.modules."""
-        return sys.modules["netbox_ssl.models"]
-
-    def test_healthy_plugin(self):
+    @patch("netbox_ssl.models.CertificateAssignment")
+    @patch("netbox_ssl.models.Certificate")
+    def test_healthy_plugin(self, mock_cert, mock_assignment):
         """Healthy plugin returns I001 info message."""
-        models_mod = self._get_models_module()
-        models_mod.Certificate.objects.count.return_value = 10
-        models_mod.CertificateAssignment.objects.count.return_value = 5
-        models_mod.Certificate.objects.filter.return_value.count.return_value = 0
+        mock_cert.objects.count.return_value = 10
+        mock_assignment.objects.count.return_value = 5
+        mock_cert.objects.filter.return_value.count.return_value = 0
         results = check_plugin_ready(None)
         assert any(r.id == "netbox_ssl.I001" for r in results)
 
-    def test_does_not_exist_error_returns_info(self):
+    @patch("netbox_ssl.models.CertificateAssignment")
+    @patch("netbox_ssl.models.Certificate")
+    def test_does_not_exist_error_returns_info(self, mock_cert, mock_assignment):
         """'does not exist' errors get friendly I003 instead of W009."""
-        models_mod = self._get_models_module()
-        models_mod.Certificate.objects.count.side_effect = Exception('relation "netbox_ssl_certificate" does not exist')
+        mock_cert.objects.count.side_effect = Exception('relation "netbox_ssl_certificate" does not exist')
         results = check_plugin_ready(None)
         assert len(results) == 1
         assert results[0].id == "netbox_ssl.I003"
         assert _is_info(results[0])
         assert "migrate netbox_ssl" in results[0].msg
-        # Reset side_effect for other tests
-        models_mod.Certificate.objects.count.side_effect = None
 
-    def test_other_error_returns_w009(self):
+    @patch("netbox_ssl.models.CertificateAssignment")
+    @patch("netbox_ssl.models.Certificate")
+    def test_other_error_returns_w009(self, mock_cert, mock_assignment):
         """Non-table errors still give W009 warning."""
-        models_mod = self._get_models_module()
-        models_mod.Certificate.objects.count.side_effect = Exception("connection refused")
+        mock_cert.objects.count.side_effect = Exception("connection refused")
         results = check_plugin_ready(None)
         assert len(results) == 1
         assert results[0].id == "netbox_ssl.W009"
         assert _is_warning(results[0])
-        # Reset side_effect for other tests
-        models_mod.Certificate.objects.count.side_effect = None

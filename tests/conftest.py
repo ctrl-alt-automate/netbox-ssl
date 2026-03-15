@@ -369,10 +369,16 @@ def renewal_test_data(netbox_api: NetBoxAPI):
         "assignment_id": assignment["id"],
     }
 
-    # Cleanup in reverse order — ignore 404s from cascade deletes
-    netbox_api.delete_assignment(assignment["id"])
+    # Cleanup in reverse order — ignore errors from cascade deletes or
+    # server-side issues (404 = already gone, 500 = cascade/event side-effect)
+    def _safe_delete(fn, *args):
+        try:
+            fn(*args)
+        except requests.exceptions.RequestException:
+            pass  # Teardown errors are acceptable
+
+    _safe_delete(netbox_api.delete_assignment, assignment["id"])
     # Also clean up any new cert that renewal may have created
-    # Search for certs with this CN and delete them
     try:
         resp = netbox_api.session.get(
             f"{netbox_api.base_url}/api/plugins/ssl/certificates/",
@@ -380,13 +386,13 @@ def renewal_test_data(netbox_api: NetBoxAPI):
         )
         if resp.status_code == 200:
             for cert in resp.json().get("results", []):
-                netbox_api.delete_certificate(cert["id"])
+                _safe_delete(netbox_api.delete_certificate, cert["id"])
     except requests.exceptions.RequestException:
-        pass  # Network errors during cleanup are acceptable
-    netbox_api.delete_certificate(old_cert_id)
-    netbox_api.delete_service(service["id"])
-    netbox_api.delete_device(device["id"])
-    netbox_api.delete_device_type(device_type["id"])
-    netbox_api.delete_device_role(device_role["id"])
-    netbox_api.delete_manufacturer(manufacturer["id"])
-    netbox_api.delete_site(site["id"])
+        pass
+    _safe_delete(netbox_api.delete_certificate, old_cert_id)
+    _safe_delete(netbox_api.delete_service, service["id"])
+    _safe_delete(netbox_api.delete_device, device["id"])
+    _safe_delete(netbox_api.delete_device_type, device_type["id"])
+    _safe_delete(netbox_api.delete_device_role, device_role["id"])
+    _safe_delete(netbox_api.delete_manufacturer, manufacturer["id"])
+    _safe_delete(netbox_api.delete_site, site["id"])
