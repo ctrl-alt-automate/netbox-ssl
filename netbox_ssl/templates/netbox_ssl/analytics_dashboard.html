@@ -1,0 +1,150 @@
+{% extends 'base/layout.html' %}
+{% load i18n static %}
+
+{% block title %}Certificate Analytics{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="{% static 'netbox_ssl/css/charts.css' %}">
+{% endblock head %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'plugins:netbox_ssl:certificate_list' %}">SSL Certificates</a>
+  </li>
+  <li class="breadcrumb-item active" aria-current="page">Analytics Dashboard</li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+
+{# Summary cards #}
+<div class="row mb-4">
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <i class="mdi mdi-certificate fs-1 text-primary"></i>
+        <h2 class="mb-0">{{ total_active }}</h2>
+        <small class="text-muted">Active Certificates</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <i class="mdi mdi-link-off fs-1 text-warning"></i>
+        <h2 class="mb-0">{{ orphan_count }}</h2>
+        <small class="text-muted">Unassigned</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <i class="mdi mdi-calendar-clock fs-1 text-info"></i>
+        <h2 class="mb-0">{% if avg_remaining_days != None %}{{ avg_remaining_days|floatformat:0 }}d{% else %}&mdash;{% endif %}</h2>
+        <small class="text-muted">Avg Days Remaining</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <i class="mdi mdi-autorenew fs-1 text-success"></i>
+        <h2 class="mb-0">{{ acme_distribution.acme }}</h2>
+        <small class="text-muted">ACME Managed</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-4">
+  {# Status Distribution #}
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><h5 class="mb-0">Certificate Status</h5></div>
+      <div class="card-body">
+        {% include "netbox_ssl/inc/svg_bar_chart.html" with bars=status_bars %}
+      </div>
+    </div>
+  </div>
+
+  {# Algorithm Distribution #}
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><h5 class="mb-0">Key Algorithms</h5></div>
+      <div class="card-body">
+        {% include "netbox_ssl/inc/svg_bar_chart.html" with bars=algo_bars %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-4">
+  {# Expiry Forecast #}
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header"><h5 class="mb-0">Expiry Forecast (12 months)</h5></div>
+      <div class="card-body">
+        {% include "netbox_ssl/inc/svg_forecast_chart.html" %}
+      </div>
+    </div>
+  </div>
+
+  {# CA Distribution #}
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header"><h5 class="mb-0">Certificate Authorities</h5></div>
+      <div class="card-body">
+        {% if ca_distribution %}
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th>CA</th><th class="text-end">Count</th></tr></thead>
+          <tbody>
+          {% for item in ca_distribution %}
+            <tr><td>{{ item.name }}</td><td class="text-end">{{ item.count }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted mb-0">No CA data available.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ACME Distribution #}
+<div class="row mb-4">
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header"><h5 class="mb-0">ACME Distribution</h5></div>
+      <div class="card-body">
+        {% with total=acme_distribution.acme|add:acme_distribution.non_acme %}
+        {% if total > 0 %}
+        <div class="progress" style="height: 24px;">
+          <div class="progress-bar bg-success" style="width: {% widthratio acme_distribution.acme total 100 %}%">
+            ACME: {{ acme_distribution.acme }}
+          </div>
+          <div class="progress-bar bg-secondary" style="width: {% widthratio acme_distribution.non_acme total 100 %}%">
+            Other: {{ acme_distribution.non_acme }}
+          </div>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No active certificates.</p>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Empty state #}
+{% if not status_bars and not algo_bars %}
+<div class="text-center py-5 text-muted">
+  <i class="mdi mdi-chart-bar fs-1"></i>
+  <p class="mt-2 mb-1">No certificate data to display.</p>
+  <a href="{% url 'plugins:netbox_ssl:certificate_import' %}" class="btn btn-sm btn-primary mt-2">
+    <i class="mdi mdi-upload"></i> Import Certificate
+  </a>
+</div>
+{% endif %}
+
+{% endblock content %}

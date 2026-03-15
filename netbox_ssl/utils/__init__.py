@@ -1,3 +1,4 @@
+from .analytics import CertificateAnalytics
 from .ca_detector import detect_issuing_ca, get_or_create_ca_from_issuer
 from .chain_validator import (
     ChainValidationError,
@@ -6,6 +7,7 @@ from .chain_validator import (
     ChainValidator,
 )
 from .compliance_checker import CheckResult, ComplianceChecker
+from .compliance_reporter import ComplianceReporter
 from .csr_parser import CSRParseError, CSRParser
 from .events import (
     EVENT_CERTIFICATE_EXPIRED,
@@ -19,12 +21,14 @@ from .export import CertificateExporter, ExportFormatChoices
 from .parser import CertificateParseError, CertificateParser, PrivateKeyDetectedError
 
 __all__ = [
+    "CertificateAnalytics",
     "CertificateParser",
     "CertificateParseError",
     "PrivateKeyDetectedError",
     "CSRParser",
     "CSRParseError",
     "ComplianceChecker",
+    "ComplianceReporter",
     "CheckResult",
     "CertificateExporter",
     "ExportFormatChoices",

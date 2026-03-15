@@ -89,6 +89,26 @@ menu = PluginMenu(
                 ),
             ),
         ),
+        (
+            "Insights",
+            (
+                PluginMenuItem(
+                    link="plugins:netbox_ssl:analytics_dashboard",
+                    link_text="Analytics Dashboard",
+                    permissions=["netbox_ssl.view_certificate"],
+                ),
+                PluginMenuItem(
+                    link="plugins:netbox_ssl:compliance_report",
+                    link_text="Compliance Report",
+                    permissions=["netbox_ssl.view_certificate"],
+                ),
+                PluginMenuItem(
+                    link="plugins:netbox_ssl:certificate_map",
+                    link_text="Certificate Map",
+                    permissions=["netbox_ssl.view_certificate"],
+                ),
+            ),
+        ),
     ),
     icon_class="mdi mdi-certificate",
 )

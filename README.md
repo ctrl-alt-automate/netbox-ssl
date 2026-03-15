@@ -20,7 +20,7 @@
 ---
 
 <p align="center">
-  <img src="docs/images/certificate-list.png" alt="NetBox SSL Certificate List" width="800">
+  <img src="docs/images/carousel-dark.gif" alt="NetBox SSL Plugin — Certificate List, Analytics, Detail, Compliance, Map" width="800">
 </p>
 
 ## ✨ Why NetBox SSL?
@@ -31,6 +31,15 @@ Managing SSL certificates across your infrastructure shouldn't be a scavenger hu
 - 🔄 **Painless renewals** — The Janus workflow transfers all assignments automatically when you renew
 - 🔒 **Security first** — Private keys are never stored, only location hints for your secret management system
 - 🎯 **Deep integration** — Certificates link directly to NetBox Services, Devices, and VMs
+
+## Requirements
+
+| Dependency | Version |
+|------------|---------|
+| NetBox     | 4.4.0 - 4.5.x |
+| Python     | 3.10+ |
+
+The plugin uses the Python [`cryptography`](https://cryptography.io/) library for X.509 certificate parsing (installed automatically as a dependency).
 
 ## Installation
 
@@ -85,21 +94,31 @@ See [Configuration](docs/configuration.md) for more options including custom fie
 <table>
   <tr>
     <td align="center">
-      <img src="docs/images/certificate-detail.png" alt="Certificate Detail" width="400"><br>
-      <em>Certificate details with validity and assignments</em>
+      <img src="docs/images/analytics-dashboard-dark.png" alt="Analytics Dashboard" width="400"><br>
+      <em>Analytics dashboard with expiry forecast</em>
     </td>
     <td align="center">
-      <img src="docs/images/certificate-import.png" alt="Smart Import" width="400"><br>
-      <em>Smart Paste import with automatic X.509 parsing</em>
+      <img src="docs/images/certificate-detail-dark.png" alt="Certificate Detail" width="400"><br>
+      <em>Certificate detail with tabbed layout</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/images/dashboard-widget.png" alt="Dashboard Widget" width="400"><br>
-      <em>Dashboard widget showing certificate health</em>
+      <img src="docs/images/compliance-report-dark.png" alt="Compliance Report" width="400"><br>
+      <em>Compliance report with score and trend</em>
     </td>
     <td align="center">
-      <img src="docs/images/assignments-list.png" alt="Assignments" width="400"><br>
+      <img src="docs/images/certificate-map-dark.png" alt="Certificate Map" width="400"><br>
+      <em>Certificate map topology per tenant</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/images/certificate-import-dark.png" alt="Smart Import" width="400"><br>
+      <em>Smart Paste import with X.509 parsing</em>
+    </td>
+    <td align="center">
+      <img src="docs/images/assignments-list-dark.png" alt="Assignments" width="400"><br>
       <em>Track which certificates are assigned where</em>
     </td>
   </tr>
@@ -140,6 +159,15 @@ Import certificate metadata from CSV or JSON files — paste content or upload a
 ### ACME Certificate Monitoring
 Track Let's Encrypt and other ACME-issued certificates with auto-detection, renewal status, and provider metadata. Supports 7+ ACME providers.
 
+### Analytics Dashboard
+Visual overview of your certificate landscape: status distribution, key algorithms, expiry forecast with contextual colors, CA distribution, and ACME coverage. Tenant-filterable with dark mode support.
+
+### Compliance Report
+Score overview with progress indicator, failure breakdowns by severity and policy type, 90-day trend chart, and CSV/JSON export.
+
+### Certificate Map
+Interactive topology view showing certificates per Tenant → Device/VM → Service, with color-coded expiry status and HTMX lazy loading for performance.
+
 ### Email Notifications
 Receive email alerts when certificates are expiring. Configurable recipients, thresholds, and subject prefix. Sends HTML + plain-text reports.
 
@@ -164,8 +192,8 @@ Add the widget to your NetBox dashboard to see:
 
 | NetBox Version | Plugin Version | Status |
 |:--------------:|:--------------:|:------:|
-| 4.5.x          | 0.6.x          | ✅ Primary |
-| 4.4.x          | 0.6.x          | ✅ Supported |
+| 4.5.x          | 0.7.x          | ✅ Primary |
+| 4.4.x          | 0.7.x          | ✅ Supported |
 | 4.3.x and older| —              | ❌ Unsupported |
 
 ## 📚 Documentation
@@ -177,6 +205,7 @@ Full documentation is available in the [docs/](docs/index.md) folder:
 - **[Usage Guide](docs/usage.md)** — Learn the workflows
 - **[API Reference](docs/api.md)** — REST API and GraphQL
 - **[Custom Scripts](docs/scripts.md)** — Expiry notifications and scheduling
+- **[Webhooks](docs/webhooks.md)** — Event Rules with Slack, Teams, PagerDuty templates
 - **[Data Models](docs/data-models.md)** — Database schema details
 - **[Contributing](CONTRIBUTING.md)** — Contribution guidelines
 

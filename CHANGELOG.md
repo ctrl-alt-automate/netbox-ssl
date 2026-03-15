@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.7.0] - 2026-03-12
+
+### Added
+
+- **Certificate Analytics Dashboard** ([#44](https://github.com/ctrl-alt-automate/netbox-ssl/issues/44)):
+  - Summary cards with MDI icons: active certificates, unassigned, avg days remaining, ACME managed
+  - Certificate status distribution chart (Bootstrap CSS classes, dark mode compatible)
+  - Key algorithm distribution chart
+  - Expiry forecast (12 months) with contextual colors (red/yellow/blue per time horizon)
+  - CA distribution and ACME distribution charts
+  - Empty states with action links
+  - Tenant filter support
+
+- **Compliance Report View** ([#45](https://github.com/ctrl-alt-automate/netbox-ssl/issues/45)):
+  - Score overview card with shield icon and progress bar indicator
+  - Failures by severity and policy type breakdowns
+  - Compliance trend chart (90 days) from snapshots
+  - CSV and JSON export buttons
+  - Tenant filter support
+
+- **Certificate Map** ([#46](https://github.com/ctrl-alt-automate/netbox-ssl/issues/46)):
+  - Visual topology: Tenant → Device/VM → Service → Certificate
+  - Color-coded expiry status legend (green/yellow/red)
+  - HTMX lazy loading per tenant for performance
+  - Parent device/VM name shown for service assignments
+  - Orphan certificates grouped as "Unassigned Certificates"
+  - Summary cards: tenant groups, devices/services, certificate assignments
+
+- **UI/UX Polish** ([#65](https://github.com/ctrl-alt-automate/netbox-ssl/issues/65)):
+  - Certificate detail: tabbed layout for SANs, Assignments, History
+  - Certificate panel: `{% badge %}` template tag for status display
+  - MDI icons on all summary cards across all dashboard pages
+  - Charts use Bootstrap CSS classes instead of hardcoded hex colors (dark mode compatible)
+  - New `charts.css` with reusable chart utility classes
+  - Empty states with icons and action links on all pages
+
+### Fixed
+
+- Compliance score CSS `conic-gradient` not rendering with Bootstrap CSS variables ([#65](https://github.com/ctrl-alt-automate/netbox-ssl/issues/65))
+- Django l10n locale formatting breaking CSS `calc()` expressions (comma vs period)
+- Certificate map HTMX loading spinner stuck for tenants with `id=None`
+- Fresh install Django system check messages improved ([#63](https://github.com/ctrl-alt-automate/netbox-ssl/issues/63))
+
+### Changed
+
+- Compliance report score card redesigned from donut ring to consistent card layout with progress bar
+- Forecast chart bars use contextual colors per time horizon instead of uniform yellow
+- Topology views refactored with shared `_parse_map_filters()` helper (DRY)
+- Updated documentation for all v0.7.0 features
+- Updated compatibility table to v0.7.x
+
 ## [0.6.0] - 2026-03-09
 
 ### Added
@@ -299,6 +352,8 @@ Initial release of NetBox SSL Plugin.
 - NetBox 4.4.0 - 4.5.x
 - Python 3.10+
 
+[Unreleased]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.4.1...v0.5.0

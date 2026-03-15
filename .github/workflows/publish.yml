@@ -2,11 +2,12 @@
 name: Publish to PyPI
 
 on:
-  release:
-    types: [published]  # Triggers on GitHub Release (not tag push)
+  push:
+    tags:
+      - "v*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   publish:
@@ -14,11 +15,14 @@ jobs:
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
+      contents: write
       id-token: write  # Required for Trusted Publisher (OIDC)
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -37,3 +41,16 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         # Uses Trusted Publisher (OIDC) - no API token needed
         # Configure at: https://pypi.org/manage/project/netbox-ssl/settings/publishing/
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          version="${GITHUB_REF#refs/tags/v}"
+          changelog=$(awk "/^## \\[${version}\\]/{found=1; next} /^## \\[/{if(found) exit} found{print}" CHANGELOG.md)
+          echo "$changelog" > /tmp/release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: /tmp/release_notes.md
+          files: dist/*

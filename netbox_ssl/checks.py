@@ -272,8 +272,20 @@ def check_database_tables(app_configs, **kwargs):
             "netbox_ssl_certificateassignment",
         ]
 
-        for table in expected_tables:
-            if table not in tables:
+        missing_tables = [t for t in expected_tables if t not in tables]
+
+        if len(missing_tables) == len(expected_tables):
+            # All tables missing — fresh install, not yet migrated
+            warnings.append(
+                Info(
+                    "Plugin tables not yet created. Run: python manage.py migrate netbox_ssl",
+                    hint="This is expected on a fresh install before running migrations.",
+                    id="netbox_ssl.I002",
+                )
+            )
+        else:
+            # Partial — some tables exist, some don't
+            for table in missing_tables:
                 warnings.append(
                     Warning(
                         f"Database table not found: {table}",
@@ -357,11 +369,22 @@ def check_plugin_ready(app_configs, **kwargs):
             )
 
     except Exception as e:
-        infos.append(
-            Warning(
-                f"Could not perform plugin health check: {e}",
-                id="netbox_ssl.W009",
+        error_msg = str(e)
+        if "does not exist" in error_msg:
+            # Tables not yet created — friendly message for fresh installs
+            infos.append(
+                Info(
+                    "Plugin not yet initialized. Run: python manage.py migrate netbox_ssl",
+                    hint=f"Database details: {error_msg}",
+                    id="netbox_ssl.I003",
+                )
             )
-        )
+        else:
+            infos.append(
+                Warning(
+                    f"Could not perform plugin health check: {error_msg}",
+                    id="netbox_ssl.W009",
+                )
+            )
 
     return infos

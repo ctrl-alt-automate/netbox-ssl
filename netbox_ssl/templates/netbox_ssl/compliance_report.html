@@ -1,0 +1,152 @@
+{% extends 'base/layout.html' %}
+{% load i18n l10n static %}
+
+{% block title %}Compliance Report{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="{% static 'netbox_ssl/css/charts.css' %}">
+{% endblock head %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'plugins:netbox_ssl:certificate_list' %}">SSL Certificates</a>
+  </li>
+  <li class="breadcrumb-item active" aria-current="page">Compliance Report</li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+
+{# Export buttons #}
+<div class="mb-3 text-end">
+  <a href="?export=csv{% if tenant %}&tenant={{ tenant.pk }}{% endif %}" class="btn btn-sm btn-outline-secondary">
+    <i class="mdi mdi-file-delimited"></i> Export CSV
+  </a>
+  <a href="?export=json{% if tenant %}&tenant={{ tenant.pk }}{% endif %}" class="btn btn-sm btn-outline-secondary">
+    <i class="mdi mdi-code-json"></i> Export JSON
+  </a>
+</div>
+
+{# Score overview #}
+<div class="row mb-4">
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <i class="mdi mdi-shield-check fs-1 {% if report.compliance_score >= 80 %}text-success{% elif report.compliance_score >= 50 %}text-warning{% else %}text-danger{% endif %}"></i>
+        <h2 class="mb-0 {% if report.compliance_score >= 80 %}text-success{% elif report.compliance_score >= 50 %}text-warning{% else %}text-danger{% endif %}">{{ report.compliance_score }}%</h2>
+        <small class="text-muted">Compliance Score</small>
+      </div>
+      <div class="card-footer p-0">
+        <div class="progress" style="height: 4px; border-radius: 0 0 4px 4px;">
+          <div class="progress-bar {% if report.compliance_score >= 80 %}bg-success{% elif report.compliance_score >= 50 %}bg-warning{% else %}bg-danger{% endif %}" style="width: {{ report.compliance_score|unlocalize }}%;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <i class="mdi mdi-certificate fs-1 text-primary"></i>
+        <h2 class="mb-0">{{ report.total_certificates }}</h2>
+        <small class="text-muted">Certificates</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <i class="mdi mdi-check-circle fs-1 text-success"></i>
+        <h2 class="mb-0 text-success">{{ report.passed_checks }}</h2>
+        <small class="text-muted">Passed</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <i class="mdi mdi-close-circle fs-1 text-danger"></i>
+        <h2 class="mb-0 text-danger">{{ report.failed_checks }}</h2>
+        <small class="text-muted">Failed</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-4">
+  {# Severity breakdown #}
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><h5 class="mb-0">Failures by Severity</h5></div>
+      <div class="card-body">
+        {% if report.severity_breakdown %}
+        {% for item in report.severity_breakdown %}
+        <div class="d-flex align-items-center mb-2">
+          <span class="text-end me-2 ssl-chart-label-sm">
+            <span class="badge {% if item.severity == 'critical' %}text-bg-danger{% elif item.severity == 'warning' %}text-bg-warning{% else %}text-bg-info{% endif %}">
+              {{ item.severity|capfirst }}
+            </span>
+          </span>
+          <span class="fw-bold">{{ item.count }}</span>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="text-success mb-0"><i class="mdi mdi-check-circle"></i> No compliance failures.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Policy type breakdown #}
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><h5 class="mb-0">Failures by Policy Type</h5></div>
+      <div class="card-body">
+        {% if report.policy_breakdown %}
+        <table class="table table-sm table-hover mb-0">
+          <thead><tr><th>Policy Type</th><th class="text-end">Failures</th></tr></thead>
+          <tbody>
+          {% for item in report.policy_breakdown %}
+            <tr>
+              <td>{{ item.policy_type|default:"—" }}</td>
+              <td class="text-end">{{ item.count }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-success mb-0"><i class="mdi mdi-check-circle"></i> All policies passing.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Trend chart #}
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><h5 class="mb-0">Compliance Trend (90 days)</h5></div>
+      <div class="card-body">
+        {% if trend_bars %}
+        {% for bar in trend_bars %}
+        <div class="d-flex align-items-center mb-1">
+          <span class="text-end me-2 ssl-chart-label-xs">{{ bar.label }}</span>
+          <div class="flex-grow-1">
+            <div class="progress ssl-chart-bar-sm">
+              <div class="progress-bar {% if bar.score >= 80 %}bg-success{% elif bar.score >= 50 %}bg-warning{% else %}bg-danger{% endif %}"
+                   role="progressbar" style="width: {{ bar.pct }}%;">
+                {% if bar.pct > 20 %}{{ bar.score|floatformat:0 }}%{% endif %}
+              </div>
+            </div>
+          </div>
+          {% if bar.pct <= 20 %}<span class="ms-1 ssl-chart-value-sm">{{ bar.score|floatformat:0 }}%</span>{% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="text-muted mb-0">No trend data available. Run compliance checks to generate snapshots.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}

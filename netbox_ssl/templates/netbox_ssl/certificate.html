@@ -186,30 +186,46 @@
 </div>
 {% endif %}
 
-{% if object.sans %}
+{# Tabbed secondary sections #}
+{% if object.sans or assignments or object.replaced_by or object.replaces.exists %}
 <div class="row mb-3">
   <div class="col col-12">
-    <div class="card">
-      <h5 class="card-header">Subject Alternative Names</h5>
-      <div class="card-body">
+    <ul class="nav nav-tabs" role="tablist">
+      {% if object.sans %}
+      <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-sans" type="button" role="tab">
+          SANs <span class="badge text-bg-secondary">{{ object.sans|length }}</span>
+        </button>
+      </li>
+      {% endif %}
+      {% if assignments %}
+      <li class="nav-item">
+        <button class="nav-link {% if not object.sans %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-assignments" type="button" role="tab">
+          Assignments <span class="badge text-bg-secondary">{{ assignments_count }}</span>
+        </button>
+      </li>
+      {% endif %}
+      {% if object.replaced_by or object.replaces.exists %}
+      <li class="nav-item">
+        <button class="nav-link {% if not object.sans and not assignments %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-history" type="button" role="tab">
+          History
+        </button>
+      </li>
+      {% endif %}
+    </ul>
+    <div class="tab-content border border-top-0 rounded-bottom">
+      {% if object.sans %}
+      <div class="tab-pane fade show active p-3" id="tab-sans" role="tabpanel">
         <ul class="list-unstyled mb-0">
           {% for san in object.sans %}
             <li><code>{{ san }}</code></li>
           {% endfor %}
         </ul>
       </div>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-{% if assignments %}
-<div class="row mb-3">
-  <div class="col col-12">
-    <div class="card">
-      <h5 class="card-header">Assignments ({{ assignments_count }})</h5>
-      <div class="card-body">
-        <table class="table table-hover">
+      {% endif %}
+      {% if assignments %}
+      <div class="tab-pane fade {% if not object.sans %}show active{% endif %} p-3" id="tab-assignments" role="tabpanel">
+        <table class="table table-hover mb-0">
           <thead>
             <tr>
               <th>Type</th>
@@ -243,29 +259,18 @@
           </tbody>
         </table>
       </div>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-{% if object.replaced_by %}
-<div class="row mb-3">
-  <div class="col col-12">
-    <div class="alert alert-info">
-      <strong>Replaced by:</strong>
-      <a href="{{ object.replaced_by.get_absolute_url }}">{{ object.replaced_by.common_name }}</a>
-      (Serial: {{ object.replaced_by.serial_number|truncatechars:20 }})
-    </div>
-  </div>
-</div>
-{% endif %}
-
-{% if object.replaces.exists %}
-<div class="row mb-3">
-  <div class="col col-12">
-    <div class="card">
-      <h5 class="card-header">Previous Certificates</h5>
-      <div class="card-body">
+      {% endif %}
+      {% if object.replaced_by or object.replaces.exists %}
+      <div class="tab-pane fade {% if not object.sans and not assignments %}show active{% endif %} p-3" id="tab-history" role="tabpanel">
+        {% if object.replaced_by %}
+        <div class="alert alert-info mb-3">
+          <strong>Replaced by:</strong>
+          <a href="{{ object.replaced_by.get_absolute_url }}">{{ object.replaced_by.common_name }}</a>
+          (Serial: {{ object.replaced_by.serial_number|truncatechars:20 }})
+        </div>
+        {% endif %}
+        {% if object.replaces.exists %}
+        <h6>Previous Certificates</h6>
         <ul class="list-unstyled mb-0">
           {% for old_cert in object.replaces.all %}
             <li>
@@ -275,7 +280,9 @@
             </li>
           {% endfor %}
         </ul>
+        {% endif %}
       </div>
+      {% endif %}
     </div>
   </div>
 </div>

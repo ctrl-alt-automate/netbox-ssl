@@ -25,19 +25,7 @@
                         </a>
                     </td>
                     <td>
-                        {% if assignment.certificate.status == 'active' %}
-                            <span class="badge text-bg-success">Active</span>
-                        {% elif assignment.certificate.status == 'expired' %}
-                            <span class="badge text-bg-danger">Expired</span>
-                        {% elif assignment.certificate.status == 'replaced' %}
-                            <span class="badge text-bg-secondary">Replaced</span>
-                        {% elif assignment.certificate.status == 'revoked' %}
-                            <span class="badge text-bg-danger">Revoked</span>
-                        {% elif assignment.certificate.status == 'pending' %}
-                            <span class="badge text-bg-warning">Pending</span>
-                        {% else %}
-                            <span class="badge text-bg-secondary">{{ assignment.certificate.status }}</span>
-                        {% endif %}
+                        {% badge assignment.certificate.get_status_display bg_color=assignment.certificate.get_status_color %}
                     </td>
                     <td>
                         {% with days=assignment.certificate.days_remaining expired_days=assignment.certificate.days_expired %}

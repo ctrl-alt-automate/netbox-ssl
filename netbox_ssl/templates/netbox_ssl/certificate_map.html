@@ -1,0 +1,97 @@
+{% extends 'base/layout.html' %}
+{% load i18n %}
+
+{% block title %}Certificate Map{% endblock %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'plugins:netbox_ssl:certificate_list' %}">SSL Certificates</a>
+  </li>
+  <li class="breadcrumb-item active" aria-current="page">Certificate Map</li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+
+{# Summary #}
+<div class="row mb-4">
+  <div class="col-md-4">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <i class="mdi mdi-domain fs-1 text-primary"></i>
+        <h2 class="mb-0">{{ total_tenants }}</h2>
+        <small class="text-muted">Tenant Groups</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <i class="mdi mdi-server fs-1 text-info"></i>
+        <h2 class="mb-0">{{ total_devices }}</h2>
+        <small class="text-muted">Devices / Services</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <i class="mdi mdi-link-variant fs-1 text-success"></i>
+        <h2 class="mb-0">{{ total_certs }}</h2>
+        <small class="text-muted">Certificate Assignments</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Legend #}
+<div class="mb-3">
+  <span class="badge text-bg-success me-1">&#9679; &gt;30 days</span>
+  <span class="badge text-bg-warning me-1">&#9679; 14-30 days</span>
+  <span class="badge text-bg-danger me-1">&#9679; &lt;14 days / expired</span>
+</div>
+
+{# Topology tree with HTMX lazy loading #}
+{% if tree %}
+<div class="accordion" id="topologyAccordion">
+  {% for node in tree %}
+  <div class="accordion-item">
+    <h2 class="accordion-header">
+      <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button"
+              data-bs-toggle="collapse" data-bs-target="#tenant-{{ forloop.counter }}">
+        <i class="mdi mdi-domain me-2"></i>
+        {{ node.tenant.name }}
+        <span class="badge text-bg-secondary ms-2">{{ node.devices|length }} device{{ node.devices|length|pluralize }}</span>
+      </button>
+    </h2>
+    <div id="tenant-{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+         data-bs-parent="#topologyAccordion"
+         {% if node.tenant.id %}
+         hx-get="{% url 'plugins:netbox_ssl:certificate_map_fragment' %}?tenant={{ node.tenant.id }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if ca_filter %}&ca={{ ca_filter }}{% endif %}"
+         hx-trigger="shown.bs.collapse once"
+         hx-swap="innerHTML"
+         {% endif %}>
+      <div class="accordion-body p-0">
+        {% if node.tenant.id %}
+        <div class="text-center py-3">
+          <div class="spinner-border spinner-border-sm text-muted" role="status"></div>
+          <span class="text-muted ms-2">Loading...</span>
+        </div>
+        {% else %}
+        {% include "netbox_ssl/inc/certificate_map_devices.html" with devices=node.devices %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="mdi mdi-sitemap fs-1"></i>
+  <p class="mt-2 mb-1">No certificate assignments found.</p>
+  <a href="{% url 'plugins:netbox_ssl:certificateassignment_add' %}" class="btn btn-sm btn-primary mt-2">
+    <i class="mdi mdi-plus"></i> Create Assignment
+  </a>
+</div>
+{% endif %}
+
+{% endblock content %}
