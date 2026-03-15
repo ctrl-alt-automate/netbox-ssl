@@ -142,6 +142,7 @@ class CertificateTopologyBuilder:
         if ca_filter:
             orphan_qs = orphan_qs.filter(issuing_ca_id=ca_filter)
 
+        # Cap orphan certificates to prevent performance issues on large installs
         orphans = list(orphan_qs.select_related("tenant")[:100])
         if orphans:
             orphan_tenant_key = "__orphans__"
