@@ -262,7 +262,7 @@ class TestCertificateSnapshot:
         mock_cert.assignments.count.return_value = 2
 
         # Mock super().snapshot() to return None, simulating the bug scenario
-        with patch.object(type(Certificate).__mro__[1], "snapshot", return_value=None):
+        with patch.object(Certificate.__mro__[1], "snapshot", return_value=None):
             data = Certificate.snapshot(mock_cert)
 
         assert isinstance(data, dict)
@@ -285,7 +285,7 @@ class TestCertificateSnapshot:
         mock_cert.assignments.count.return_value = 1
 
         base_data = {"common_name": "example.com", "status": "active"}
-        with patch.object(type(Certificate).__mro__[1], "snapshot", return_value=base_data):
+        with patch.object(Certificate.__mro__[1], "snapshot", return_value=base_data):
             data = Certificate.snapshot(mock_cert)
 
         assert data["common_name"] == "example.com"
