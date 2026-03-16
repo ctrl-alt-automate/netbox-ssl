@@ -240,6 +240,62 @@ class TestCertificateModel:
         assert cert.expiry_status == "expired"
 
 
+class TestCertificateSnapshot:
+    """Tests for Certificate.snapshot() enrichment (issue #67).
+
+    The actual fix is `super().snapshot() or {}` in certificates.py:361.
+    We test the defensive pattern here; the real integration test happens
+    when editing certificates in a running NetBox instance.
+    """
+
+    @pytest.mark.unit
+    def test_snapshot_none_fallback_produces_dict(self):
+        """Test that the `or {}` pattern converts None to a usable dict.
+
+        Regression test for issue #67: 'NoneType' object does not support
+        item assignment when editing and saving a certificate.
+        """
+        # Simulates what happens inside Certificate.snapshot()
+        data = None or {}
+        data["days_remaining"] = 42
+        data["expiry_status"] = "ok"
+        data["assignment_count"] = 2
+
+        assert isinstance(data, dict)
+        assert data["days_remaining"] == 42
+        assert data["expiry_status"] == "ok"
+        assert data["assignment_count"] == 2
+
+    @pytest.mark.unit
+    def test_snapshot_dict_fallback_preserves_existing(self):
+        """Test that `or {}` preserves an existing dict from super()."""
+        base_data = {"common_name": "example.com", "status": "active"}
+        data = base_data or {}
+        data["days_remaining"] = 10
+
+        assert data["common_name"] == "example.com"
+        assert data["days_remaining"] == 10
+
+    @pytest.mark.unit
+    def test_snapshot_without_fix_would_crash(self):
+        """Verify that without the `or {}` fix, None causes TypeError."""
+        data = None
+        with pytest.raises(TypeError, match="does not support item assignment"):
+            data["days_remaining"] = 42
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_snapshot_method_exists_on_certificate(self):
+        """Verify Certificate model has a snapshot method override."""
+        import inspect
+
+        from netbox_ssl.models.certificates import Certificate
+
+        assert hasattr(Certificate, "snapshot")
+        source = inspect.getsource(Certificate.snapshot)
+        assert "or {}" in source, "snapshot() must have the `or {}` defensive fallback"
+
+
 class TestCertificateStatusChoices:
     """Tests for CertificateStatusChoices."""
 

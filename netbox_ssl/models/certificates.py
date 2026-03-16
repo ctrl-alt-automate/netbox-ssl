@@ -358,7 +358,7 @@ class Certificate(NetBoxModel):
         NetBox calls this method to capture object state for changelog diffs.
         By adding computed fields, the changelog shows more useful information.
         """
-        data = super().snapshot()
+        data = super().snapshot() or {}
         # Add computed fields to the snapshot for richer changelog diffs
         data["days_remaining"] = self.days_remaining
         data["expiry_status"] = self.expiry_status
