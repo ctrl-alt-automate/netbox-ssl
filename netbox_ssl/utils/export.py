@@ -76,6 +76,19 @@ class CertificateExporter:
         "last_updated",
     ]
 
+    # Allowlist of all permitted export fields
+    ALLOWED_FIELDS: frozenset[str] = frozenset(DEFAULT_FIELDS + EXTENDED_FIELDS)
+
+    # Characters that trigger formula interpretation in spreadsheet applications
+    _FORMULA_CHARS: frozenset[str] = frozenset("=+-@\t\r")
+
+    @staticmethod
+    def _sanitize_csv_value(value: str) -> str:
+        """Prevent CSV formula injection by prefixing formula-triggering values."""
+        if isinstance(value, str) and value and value[0] in CertificateExporter._FORMULA_CHARS:
+            return "'" + value
+        return value
+
     @classmethod
     def certificate_to_dict(
         cls, certificate, fields: list[str] | None = None, include_pem: bool = False
@@ -120,6 +133,8 @@ class CertificateExporter:
                 data[field] = certificate.is_expiring_soon
             elif field == "expiry_status":
                 data[field] = certificate.expiry_status
+            elif field not in cls.ALLOWED_FIELDS:
+                continue  # skip unknown fields silently
             elif hasattr(certificate, field):
                 data[field] = getattr(certificate, field)
 
@@ -161,7 +176,8 @@ class CertificateExporter:
 
         for cert in certificates:
             row = cls.certificate_to_dict(cert, fields=csv_fields)
-            writer.writerow(row)
+            sanitized_row = {k: cls._sanitize_csv_value(v) for k, v in row.items()}
+            writer.writerow(sanitized_row)
 
         return output.getvalue()
 

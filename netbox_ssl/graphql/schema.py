@@ -18,52 +18,64 @@ class NetBoxSSLQuery:
     """GraphQL query type for NetBox SSL plugin."""
 
     @strawberry_django.field
-    def certificate(self, id: int) -> CertificateType:
+    def certificate(self, info: strawberry.types.Info, id: int) -> CertificateType | None:
         from ..models import Certificate
 
-        return Certificate.objects.get(pk=id)
+        try:
+            return Certificate.objects.restrict(info.context.request.user, "view").get(pk=id)
+        except Certificate.DoesNotExist:
+            return None
 
     @strawberry_django.field
-    def certificate_list(self) -> list[CertificateType]:
+    def certificate_list(self, info: strawberry.types.Info) -> list[CertificateType]:
         from ..models import Certificate
 
-        return Certificate.objects.all()
+        return Certificate.objects.restrict(info.context.request.user, "view")
 
     @strawberry_django.field
-    def certificate_assignment(self, id: int) -> CertificateAssignmentType:
+    def certificate_assignment(self, info: strawberry.types.Info, id: int) -> CertificateAssignmentType | None:
         from ..models import CertificateAssignment
 
-        return CertificateAssignment.objects.get(pk=id)
+        try:
+            return CertificateAssignment.objects.restrict(info.context.request.user, "view").get(pk=id)
+        except CertificateAssignment.DoesNotExist:
+            return None
 
     @strawberry_django.field
-    def certificate_assignment_list(self) -> list[CertificateAssignmentType]:
+    def certificate_assignment_list(self, info: strawberry.types.Info) -> list[CertificateAssignmentType]:
         from ..models import CertificateAssignment
 
-        return CertificateAssignment.objects.all()
+        return CertificateAssignment.objects.restrict(info.context.request.user, "view")
 
     @strawberry_django.field
-    def certificate_authority(self, id: int) -> CertificateAuthorityType:
+    def certificate_authority(self, info: strawberry.types.Info, id: int) -> CertificateAuthorityType | None:
         from ..models import CertificateAuthority
 
-        return CertificateAuthority.objects.get(pk=id)
+        try:
+            return CertificateAuthority.objects.restrict(info.context.request.user, "view").get(pk=id)
+        except CertificateAuthority.DoesNotExist:
+            return None
 
     @strawberry_django.field
-    def certificate_authority_list(self) -> list[CertificateAuthorityType]:
+    def certificate_authority_list(self, info: strawberry.types.Info) -> list[CertificateAuthorityType]:
         from ..models import CertificateAuthority
 
-        return CertificateAuthority.objects.all()
+        return CertificateAuthority.objects.restrict(info.context.request.user, "view")
 
     @strawberry_django.field
-    def certificate_signing_request(self, id: int) -> CertificateSigningRequestType:
+    def certificate_signing_request(self, info: strawberry.types.Info, id: int) -> CertificateSigningRequestType | None:
         from ..models import CertificateSigningRequest
 
-        return CertificateSigningRequest.objects.get(pk=id)
+        try:
+            return CertificateSigningRequest.objects.restrict(info.context.request.user, "view").get(pk=id)
+        except CertificateSigningRequest.DoesNotExist:
+            return None
 
     @strawberry_django.field
-    def certificate_signing_request_list(self) -> list[CertificateSigningRequestType]:
+    def certificate_signing_request_list(self, info: strawberry.types.Info) -> list[CertificateSigningRequestType]:
         from ..models import CertificateSigningRequest
 
-        return CertificateSigningRequest.objects.all()
+        return CertificateSigningRequest.objects.restrict(info.context.request.user, "view")
 
 
 schema = [NetBoxSSLQuery]

@@ -14,7 +14,17 @@ from ..models import Certificate, CertificateAssignment, CertificateAuthority, C
 
 @strawberry_django.type(
     CertificateAuthority,
-    fields="__all__",
+    fields=[
+        "id",
+        "name",
+        "description",
+        "issuer_pattern",
+        "website",
+        "is_acme",
+        "tags",
+        "created",
+        "last_updated",
+    ],
     filters=filtersets.CertificateAuthorityFilterSet,
 )
 class CertificateAuthorityType(NetBoxObjectType):
@@ -36,7 +46,25 @@ class CertificateAuthorityType(NetBoxObjectType):
 
 @strawberry_django.type(
     Certificate,
-    fields="__all__",
+    fields=[
+        "id",
+        "common_name",
+        "serial_number",
+        "fingerprint_sha256",
+        "issuer",
+        "valid_from",
+        "valid_to",
+        "algorithm",
+        "key_size",
+        "status",
+        "sans",
+        "tenant",
+        "issuing_ca",
+        "tags",
+        "comments",
+        "created",
+        "last_updated",
+    ],
     filters=filtersets.CertificateFilterSet,
 )
 class CertificateType(NetBoxObjectType):
@@ -46,15 +74,12 @@ class CertificateType(NetBoxObjectType):
     serial_number: str
     fingerprint_sha256: str
     issuer: str
-    issuer_chain: str
     valid_from: str
     valid_to: str
     sans: list[str]
     key_size: int | None
     algorithm: str
     status: str
-    private_key_location: str
-    pem_content: str
     issuing_ca: Annotated["CertificateAuthorityType", strawberry.lazy(".types")] | None
 
     @strawberry_django.field
@@ -80,7 +105,15 @@ class CertificateType(NetBoxObjectType):
 
 @strawberry_django.type(
     CertificateAssignment,
-    fields="__all__",
+    fields=[
+        "id",
+        "certificate",
+        "assigned_object_type",
+        "assigned_object_id",
+        "is_primary",
+        "created",
+        "last_updated",
+    ],
     filters=filtersets.CertificateAssignmentFilterSet,
 )
 class CertificateAssignmentType(NetBoxObjectType):
@@ -88,12 +121,27 @@ class CertificateAssignmentType(NetBoxObjectType):
 
     certificate: Annotated["CertificateType", strawberry.lazy(".types")]
     is_primary: bool
-    notes: str
 
 
 @strawberry_django.type(
     CertificateSigningRequest,
-    fields="__all__",
+    fields=[
+        "id",
+        "common_name",
+        "organization",
+        "organizational_unit",
+        "country",
+        "state",
+        "locality",
+        "sans",
+        "key_size",
+        "algorithm",
+        "status",
+        "tenant",
+        "tags",
+        "created",
+        "last_updated",
+    ],
     filters=filtersets.CertificateSigningRequestFilterSet,
 )
 class CertificateSigningRequestType(NetBoxObjectType):
@@ -108,13 +156,7 @@ class CertificateSigningRequestType(NetBoxObjectType):
     sans: list[str]
     key_size: int | None
     algorithm: str
-    fingerprint_sha256: str
-    pem_content: str
     status: str
-    requested_date: str
-    requested_by: str
-    target_ca: str
-    notes: str
     # resulting_certificate is auto-resolved by strawberry_django from the ForeignKey
     resulting_certificate: Annotated["CertificateType", strawberry.lazy(".types")] | None
 

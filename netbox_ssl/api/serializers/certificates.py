@@ -102,6 +102,7 @@ class CertificateImportSerializer(serializers.Serializer):
     """Serializer for importing certificates from PEM content."""
 
     pem_content = serializers.CharField(
+        max_length=65536,
         help_text="Certificate in PEM format. May include certificate chain.",
         style={"base_template": "textarea.html"},
     )

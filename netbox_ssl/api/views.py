@@ -2,6 +2,8 @@
 REST API views for NetBox SSL plugin.
 """
 
+import logging
+
 from django.conf import settings
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Count
@@ -42,6 +44,8 @@ from .serializers import (
     CSRImportSerializer,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class CertificateViewSet(NetBoxModelViewSet):
     """API viewset for Certificate model."""
@@ -62,6 +66,9 @@ class CertificateViewSet(NetBoxModelViewSet):
         Accepts raw PEM content and automatically parses all X.509 attributes.
         Private keys are rejected for security reasons.
         """
+        if not request.user.has_perm("netbox_ssl.add_certificate"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
         serializer = CertificateImportSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         certificate = serializer.save()
@@ -91,6 +98,9 @@ class CertificateViewSet(NetBoxModelViewSet):
             }
         ]
         """
+        if not request.user.has_perm("netbox_ssl.add_certificate"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
         # Validate input is a list
         if not isinstance(request.data, list):
             raise serializers.ValidationError({"detail": "Expected a list of certificate objects."})
@@ -134,11 +144,15 @@ class CertificateViewSet(NetBoxModelViewSet):
                     certificate = serializer.save()
                     created_certificates.append(certificate)
         except IntegrityError as e:
+            logger.error("Bulk import IntegrityError: %s", e)
             raise serializers.ValidationError(
-                {"detail": f"Database integrity error during bulk import: {str(e)}"}
+                {"detail": "A database constraint error occurred. Check for duplicate certificates."}
             ) from e
         except DatabaseError as e:
-            raise serializers.ValidationError({"detail": f"Database error during bulk import: {str(e)}"}) from e
+            logger.error("Bulk import DatabaseError: %s", e)
+            raise serializers.ValidationError(
+                {"detail": "A database error occurred during bulk import. Please try again."}
+            ) from e
 
         # Return created certificates
         output_serializer = CertificateSerializer(created_certificates, many=True, context={"request": request})
@@ -165,12 +179,23 @@ class CertificateViewSet(NetBoxModelViewSet):
             "on_duplicate": "skip"
         }
         """
+        if not request.user.has_perm("netbox_ssl.add_certificate"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
         content = request.data.get("content", "")
         fmt = request.data.get("format", "auto")
         on_duplicate = request.data.get("on_duplicate", "error")
 
         if not content:
             raise serializers.ValidationError({"content": "This field is required."})
+
+        valid_formats = {"auto", "csv", "json"}
+        valid_on_duplicate = {"skip", "error"}
+
+        if fmt not in valid_formats:
+            raise serializers.ValidationError({"format": f"Must be one of: {sorted(valid_formats)}"})
+        if on_duplicate not in valid_on_duplicate:
+            raise serializers.ValidationError({"on_duplicate": f"Must be one of: {sorted(valid_on_duplicate)}"})
 
         result = bulk_parse(content, fmt=fmt)
 
@@ -197,10 +222,14 @@ class CertificateViewSet(NetBoxModelViewSet):
             with transaction.atomic():
                 for row in result.valid_rows:
                     # Duplicate check
-                    exists = Certificate.objects.filter(
-                        serial_number=row["serial_number"],
-                        issuer=row["issuer"],
-                    ).exists()
+                    exists = (
+                        Certificate.objects.restrict(request.user, "view")
+                        .filter(
+                            serial_number=row["serial_number"],
+                            issuer=row["issuer"],
+                        )
+                        .exists()
+                    )
                     if exists:
                         if on_duplicate == "skip":
                             skipped += 1
@@ -248,7 +277,10 @@ class CertificateViewSet(NetBoxModelViewSet):
                     cert.auto_detect_acme(save=True)
                     created_certs.append(cert)
         except IntegrityError as e:
-            raise serializers.ValidationError({"detail": f"Database error during import: {e}"}) from e
+            logger.error("Bulk data import IntegrityError: %s", e)
+            raise serializers.ValidationError(
+                {"detail": "A database constraint error occurred. Check for duplicate certificates."}
+            ) from e
 
         output = CertificateSerializer(created_certs, many=True, context={"request": request})
         return Response(
@@ -346,7 +378,11 @@ class CertificateViewSet(NetBoxModelViewSet):
         if ids:
             try:
                 ids = [int(i) for i in ids]
-                certificates = Certificate.objects.filter(pk__in=ids).annotate(_assignment_count=Count("assignments"))
+                certificates = (
+                    Certificate.objects.restrict(request.user, "view")
+                    .filter(pk__in=ids)
+                    .annotate(_assignment_count=Count("assignments"))
+                )
             except (ValueError, TypeError) as e:
                 raise serializers.ValidationError(
                     {"ids": "Invalid certificate IDs. Must be a list of integers."}
@@ -370,6 +406,11 @@ class CertificateViewSet(NetBoxModelViewSet):
         if fields:
             if isinstance(fields, str):
                 fields = [f.strip() for f in fields.split(",")]
+            # Validate fields against allowlist
+            allowed = set(CertificateExporter.DEFAULT_FIELDS + CertificateExporter.EXTENDED_FIELDS)
+            invalid = set(fields) - allowed
+            if invalid:
+                raise serializers.ValidationError({"fields": f"Unknown fields: {sorted(invalid)}"})
         else:
             fields = None  # Use defaults
 
@@ -385,7 +426,10 @@ class CertificateViewSet(NetBoxModelViewSet):
         except ImportError as e:
             raise serializers.ValidationError({"detail": str(e)}) from e
         except Exception as e:
-            raise serializers.ValidationError({"detail": f"Export failed: {str(e)}"}) from e
+            logger.error("Certificate export failed: %s", e)
+            raise serializers.ValidationError(
+                {"detail": "Export failed due to an internal error. Please check your parameters and try again."}
+            ) from e
 
         # Get content type and extension
         content_type = CertificateExporter.get_content_type(export_format)
@@ -434,7 +478,8 @@ class CertificateViewSet(NetBoxModelViewSet):
 
         response = HttpResponse(content, content_type=content_type)
         # Use common name in filename (sanitized)
-        safe_name = "".join(c if c.isalnum() or c in ".-_" else "_" for c in certificate.common_name)
+        safe_name = "".join(c if (c.isascii() and c.isalnum()) or c in ".-_" else "_" for c in certificate.common_name)
+        safe_name = safe_name[:64] or "certificate"
         filename = f"{safe_name}.{extension}"
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
@@ -539,6 +584,9 @@ class CertificateViewSet(NetBoxModelViewSet):
             "ids": [1, 2, 3, 4, 5]
         }
         """
+        if not request.user.has_perm("netbox_ssl.change_certificate"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
         certificate_ids = request.data.get("ids", [])
 
         if not certificate_ids:
@@ -552,7 +600,7 @@ class CertificateViewSet(NetBoxModelViewSet):
                 {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
             )
 
-        certificates = list(Certificate.objects.filter(pk__in=certificate_ids))
+        certificates = list(Certificate.objects.restrict(request.user, "view").filter(pk__in=certificate_ids))
         results = []
         certs_to_update = []
 
@@ -626,7 +674,9 @@ class CertificateViewSet(NetBoxModelViewSet):
             )
 
         # Get certificates with tenant prefetched to avoid N+1 queries
-        certificates = Certificate.objects.filter(pk__in=certificate_ids).select_related("tenant")
+        certificates = (
+            Certificate.objects.restrict(request.user, "view").filter(pk__in=certificate_ids).select_related("tenant")
+        )
         found_ids = set(certificates.values_list("pk", flat=True))
         missing_ids = set(certificate_ids) - found_ids
 
@@ -700,6 +750,9 @@ class CertificateViewSet(NetBoxModelViewSet):
             "ids": [1, 2, 3, 4, 5]
         }
         """
+        if not request.user.has_perm("netbox_ssl.change_certificate"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
         ids = request.data.get("ids", [])
 
         if not ids:
@@ -716,7 +769,7 @@ class CertificateViewSet(NetBoxModelViewSet):
                 {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
             )
 
-        certificates = list(Certificate.objects.filter(pk__in=ids))
+        certificates = list(Certificate.objects.restrict(request.user, "view").filter(pk__in=ids))
         found_ids = {cert.pk for cert in certificates}
         missing_ids = set(ids) - found_ids
 
@@ -806,6 +859,9 @@ class CertificateSigningRequestViewSet(NetBoxModelViewSet):
 
         Accepts raw PEM content and automatically parses all CSR attributes.
         """
+        if not request.user.has_perm("netbox_ssl.add_certificatesigningrequest"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
         serializer = CSRImportSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         csr = serializer.save()
