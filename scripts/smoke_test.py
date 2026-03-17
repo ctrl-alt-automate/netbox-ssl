@@ -11,6 +11,7 @@ Usage:
 """
 
 import argparse
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -110,9 +111,7 @@ class NetBoxSmokeTest:
 
     def _get_api_token(self):
         """Try to get or create an API token."""
-        # For testing, we'll use basic auth or the pre-configured token
-        # The default superuser token from docker setup
-        self.api_token = "0123456789abcdef0123456789abcdef01234567"
+        self.api_token = os.environ.get("NETBOX_TOKEN")
 
     def check_for_errors(self, response: requests.Response) -> str:
         """Check response for error patterns."""

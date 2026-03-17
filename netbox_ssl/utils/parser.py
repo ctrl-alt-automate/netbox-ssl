@@ -52,12 +52,11 @@ class CertificateParser:
     Security: Rejects any input containing private keys.
     """
 
+    MAX_PEM_INPUT_BYTES = 65536
+
     # Patterns to detect private keys
     PRIVATE_KEY_PATTERNS = [
-        r"-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----",
-        r"-----BEGIN\s+EC\s+PRIVATE\s+KEY-----",
-        r"-----BEGIN\s+ENCRYPTED\s+PRIVATE\s+KEY-----",
-        r"-----BEGIN\s+OPENSSH\s+PRIVATE\s+KEY-----",
+        r"-----BEGIN\s+(?:\w+\s+)*PRIVATE\s+KEY-----",
     ]
 
     # Pattern to extract individual certificates
@@ -91,6 +90,12 @@ class CertificateParser:
             PrivateKeyDetectedError: If private key material is found
             CertificateParseError: If parsing fails
         """
+        # Size guard: reject oversized input
+        if len(pem_text) > cls.MAX_PEM_INPUT_BYTES:
+            raise CertificateParseError(
+                f"Input too large ({len(pem_text)} bytes). Maximum is {cls.MAX_PEM_INPUT_BYTES} bytes."
+            )
+
         # Security check: reject private keys
         if cls.contains_private_key(pem_text):
             raise PrivateKeyDetectedError(
@@ -157,7 +162,7 @@ class CertificateParser:
             cn_attrs = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
             if cn_attrs:
                 return cn_attrs[0].value
-        except Exception:
+        except (AttributeError, ValueError, UnicodeDecodeError, TypeError):
             pass
         return "Unknown"
 
@@ -171,7 +176,7 @@ class CertificateParser:
                 oid_name = attr.oid._name if hasattr(attr.oid, "_name") else str(attr.oid)
                 parts.append(f"{oid_name}={attr.value}")
             return ", ".join(parts)
-        except Exception:
+        except (AttributeError, ValueError, UnicodeDecodeError, TypeError):
             return str(cert.issuer)
 
     @classmethod
@@ -193,7 +198,7 @@ class CertificateParser:
                     sans.append(str(name.value))
         except x509.ExtensionNotFound:
             pass
-        except Exception:
+        except (AttributeError, ValueError, UnicodeDecodeError, TypeError):
             pass
         return sans
 

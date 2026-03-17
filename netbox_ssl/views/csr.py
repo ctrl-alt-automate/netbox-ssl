@@ -3,6 +3,7 @@ Views for CertificateSigningRequest model.
 """
 
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
@@ -71,7 +72,7 @@ class CertificateSigningRequestBulkDeleteView(generic.BulkDeleteView):
     table = CertificateSigningRequestTable
 
 
-class CSRImportView(View):
+class CSRImportView(LoginRequiredMixin, View):
     """
     Import view for PEM CSRs.
 

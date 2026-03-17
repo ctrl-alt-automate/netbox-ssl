@@ -4,10 +4,12 @@ Views for Certificate model.
 Includes Smart Paste import and Janus Renewal workflow views.
 """
 
+import contextlib
 from datetime import datetime
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -102,7 +104,7 @@ class CertificateBulkDeleteView(generic.BulkDeleteView):
     table = CertificateTable
 
 
-class CertificateImportView(View):
+class CertificateImportView(LoginRequiredMixin, View):
     """
     Smart Paste import view for PEM certificates.
 
@@ -124,11 +126,8 @@ class CertificateImportView(View):
         renew_from = request.GET.get("renew_from")
         renew_certificate = None
         if renew_from:
-            try:
-                renew_certificate = Certificate.objects.get(pk=int(renew_from))
-                request.session["renew_from_id"] = renew_certificate.pk
-            except (ValueError, TypeError, Certificate.DoesNotExist):
-                pass
+            with contextlib.suppress(ValueError, TypeError, Certificate.DoesNotExist):
+                renew_certificate = Certificate.objects.restrict(request.user, "view").get(pk=int(renew_from))
 
         return render(
             request,
@@ -161,10 +160,14 @@ class CertificateImportView(View):
             parsed = CertificateParser.parse(pem_content)
 
             # Check for existing certificate (duplicate check)
-            existing = Certificate.objects.filter(
-                serial_number=parsed.serial_number,
-                issuer=parsed.issuer,
-            ).first()
+            existing = (
+                Certificate.objects.restrict(request.user, "view")
+                .filter(
+                    serial_number=parsed.serial_number,
+                    issuer=parsed.issuer,
+                )
+                .first()
+            )
 
             if existing:
                 messages.error(
@@ -265,7 +268,7 @@ class CertificateImportView(View):
             )
 
 
-class CertificateRenewView(View):
+class CertificateRenewView(LoginRequiredMixin, View):
     """
     Janus Renewal workflow view.
 
@@ -294,7 +297,10 @@ class CertificateRenewView(View):
             messages.warning(request, _("No pending certificate renewal found."))
             return redirect(reverse("plugins:netbox_ssl:certificate_import"))
 
-        old_certificate = get_object_or_404(Certificate, pk=renewal_candidate_id)
+        old_certificate = get_object_or_404(
+            Certificate.objects.restrict(request.user, "change"),
+            pk=renewal_candidate_id,
+        )
 
         # Parse ISO date strings into formatted dates for the template
         pending_data = dict(pending_data)
@@ -342,7 +348,10 @@ class CertificateRenewView(View):
 
         if is_renewal and renewal_candidate_id:
             # Janus Renewal: Replace & Archive
-            old_certificate = get_object_or_404(Certificate, pk=renewal_candidate_id)
+            old_certificate = get_object_or_404(
+                Certificate.objects.restrict(request.user, "change"),
+                pk=renewal_candidate_id,
+            )
 
             # If the old certificate is tenant-scoped, carry it forward
             if tenant is None and old_certificate.tenant:
@@ -460,7 +469,7 @@ class CertificateRenewView(View):
             return redirect(certificate.get_absolute_url())
 
 
-class CertificateBulkDataImportView(View):
+class CertificateBulkDataImportView(LoginRequiredMixin, View):
     """
     Bulk import certificates from CSV or JSON data.
 
@@ -503,6 +512,10 @@ class CertificateBulkDataImportView(View):
             content = uploaded.read().decode("utf-8-sig")
         else:
             content = request.POST.get("data_content", "")
+
+        if len(content) > self.MAX_UPLOAD_SIZE:
+            messages.error(request, _("Pasted content too large."))
+            return render(request, self.template_name, {"step": "input"})
 
         if not content.strip():
             messages.error(request, _("No data provided. Paste CSV/JSON or upload a file."))

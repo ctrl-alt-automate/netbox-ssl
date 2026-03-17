@@ -11,6 +11,7 @@ from utilities.forms.rendering import FieldSet
 
 from ..models import CertificateSigningRequest, CSRStatusChoices
 from ..utils import CSRParseError, CSRParser
+from ..utils.parser import CertificateParser
 
 
 class CertificateSigningRequestForm(NetBoxModelForm):
@@ -132,6 +133,9 @@ class CSRImportForm(forms.Form):
     def clean_pem_content(self):
         """Validate PEM content."""
         pem_content = self.cleaned_data["pem_content"]
+
+        if CertificateParser.contains_private_key(pem_content):
+            raise forms.ValidationError("Private key detected. CSR imports must not include private key material.")
 
         try:
             CSRParser.parse(pem_content)

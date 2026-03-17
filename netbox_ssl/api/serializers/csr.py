@@ -9,6 +9,7 @@ from tenancy.models import Tenant
 
 from ...models import CertificateSigningRequest, CSRStatusChoices
 from ...utils import CSRParseError, CSRParser
+from ...utils.parser import CertificateParser
 
 
 class CertificateSigningRequestSerializer(NetBoxModelSerializer):
@@ -64,6 +65,7 @@ class CSRImportSerializer(serializers.Serializer):
     """Serializer for importing CSRs from PEM content."""
 
     pem_content = serializers.CharField(
+        max_length=65536,
         help_text="CSR in PEM format.",
         style={"base_template": "textarea.html"},
     )
@@ -88,6 +90,11 @@ class CSRImportSerializer(serializers.Serializer):
 
     def validate_pem_content(self, value):
         """Validate PEM content."""
+        if CertificateParser.contains_private_key(value):
+            raise serializers.ValidationError(
+                "Private key detected. CSR imports must not include private key material."
+            )
+
         try:
             CSRParser.parse(value)
         except CSRParseError as e:

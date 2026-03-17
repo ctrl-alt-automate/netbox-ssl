@@ -57,6 +57,8 @@ class ChainValidator:
     - Self-signed root detection
     """
 
+    MAX_CHAIN_DEPTH = 10
+
     @classmethod
     def validate(cls, leaf_pem: str, chain_pem: str = "") -> ChainValidationResult:
         """
@@ -122,6 +124,18 @@ class ChainValidator:
                 chain_depth=1,
                 certificates=certificates,
                 errors=["No valid certificates found in chain"],
+                validated_at=validated_at,
+            )
+
+        # Chain depth cap
+        if len(chain_certs) + 1 > cls.MAX_CHAIN_DEPTH:
+            return ChainValidationResult(
+                status=ChainValidationStatus.PARSE_ERROR,
+                is_valid=False,
+                message=f"Chain too long ({len(chain_certs) + 1} certificates). Maximum is {cls.MAX_CHAIN_DEPTH}.",
+                chain_depth=len(chain_certs) + 1,
+                certificates=certificates,
+                errors=[f"Chain depth {len(chain_certs) + 1} exceeds maximum of {cls.MAX_CHAIN_DEPTH}"],
                 validated_at=validated_at,
             )
 
