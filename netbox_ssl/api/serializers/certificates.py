@@ -75,6 +75,9 @@ class CertificateSerializer(NetBoxModelSerializer):
             "acme_renewal_days",
             "acme_renewal_due",
             "acme_renewal_status",
+            # Archival fields
+            "archive_pinned",
+            "archived_at",
             "tags",
             "custom_fields",
             "created",

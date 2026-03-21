@@ -47,6 +47,16 @@
               {% endif %}
             </td>
           </tr>
+          <tr>
+            <th scope="row">Archive Pinned</th>
+            <td>{% checkmark object.archive_pinned %}</td>
+          </tr>
+          {% if object.status == 'archived' and object.archived_at %}
+          <tr>
+            <th scope="row">Archived At</th>
+            <td>{{ object.archived_at|date:"Y-m-d H:i" }}</td>
+          </tr>
+          {% endif %}
         </table>
       </div>
     </div>

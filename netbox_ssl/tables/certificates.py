@@ -54,6 +54,9 @@ class CertificateTable(NetBoxTable):
     acme_provider = columns.ChoiceFieldColumn(
         verbose_name="ACME Provider",
     )
+    archive_pinned = columns.BooleanColumn(
+        verbose_name="Archive Pinned",
+    )
     tags = columns.TagColumn(
         url_name="plugins:netbox_ssl:certificate_list",
     )
@@ -76,6 +79,7 @@ class CertificateTable(NetBoxTable):
             "assignment_count",
             "is_acme",
             "acme_provider",
+            "archive_pinned",
             "tags",
         )
         default_columns = (
@@ -96,6 +100,7 @@ class CertificateTable(NetBoxTable):
             "replaced": "secondary",  # Gray
             "revoked": "danger",  # Red
             "pending": "warning",  # Yellow
+            "archived": "dark",  # Dark
         }
         color = status_colors.get(record.status, "secondary")
         label = record.get_status_display()

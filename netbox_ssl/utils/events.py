@@ -19,6 +19,7 @@ EVENT_CERTIFICATE_EXPIRED = "certificate_expired"
 EVENT_CERTIFICATE_EXPIRING_SOON = "certificate_expiring_soon"
 EVENT_CERTIFICATE_RENEWED = "certificate_renewed"
 EVENT_CERTIFICATE_REVOKED = "certificate_revoked"
+EVENT_CERTIFICATE_ARCHIVED = "certificate_archived"
 
 
 def build_certificate_event_payload(

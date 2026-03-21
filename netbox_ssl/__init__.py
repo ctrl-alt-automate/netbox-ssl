@@ -36,6 +36,8 @@ class NetBoxSSLConfig(PluginConfig):
         "notification_email_subject_prefix": "[NetBox SSL]",
         "expiry_scan_thresholds": [14, 30, 60, 90],
         "expiry_scan_cooldown_hours": 24,
+        "auto_archive_enabled": False,
+        "auto_archive_after_days": 90,
     }
 
     def ready(self):

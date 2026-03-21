@@ -60,6 +60,8 @@ class CertificateAuthorityType(NetBoxObjectType):
         "sans",
         "tenant",
         "issuing_ca",
+        "archive_pinned",
+        "archived_at",
         "tags",
         "comments",
         "created",
@@ -80,6 +82,8 @@ class CertificateType(NetBoxObjectType):
     key_size: int | None
     algorithm: str
     status: str
+    archive_pinned: bool
+    archived_at: str | None
     issuing_ca: Annotated["CertificateAuthorityType", strawberry.lazy(".types")] | None
 
     @strawberry_django.field

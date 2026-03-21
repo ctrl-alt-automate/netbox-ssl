@@ -108,6 +108,9 @@ class CertificateFilterSet(NetBoxModelFilterSet):
     acme_auto_renewal = django_filters.BooleanFilter(
         label="ACME Auto Renewal",
     )
+    archive_pinned = django_filters.BooleanFilter(
+        label="Archive Pinned",
+    )
 
     class Meta:
         model = Certificate

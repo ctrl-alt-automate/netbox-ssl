@@ -27,6 +27,7 @@ class CertificateStatusChoices(ChoiceSet):
     STATUS_REPLACED = "replaced"
     STATUS_REVOKED = "revoked"
     STATUS_PENDING = "pending"
+    STATUS_ARCHIVED = "archived"
 
     CHOICES = [
         (STATUS_ACTIVE, "Active", "green"),
@@ -34,6 +35,7 @@ class CertificateStatusChoices(ChoiceSet):
         (STATUS_REPLACED, "Replaced", "gray"),
         (STATUS_REVOKED, "Revoked", "orange"),
         (STATUS_PENDING, "Pending", "blue"),
+        (STATUS_ARCHIVED, "Archived", "dark"),
     ]
 
 
@@ -235,6 +237,17 @@ class Certificate(NetBoxModel):
         help_text="Tenant this certificate belongs to",
     )
 
+    # Archival fields
+    archive_pinned = models.BooleanField(
+        default=False,
+        help_text="When enabled, prevents this certificate from being auto-archived",
+    )
+    archived_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when this certificate was archived",
+    )
+
     # Issuing Certificate Authority
     issuing_ca = models.ForeignKey(
         to="netbox_ssl.CertificateAuthority",
@@ -335,6 +348,13 @@ class Certificate(NetBoxModel):
     def save(self, *args, **kwargs):
         """Save with status transition detection and event logging."""
         status_changed = self.pk and self._original_status and self._original_status != self.status
+
+        # Auto-set archived_at when status changes to archived
+        is_becoming_archived = self.status == CertificateStatusChoices.STATUS_ARCHIVED and (
+            not self.pk or (status_changed and self._original_status != CertificateStatusChoices.STATUS_ARCHIVED)
+        )
+        if is_becoming_archived and not self.archived_at:
+            self.archived_at = timezone.now()
 
         super().save(*args, **kwargs)
 
