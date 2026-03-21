@@ -9,7 +9,13 @@ import strawberry_django
 from netbox.graphql.types import NetBoxObjectType
 
 from .. import filtersets
-from ..models import Certificate, CertificateAssignment, CertificateAuthority, CertificateSigningRequest
+from ..models import (
+    Certificate,
+    CertificateAssignment,
+    CertificateAuthority,
+    CertificateLifecycleEvent,
+    CertificateSigningRequest,
+)
 
 
 @strawberry_django.type(
@@ -177,3 +183,26 @@ class CertificateSigningRequestType(NetBoxObjectType):
         if self.country:
             parts.append(f"C={self.country}")
         return ", ".join(parts) if parts else ""
+
+
+@strawberry_django.type(
+    CertificateLifecycleEvent,
+    fields=[
+        "id",
+        "event_type",
+        "timestamp",
+        "description",
+        "old_status",
+        "new_status",
+        "actor",
+    ],
+)
+class CertificateLifecycleEventType:
+    """GraphQL type for CertificateLifecycleEvent model."""
+
+    event_type: str
+    timestamp: str
+    description: str
+    old_status: str
+    new_status: str
+    actor: str

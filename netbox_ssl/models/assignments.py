@@ -5,11 +5,15 @@ Supports assignment to Services (primary/recommended), Devices, and Virtual Mach
 Service-level assignment is preferred as it provides port-level granularity.
 """
 
+import logging
+
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.urls import reverse
 from netbox.models import NetBoxModel
+
+logger = logging.getLogger("netbox_ssl.models")
 
 
 class CertificateAssignment(NetBoxModel):
@@ -115,8 +119,32 @@ class CertificateAssignment(NetBoxModel):
 
             Certificate.objects.filter(pk=self.certificate_id).update(last_updated=timezone.now())
 
+        # Create lifecycle event for assignment
+        from .lifecycle import CertificateLifecycleEvent, LifecycleEventTypeChoices
+
+        try:
+            CertificateLifecycleEvent.objects.create(
+                certificate_id=self.certificate_id,
+                event_type=LifecycleEventTypeChoices.EVENT_ASSIGNMENT_ADDED,
+                description=f"Assigned to {self.assigned_object_type.model}: {self.assigned_object}",
+            )
+        except Exception as e:
+            logger.warning("Failed to create lifecycle event: %s", e)
+
     def delete(self, *args, **kwargs):
         """Delete and touch parent certificate to update its changelog."""
+        # Create lifecycle event for assignment removal (before delete)
+        from .lifecycle import CertificateLifecycleEvent, LifecycleEventTypeChoices
+
+        try:
+            CertificateLifecycleEvent.objects.create(
+                certificate_id=self.certificate_id,
+                event_type=LifecycleEventTypeChoices.EVENT_ASSIGNMENT_REMOVED,
+                description=f"Removed from {self.assigned_object_type.model}: {self.assigned_object}",
+            )
+        except Exception as e:
+            logger.warning("Failed to create lifecycle event: %s", e)
+
         certificate_id = self.certificate_id
         result = super().delete(*args, **kwargs)
         # Touch the parent certificate so its changelog reflects assignment removal

@@ -348,6 +348,43 @@ class Certificate(NetBoxModel):
                 self.status,
             )
 
+        # Create lifecycle event for status transitions
+        if status_changed:
+            # Import here to avoid circular imports
+            from .lifecycle import CertificateLifecycleEvent, LifecycleEventTypeChoices
+
+            # Determine event type based on the new status
+            event_type = LifecycleEventTypeChoices.EVENT_STATUS_CHANGED
+            if self.status == "revoked":
+                event_type = LifecycleEventTypeChoices.EVENT_REVOKED
+            elif self.status == "archived":
+                event_type = LifecycleEventTypeChoices.EVENT_ARCHIVED
+
+            try:
+                CertificateLifecycleEvent.objects.create(
+                    certificate=self,
+                    event_type=event_type,
+                    old_status=self._original_status,
+                    new_status=self.status,
+                    description=f"Status changed from {self._original_status} to {self.status}",
+                )
+            except Exception as e:
+                logger.warning("Failed to create lifecycle event for certificate %s: %s", self.pk, e)
+
+        # Create lifecycle event for new certificates
+        if not status_changed and self._original_status is None:
+            from .lifecycle import CertificateLifecycleEvent, LifecycleEventTypeChoices
+
+            try:
+                CertificateLifecycleEvent.objects.create(
+                    certificate=self,
+                    event_type=LifecycleEventTypeChoices.EVENT_IMPORTED,
+                    new_status=self.status,
+                    description=f"Certificate imported with status {self.status}",
+                )
+            except Exception as e:
+                logger.warning("Failed to create lifecycle event for certificate %s: %s", self.pk, e)
+
         # Update tracked status after save
         self._original_status = self.status
 
