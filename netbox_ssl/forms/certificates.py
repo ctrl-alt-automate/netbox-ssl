@@ -68,6 +68,10 @@ class CertificateForm(NetBoxModelForm):
             name=_("Certificate Data"),
         ),
         FieldSet(
+            "renewal_note",
+            name=_("Renewal"),
+        ),
+        FieldSet(
             "is_acme",
             "acme_provider",
             "acme_account_email",
@@ -99,6 +103,7 @@ class CertificateForm(NetBoxModelForm):
             "algorithm",
             "status",
             "private_key_location",
+            "renewal_note",
             "tenant",
             "pem_content",
             "is_acme",
@@ -123,6 +128,9 @@ class CertificateForm(NetBoxModelForm):
             ),
             "issuer_chain": forms.Textarea(
                 attrs={"rows": 10, "class": "font-monospace"},
+            ),
+            "renewal_note": forms.Textarea(
+                attrs={"rows": 5},
             ),
         }
 

@@ -215,6 +215,12 @@ class Certificate(NetBoxModel):
         help_text="Hint for private key location (e.g., Vault path)",
     )
 
+    # Per-certificate renewal note
+    renewal_note = models.TextField(
+        blank=True,
+        help_text="Custom renewal instructions for this specific certificate. Overrides CA-level instructions.",
+    )
+
     # Renewal tracking (Janus workflow)
     replaced_by = models.ForeignKey(
         "self",

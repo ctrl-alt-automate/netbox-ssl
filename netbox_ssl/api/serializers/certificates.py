@@ -29,6 +29,7 @@ class CertificateSerializer(NetBoxModelSerializer):
     chain_needs_validation = serializers.BooleanField(read_only=True)
     acme_renewal_due = serializers.BooleanField(read_only=True)
     acme_renewal_status = serializers.CharField(read_only=True)
+    effective_renewal_instructions = serializers.SerializerMethodField()
 
     class Meta:
         model = Certificate
@@ -53,6 +54,8 @@ class CertificateSerializer(NetBoxModelSerializer):
             "algorithm",
             "status",
             "private_key_location",
+            "renewal_note",
+            "effective_renewal_instructions",
             "replaced_by",
             "tenant",
             "pem_content",
@@ -96,6 +99,14 @@ class CertificateSerializer(NetBoxModelSerializer):
     def get_assignment_count(self, obj):
         """Get the number of assignments for this certificate."""
         return obj.assignments.count()
+
+    def get_effective_renewal_instructions(self, obj) -> str:
+        """Get renewal instructions with fallback: cert note > CA instructions > empty."""
+        if obj.renewal_note:
+            return obj.renewal_note
+        if obj.issuing_ca and hasattr(obj.issuing_ca, "renewal_instructions"):
+            return obj.issuing_ca.renewal_instructions or ""
+        return ""
 
 
 class CertificateImportSerializer(serializers.Serializer):

@@ -38,6 +38,10 @@ class CertificateAuthorityForm(NetBoxModelForm):
             name=_("Contact Information"),
         ),
         FieldSet(
+            "renewal_instructions",
+            name=_("Renewal Instructions"),
+        ),
+        FieldSet(
             "tags",
             name=_("Tags"),
         ),
@@ -53,6 +57,7 @@ class CertificateAuthorityForm(NetBoxModelForm):
             "website_url",
             "portal_url",
             "contact_email",
+            "renewal_instructions",
             "is_approved",
             "tags",
             "comments",
@@ -60,6 +65,9 @@ class CertificateAuthorityForm(NetBoxModelForm):
         widgets = {
             "description": forms.Textarea(
                 attrs={"rows": 5},
+            ),
+            "renewal_instructions": forms.Textarea(
+                attrs={"rows": 10},
             ),
         }
 

@@ -175,6 +175,29 @@
 </div>
 {% endif %}
 
+<div class="row mb-3">
+  <div class="col col-12">
+    <div class="card">
+      <h5 class="card-header">Renewal Guide</h5>
+      <div class="card-body">
+        {% if object.renewal_note %}
+          {{ object.renewal_note|linebreaks }}
+        {% elif object.issuing_ca and object.issuing_ca.renewal_instructions %}
+          {{ object.issuing_ca.renewal_instructions|linebreaks }}
+          <p class="text-muted mt-2">
+            <small>Source: <a href="{{ object.issuing_ca.get_absolute_url }}">{{ object.issuing_ca.name }}</a></small>
+          </p>
+        {% else %}
+          <p class="text-muted mb-0">No renewal instructions configured.</p>
+          {% if object.issuing_ca %}
+            <p class="text-muted"><small>Add instructions on the <a href="{{ object.issuing_ca.get_absolute_url }}">{{ object.issuing_ca.name }}</a> CA page.</small></p>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
 {% if object.status == 'active' or object.status == 'expired' %}
 <div class="row mb-3">
   <div class="col col-12">

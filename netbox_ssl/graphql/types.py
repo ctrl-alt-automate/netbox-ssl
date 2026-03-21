@@ -21,6 +21,7 @@ from ..models import Certificate, CertificateAssignment, CertificateAuthority, C
         "issuer_pattern",
         "website",
         "is_acme",
+        "renewal_instructions",
         "tags",
         "created",
         "last_updated",
@@ -37,6 +38,7 @@ class CertificateAuthorityType(NetBoxObjectType):
     website_url: str
     portal_url: str
     contact_email: str
+    renewal_instructions: str
     is_approved: bool
 
     @strawberry_django.field
@@ -60,6 +62,7 @@ class CertificateAuthorityType(NetBoxObjectType):
         "sans",
         "tenant",
         "issuing_ca",
+        "renewal_note",
         "tags",
         "comments",
         "created",
@@ -80,7 +83,17 @@ class CertificateType(NetBoxObjectType):
     key_size: int | None
     algorithm: str
     status: str
+    renewal_note: str
     issuing_ca: Annotated["CertificateAuthorityType", strawberry.lazy(".types")] | None
+
+    @strawberry_django.field
+    def effective_renewal_instructions(self) -> str:
+        """Get renewal instructions with fallback: cert note > CA instructions > empty."""
+        if self.renewal_note:
+            return self.renewal_note
+        if self.issuing_ca and hasattr(self.issuing_ca, "renewal_instructions"):
+            return self.issuing_ca.renewal_instructions or ""
+        return ""
 
     @strawberry_django.field
     def days_remaining(self) -> int | None:
