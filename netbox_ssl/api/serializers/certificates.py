@@ -189,3 +189,37 @@ class CertificateImportSerializer(serializers.Serializer):
         certificate.auto_detect_acme(save=True)
 
         return certificate
+
+
+class BulkStatusUpdateSerializer(serializers.Serializer):
+    """Serializer for bulk status update."""
+
+    ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        allow_empty=False,
+        help_text="List of certificate IDs to update.",
+    )
+    status = serializers.ChoiceField(
+        choices=CertificateStatusChoices,
+        help_text="New status to set.",
+    )
+
+
+class BulkAssignSerializer(serializers.Serializer):
+    """Serializer for bulk certificate assignment."""
+
+    certificate_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        allow_empty=False,
+        help_text="List of certificate IDs to assign.",
+    )
+    assigned_object_type = serializers.CharField(
+        help_text="Content type (e.g., 'dcim.device', 'dcim.service', 'virtualization.virtualmachine').",
+    )
+    assigned_object_id = serializers.IntegerField(
+        help_text="ID of the object to assign certificates to.",
+    )
+    is_primary = serializers.BooleanField(
+        default=True,
+        help_text="Whether this is the primary certificate for the object.",
+    )
