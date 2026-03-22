@@ -1,3 +1,15 @@
+from pathlib import Path
+
+try:
+    from conftest import get_plugin_source_dir
+except ImportError:
+    def get_plugin_source_dir():
+        local = Path(__file__).parent.parent / "netbox_ssl"
+        if local.is_dir(): return local
+        docker = Path("/opt/netbox/netbox/netbox_ssl")
+        if docker.is_dir(): return docker
+        return local
+
 """
 Unit tests for renewal reminders feature (#47).
 

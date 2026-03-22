@@ -8,6 +8,11 @@ or djangorestframework installed.
 
 import importlib.util
 from pathlib import Path
+
+try:
+    from conftest import get_plugin_source_dir
+except ImportError:
+    from tests.conftest import get_plugin_source_dir
 from types import ModuleType
 from unittest.mock import MagicMock
 
@@ -126,7 +131,7 @@ def _load_serializer_classes() -> tuple:
     }
 
     # Read the source and strip import lines so our injected names are used
-    source_path = Path(__file__).parent.parent / "netbox_ssl" / "api" / "serializers" / "certificates.py"
+    source_path = get_plugin_source_dir() /  "api" / "serializers" / "certificates.py"
     if not source_path.exists():
         # Docker CI: tests at /tmp/plugin_tests/, plugin at /opt/netbox/netbox/netbox_ssl/
         source_path = Path("/opt/netbox/netbox/netbox_ssl/api/serializers/certificates.py")

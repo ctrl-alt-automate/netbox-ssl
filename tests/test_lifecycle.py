@@ -11,13 +11,18 @@ importing Django models (which require a full NetBox environment).
 
 from pathlib import Path
 
+try:
+    from conftest import get_plugin_source_dir
+except ImportError:
+    from tests.conftest import get_plugin_source_dir
+
 import pytest
 
 # ---------------------------------------------------------------------------
 # Paths to source files
 # ---------------------------------------------------------------------------
-_MODELS_DIR = Path(__file__).parent.parent / "netbox_ssl" / "models"
-_MIGRATIONS_DIR = Path(__file__).parent.parent / "netbox_ssl" / "migrations"
+_MODELS_DIR = get_plugin_source_dir() /  "models"
+_MIGRATIONS_DIR = get_plugin_source_dir() /  "migrations"
 _LIFECYCLE_PATH = _MODELS_DIR / "lifecycle.py"
 _CERTIFICATES_PATH = _MODELS_DIR / "certificates.py"
 _ASSIGNMENTS_PATH = _MODELS_DIR / "assignments.py"
@@ -393,21 +398,21 @@ class TestViewAndTemplateIntegration:
 
     def test_certificate_view_includes_lifecycle_events(self):
         """Test that CertificateView passes lifecycle_events to context."""
-        views_path = Path(__file__).parent.parent / "netbox_ssl" / "views" / "certificates.py"
+        views_path = get_plugin_source_dir() /  "views" / "certificates.py"
         source = views_path.read_text()
         assert "lifecycle_events" in source
         assert "instance.lifecycle_events.all()" in source
 
     def test_certificate_template_has_lifecycle_tab(self):
         """Test that certificate detail template has a Lifecycle tab."""
-        template_path = Path(__file__).parent.parent / "netbox_ssl" / "templates" / "netbox_ssl" / "certificate.html"
+        template_path = get_plugin_source_dir() /  "templates" / "netbox_ssl" / "certificate.html"
         source = template_path.read_text()
         assert "tab-lifecycle" in source
         assert "Lifecycle" in source
 
     def test_certificate_template_shows_lifecycle_badge_colors(self):
         """Test that template uses appropriate badge colors per event type."""
-        template_path = Path(__file__).parent.parent / "netbox_ssl" / "templates" / "netbox_ssl" / "certificate.html"
+        template_path = get_plugin_source_dir() /  "templates" / "netbox_ssl" / "certificate.html"
         source = template_path.read_text()
         assert "event.event_type == 'imported'" in source
         assert "event.event_type == 'status_changed'" in source
@@ -415,7 +420,7 @@ class TestViewAndTemplateIntegration:
 
     def test_certificate_template_tabbed_section_includes_lifecycle(self):
         """Test that the tabbed section condition includes lifecycle_events."""
-        template_path = Path(__file__).parent.parent / "netbox_ssl" / "templates" / "netbox_ssl" / "certificate.html"
+        template_path = get_plugin_source_dir() /  "templates" / "netbox_ssl" / "certificate.html"
         source = template_path.read_text()
         assert "or lifecycle_events" in source
 
@@ -431,20 +436,20 @@ class TestApiLifecycleEndpoint:
 
     def test_api_viewset_has_lifecycle_action(self):
         """Test that CertificateViewSet has a lifecycle action."""
-        api_views_path = Path(__file__).parent.parent / "netbox_ssl" / "api" / "views.py"
+        api_views_path = get_plugin_source_dir() /  "api" / "views.py"
         source = api_views_path.read_text()
         assert "def lifecycle(self, request, pk=None)" in source
 
     def test_api_lifecycle_is_get_method(self):
         """Test that lifecycle endpoint accepts GET requests."""
-        api_views_path = Path(__file__).parent.parent / "netbox_ssl" / "api" / "views.py"
+        api_views_path = get_plugin_source_dir() /  "api" / "views.py"
         source = api_views_path.read_text()
         assert 'methods=["get"]' in source
         assert 'url_path="lifecycle"' in source
 
     def test_api_lifecycle_limits_to_50_events(self):
         """Test that lifecycle endpoint limits results to 50 events."""
-        api_views_path = Path(__file__).parent.parent / "netbox_ssl" / "api" / "views.py"
+        api_views_path = get_plugin_source_dir() /  "api" / "views.py"
         source = api_views_path.read_text()
         assert "lifecycle_events.all()[:50]" in source
 
@@ -460,19 +465,19 @@ class TestGraphQLLifecycleType:
 
     def test_graphql_types_imports_lifecycle_model(self):
         """Test that GraphQL types.py imports CertificateLifecycleEvent."""
-        types_path = Path(__file__).parent.parent / "netbox_ssl" / "graphql" / "types.py"
+        types_path = get_plugin_source_dir() /  "graphql" / "types.py"
         source = types_path.read_text()
         assert "CertificateLifecycleEvent" in source
 
     def test_graphql_has_lifecycle_event_type(self):
         """Test that GraphQL defines CertificateLifecycleEventType."""
-        types_path = Path(__file__).parent.parent / "netbox_ssl" / "graphql" / "types.py"
+        types_path = get_plugin_source_dir() /  "graphql" / "types.py"
         source = types_path.read_text()
         assert "class CertificateLifecycleEventType" in source
 
     def test_graphql_lifecycle_type_has_explicit_fields(self):
         """Test that GraphQL type uses explicit field list (not __all__)."""
-        types_path = Path(__file__).parent.parent / "netbox_ssl" / "graphql" / "types.py"
+        types_path = get_plugin_source_dir() /  "graphql" / "types.py"
         source = types_path.read_text()
         # Verify explicit fields are listed for the lifecycle type
         assert '"event_type"' in source

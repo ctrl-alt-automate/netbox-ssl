@@ -6,8 +6,24 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
+
+
+def get_plugin_source_dir() -> Path:
+    """Return the path to the netbox_ssl source directory.
+
+    Works both locally (tests/ adjacent to netbox_ssl/) and in Docker CI
+    (tests at /tmp/plugin_tests/, plugin at /opt/netbox/netbox/netbox_ssl/).
+    """
+    local = Path(__file__).parent.parent / "netbox_ssl"
+    if local.is_dir():
+        return local
+    docker = Path("/opt/netbox/netbox/netbox_ssl")
+    if docker.is_dir():
+        return docker
+    return local  # fallback
 import requests
 
 # Try to import Django - not needed for browser tests

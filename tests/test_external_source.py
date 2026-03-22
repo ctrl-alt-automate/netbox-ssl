@@ -1,3 +1,15 @@
+from pathlib import Path
+
+try:
+    from conftest import get_plugin_source_dir
+except ImportError:
+    def get_plugin_source_dir():
+        local = Path(__file__).parent.parent / "netbox_ssl"
+        if local.is_dir(): return local
+        docker = Path("/opt/netbox/netbox/netbox_ssl")
+        if docker.is_dir(): return docker
+        return local
+
 """
 Unit tests for the ExternalSource model and related infrastructure.
 
@@ -93,7 +105,7 @@ else:
     # which imports all other models requiring complex metaclass mocking.
     _es_spec = importlib.util.spec_from_file_location(
         "netbox_ssl.models.external_source",
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), "netbox_ssl", "models", "external_source.py"),
+        os.path.join(str(get_plugin_source_dir()), "models", "external_source.py"),
         submodule_search_locations=[],
     )
     _es_mod = importlib.util.module_from_spec(_es_spec)
