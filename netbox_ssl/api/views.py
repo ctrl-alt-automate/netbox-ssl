@@ -538,6 +538,27 @@ class CertificateViewSet(NetBoxModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=["get"], url_path="lifecycle")
+    def lifecycle(self, request, pk=None):
+        """Get lifecycle events for a certificate."""
+        certificate = self.get_object()
+        events = certificate.lifecycle_events.all()[:50]
+        data = [
+            {
+                "id": event.pk,
+                "event_type": event.event_type,
+                "event_type_display": event.get_event_type_display(),
+                "timestamp": event.timestamp.isoformat(),
+                "description": event.description,
+                "old_status": event.old_status,
+                "new_status": event.new_status,
+                "related_certificate_id": event.related_certificate_id,
+                "actor": event.actor,
+            }
+            for event in events
+        ]
+        return Response({"certificate_id": certificate.pk, "events": data}, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=["post"], url_path="detect-acme")
     def detect_acme(self, request, pk=None):
         """

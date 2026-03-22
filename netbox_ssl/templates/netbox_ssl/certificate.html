@@ -197,7 +197,7 @@
 {% endif %}
 
 {# Tabbed secondary sections #}
-{% if object.sans or assignments or object.replaced_by or object.replaces.exists %}
+{% if object.sans or assignments or object.replaced_by or object.replaces.exists or lifecycle_events %}
 <div class="row mb-3">
   <div class="col col-12">
     <ul class="nav nav-tabs" role="tablist">
@@ -222,6 +222,11 @@
         </button>
       </li>
       {% endif %}
+      <li class="nav-item">
+        <button class="nav-link {% if not object.sans and not assignments and not object.replaced_by and not object.replaces.exists %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-lifecycle" type="button" role="tab">
+          Lifecycle <span class="badge text-bg-secondary">{{ lifecycle_events|length }}</span>
+        </button>
+      </li>
     </ul>
     <div class="tab-content border border-top-0 rounded-bottom">
       {% if object.sans %}
@@ -293,6 +298,30 @@
         {% endif %}
       </div>
       {% endif %}
+      <div class="tab-pane fade {% if not object.sans and not assignments and not object.replaced_by and not object.replaces.exists %}show active{% endif %} p-3" id="tab-lifecycle" role="tabpanel">
+        {% if lifecycle_events %}
+        <div class="timeline">
+          {% for event in lifecycle_events %}
+          <div class="d-flex mb-3">
+            <div class="me-3 text-muted" style="min-width: 140px; font-size: 0.85em;">
+              {{ event.timestamp|date:"Y-m-d H:i" }}
+            </div>
+            <div>
+              <span class="badge text-bg-{% if event.event_type == 'imported' %}info{% elif event.event_type == 'status_changed' %}warning{% elif event.event_type == 'renewed' %}primary{% elif event.event_type == 'revoked' %}danger{% elif event.event_type == 'archived' %}dark{% elif event.event_type == 'assignment_added' %}success{% elif event.event_type == 'assignment_removed' %}secondary{% else %}info{% endif %}">
+                {{ event.get_event_type_display }}
+              </span>
+              <span class="ms-2">{{ event.description }}</span>
+              {% if event.actor %}
+                <small class="text-muted ms-2">by {{ event.actor }}</small>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No lifecycle events recorded.</p>
+        {% endif %}
+      </div>
     </div>
   </div>
 </div>
