@@ -5,7 +5,9 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
+
+import requests
 
 logger = logging.getLogger("netbox_ssl.adapters")
 
@@ -27,6 +29,9 @@ MAX_SYNC_RESPONSE_BYTES: int = 10 * 1024 * 1024
 CONNECT_TIMEOUT: int = 5
 READ_TIMEOUT: int = 30
 
+# Chunk size for streaming response reads
+_STREAM_CHUNK_SIZE: int = 8192
+
 
 @dataclass(frozen=True)
 class FetchedCertificate:
@@ -39,7 +44,7 @@ class FetchedCertificate:
     issuer: str
     valid_from: datetime
     valid_to: datetime
-    sans: list[str] = field(default_factory=list)
+    sans: tuple[str, ...] = field(default_factory=tuple)
     key_size: int | None = None
     algorithm: str = "unknown"
     pem_content: str = ""
@@ -77,6 +82,92 @@ class BaseAdapter(ABC):
         elif self.source.auth_method == "api_key":
             return {"X-API-Key": cred, "Accept": "application/json"}
         return {"Accept": "application/json"}
+
+    def _make_request(self, url: str, params: dict | None = None) -> requests.Response:
+        """Make an authenticated HTTP request with streaming size check.
+
+        Checks the Content-Length header first, then streams the response
+        body with a byte cap to avoid reading oversized responses into memory.
+
+        Args:
+            url: Full URL to request.
+            params: Optional query parameters.
+
+        Returns:
+            The HTTP response.
+
+        Raises:
+            requests.RequestException: On network or HTTP errors.
+            ValueError: If response exceeds size limit.
+        """
+        headers = self._get_headers()
+        response = requests.get(
+            url,
+            headers=headers,
+            params=params,
+            timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
+            allow_redirects=False,
+            verify=self.source.verify_ssl,
+            stream=True,
+        )
+        # Check Content-Length header first (fast path)
+        content_length_header = response.headers.get("Content-Length")
+        if content_length_header:
+            try:
+                declared_size = int(content_length_header)
+                if declared_size > MAX_SYNC_RESPONSE_BYTES:
+                    response.close()
+                    raise ValueError(
+                        f"Response Content-Length ({declared_size} bytes) "
+                        f"exceeds maximum ({MAX_SYNC_RESPONSE_BYTES} bytes)"
+                    )
+            except (ValueError, TypeError):
+                pass  # Invalid header — fall through to streaming check
+
+        # Stream response body with byte cap
+        chunks: list[bytes] = []
+        total_bytes = 0
+        for chunk in response.iter_content(chunk_size=_STREAM_CHUNK_SIZE):
+            total_bytes += len(chunk)
+            if total_bytes > MAX_SYNC_RESPONSE_BYTES:
+                response.close()
+                raise ValueError(f"Response size exceeds maximum ({MAX_SYNC_RESPONSE_BYTES} bytes)")
+            chunks.append(chunk)
+
+        # Reassemble the content so response.content / response.json() work
+        response._content = b"".join(chunks)
+
+        response.raise_for_status()
+        return response
+
+    @staticmethod
+    def _parse_datetime(value: str) -> datetime | None:
+        """Parse a datetime string from an external API.
+
+        Args:
+            value: ISO 8601 datetime string.
+
+        Returns:
+            datetime object or None if parsing fails.
+        """
+        if not value:
+            return None
+        try:
+            # Try ISO format first (Python 3.11+)
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+        except (ValueError, AttributeError):
+            pass
+        # Try common date formats
+        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S.%f"):
+            try:
+                dt = datetime.strptime(value, fmt)
+                return dt.replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+        return None
 
     @abstractmethod
     def test_connection(self) -> tuple[bool, str]:

@@ -1,16 +1,19 @@
-"""Generic REST API adapter for fetching certificates from arbitrary REST APIs."""
+"""Generic REST API adapter for fetching certificates from arbitrary REST APIs.
+
+Note: This adapter does not support pagination in v0.8.  Pagination support
+is planned for v0.9.  If the external API returns paginated results, only the
+first page will be consumed.
+"""
 
 from __future__ import annotations
 
+import contextlib
 import logging
-from datetime import datetime, timezone
+import urllib.parse
 
 import requests
 
 from .base import (
-    CONNECT_TIMEOUT,
-    MAX_SYNC_RESPONSE_BYTES,
-    READ_TIMEOUT,
     BaseAdapter,
     FetchedCertificate,
 )
@@ -75,6 +78,10 @@ class GenericRESTAdapter(BaseAdapter):
 
     The field_mapping JSON on the ExternalSource configures how to map
     API responses to FetchedCertificate fields using dotted-path notation.
+
+    Known limitation (v0.8): This adapter does not support pagination.
+    If the external API paginates its results, only the first page is
+    consumed.  Pagination support is planned for v0.9.
     """
 
     def __init__(self, source) -> None:
@@ -88,37 +95,6 @@ class GenericRESTAdapter(BaseAdapter):
             List of missing required keys.
         """
         return [key for key in REQUIRED_MAPPING_KEYS if key not in self._mapping]
-
-    def _make_request(self, url: str, params: dict | None = None) -> requests.Response:
-        """Make an authenticated HTTP request.
-
-        Args:
-            url: Full URL to request.
-            params: Optional query parameters.
-
-        Returns:
-            The HTTP response.
-
-        Raises:
-            requests.RequestException: On network or HTTP errors.
-            ValueError: If response exceeds size limit.
-        """
-        headers = self._get_headers()
-        response = requests.get(
-            url,
-            headers=headers,
-            params=params,
-            timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
-            allow_redirects=False,
-            verify=self.source.verify_ssl,
-        )
-        content_length = len(response.content)
-        if content_length > MAX_SYNC_RESPONSE_BYTES:
-            raise ValueError(
-                f"Response size ({content_length} bytes) exceeds maximum ({MAX_SYNC_RESPONSE_BYTES} bytes)"
-            )
-        response.raise_for_status()
-        return response
 
     def _build_url(self, endpoint: str) -> str:
         """Build a full URL from a relative endpoint path.
@@ -238,8 +214,10 @@ class GenericRESTAdapter(BaseAdapter):
             )
             return None
 
-        # Substitute {id} in the detail endpoint
-        endpoint = detail_endpoint.replace("{id}", str(external_id))
+        # MED-1: URL-encode the external_id before substitution to avoid
+        # path traversal or injection through crafted identifiers.
+        safe_id = urllib.parse.quote(str(external_id), safe="")
+        endpoint = detail_endpoint.replace("{id}", safe_id)
         url = self._build_url(endpoint)
 
         try:
@@ -277,15 +255,15 @@ class GenericRESTAdapter(BaseAdapter):
             valid_from_raw = resolve_dotted_path(item, self._mapping["valid_from"])
             valid_to_raw = resolve_dotted_path(item, self._mapping["valid_to"])
 
-            valid_from = _parse_datetime(str(valid_from_raw)) if valid_from_raw else None
-            valid_to = _parse_datetime(str(valid_to_raw)) if valid_to_raw else None
+            valid_from = BaseAdapter._parse_datetime(str(valid_from_raw)) if valid_from_raw else None
+            valid_to = BaseAdapter._parse_datetime(str(valid_to_raw)) if valid_to_raw else None
 
             if not all([common_name, serial_number, fingerprint, issuer, valid_from, valid_to]):
                 return None
 
             # Optional fields
             sans_raw = resolve_dotted_path(item, self._mapping["sans"]) if "sans" in self._mapping else None
-            sans = list(sans_raw) if isinstance(sans_raw, (list, tuple)) else []
+            sans = tuple(sans_raw) if isinstance(sans_raw, (list, tuple)) else ()
 
             pem_content = ""
             if "pem_content" in self._mapping:
@@ -296,8 +274,6 @@ class GenericRESTAdapter(BaseAdapter):
             if "key_size" in self._mapping:
                 ks_raw = resolve_dotted_path(item, self._mapping["key_size"])
                 if ks_raw is not None:
-                    import contextlib
-
                     with contextlib.suppress(ValueError, TypeError):
                         key_size = int(ks_raw)
 
@@ -323,30 +299,3 @@ class GenericRESTAdapter(BaseAdapter):
         except (KeyError, TypeError, ValueError) as e:
             logger.warning("Failed to parse item from '%s': %s", self.source.name, e)
             return None
-
-
-def _parse_datetime(value: str) -> datetime | None:
-    """Parse a datetime string.
-
-    Args:
-        value: ISO 8601 datetime string.
-
-    Returns:
-        datetime object or None if parsing fails.
-    """
-    if not value:
-        return None
-    try:
-        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except (ValueError, AttributeError):
-        pass
-    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S.%f"):
-        try:
-            dt = datetime.strptime(value, fmt)
-            return dt.replace(tzinfo=timezone.utc)
-        except ValueError:
-            continue
-    return None

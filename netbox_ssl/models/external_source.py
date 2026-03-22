@@ -2,8 +2,11 @@
 External Source models for syncing certificates from external systems.
 """
 
+import ipaddress
 import logging
 import re
+import socket
+from datetime import timedelta
 from urllib.parse import urlparse
 
 from django.core.exceptions import ValidationError
@@ -15,14 +18,23 @@ from utilities.choices import ChoiceSet
 
 logger = logging.getLogger("netbox_ssl.models")
 
+# Fields that must never appear in field_mapping (mirrors adapters.base.PROHIBITED_SYNC_FIELDS).
+_PROHIBITED_MAPPING_KEYS: frozenset[str] = frozenset(
+    {
+        "private_key",
+        "key_material",
+        "p12",
+        "pfx",
+        "pkcs12",
+    }
+)
+
 # Env var name validation
 _ENV_VAR_PATTERN = re.compile(r"^[A-Z_][A-Z0-9_]{0,254}$")
 
 
 def validate_external_source_url(value: str) -> None:
     """Validate that URL uses HTTPS and doesn't point to private addresses."""
-    import ipaddress
-
     try:
         parsed = urlparse(value)
     except Exception as exc:
@@ -41,7 +53,21 @@ def validate_external_source_url(value: str) -> None:
         if addr.is_private or addr.is_loopback or addr.is_link_local:
             raise ValidationError("URL must not point to a private or loopback address.")
     except ValueError:
-        pass  # DNS name — can't fully validate
+        # HIGH-3: DNS name — resolve and check if any IP is private/loopback/link-local.
+        try:
+            addrs = socket.getaddrinfo(hostname, None)
+            for _family, _type, _proto, _canonname, sockaddr in addrs:
+                resolved_ip = sockaddr[0]
+                try:
+                    resolved_addr = ipaddress.ip_address(resolved_ip)
+                    if resolved_addr.is_private or resolved_addr.is_loopback or resolved_addr.is_link_local:
+                        raise ValidationError("URL hostname resolves to a private or loopback address.")
+                except ValueError:
+                    continue
+        except OSError:
+            # DNS resolution failed — allow for now (host may not be reachable
+            # at validation time, e.g. in CI).
+            pass
 
 
 class ExternalSourceTypeChoices(ChoiceSet):
@@ -150,7 +176,10 @@ class ExternalSource(NetBoxModel):
     )
     verify_ssl = models.BooleanField(
         default=True,
-        help_text="Verify TLS certificates when connecting to the source",
+        help_text=(
+            "Verify TLS certificates when connecting to the source. "
+            "WARNING: Disabling this removes protection against MITM attacks."
+        ),
     )
 
     class Meta:
@@ -164,6 +193,19 @@ class ExternalSource(NetBoxModel):
     def get_absolute_url(self) -> str:
         return reverse("plugins:netbox_ssl:externalsource", args=[self.pk])
 
+    def clean(self) -> None:
+        """Validate model fields before saving.
+
+        MED-2: Ensure field_mapping keys do not include prohibited sync fields.
+        """
+        super().clean()
+        if self.field_mapping and isinstance(self.field_mapping, dict):
+            prohibited_found = _PROHIBITED_MAPPING_KEYS & set(self.field_mapping.keys())
+            if prohibited_found:
+                raise ValidationError(
+                    {"field_mapping": (f"Field mapping must not contain prohibited fields: {sorted(prohibited_found)}")}
+                )
+
     def save(self, *args, **kwargs) -> None:
         if not self.verify_ssl:
             logger.warning(
@@ -175,7 +217,13 @@ class ExternalSource(NetBoxModel):
 
     @property
     def certificate_count(self) -> int:
-        """Return the number of certificates synced from this source."""
+        """Return the number of certificates synced from this source.
+
+        Note (HIGH-9): This property triggers a COUNT query per instance.
+        For list views, use ``annotate(Count("certificates"))`` on the
+        queryset to avoid N+1 queries.  This property is kept for
+        single-object views.
+        """
         return self.certificates.count()
 
     @property
@@ -185,8 +233,7 @@ class ExternalSource(NetBoxModel):
             return False
         if not self.last_synced:
             return True
-        from datetime import timedelta
-
+        # LOW-5: timedelta imported at module level.
         return timezone.now() >= self.last_synced + timedelta(minutes=self.sync_interval_minutes)
 
 
@@ -256,3 +303,19 @@ class ExternalSourceSyncLog(models.Model):
     def __str__(self) -> str:
         status = "OK" if self.success else "FAILED"
         return f"{self.source.name} sync at {self.started_at:%Y-%m-%d %H:%M} — {status}"
+
+    @classmethod
+    def cleanup_old_logs(cls, keep_days: int = 90) -> int:
+        """Remove sync log entries older than the specified number of days.
+
+        Follows the pattern from ``CertificateEventLog.cleanup_old_entries()``.
+
+        Args:
+            keep_days: Delete entries older than this many days.
+
+        Returns:
+            Number of entries deleted.
+        """
+        cutoff = timezone.now() - timedelta(days=keep_days)
+        count, _ = cls.objects.filter(started_at__lt=cutoff).delete()
+        return count

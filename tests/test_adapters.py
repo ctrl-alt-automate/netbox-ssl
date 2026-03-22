@@ -102,7 +102,7 @@ class TestBaseAdapter:
             valid_from=datetime(2026, 1, 1, tzinfo=timezone.utc),
             valid_to=datetime(2027, 1, 1, tzinfo=timezone.utc),
         )
-        assert cert.sans == []
+        assert cert.sans == ()
         assert cert.key_size is None
         assert cert.algorithm == "unknown"
         assert cert.pem_content == ""
@@ -368,7 +368,7 @@ class TestGenericRESTAdapter:
         }
         cert = adapter._parse_item(item)
         assert cert is not None
-        assert cert.sans == ["test.com", "www.test.com"]
+        assert cert.sans == ("test.com", "www.test.com")
         assert cert.key_size == 4096
         assert cert.algorithm == "rsa"
 

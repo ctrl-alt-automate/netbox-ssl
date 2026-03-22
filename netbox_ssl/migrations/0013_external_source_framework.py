@@ -3,6 +3,14 @@ Migration for External Source Framework (#62).
 
 Creates ExternalSource and ExternalSourceSyncLog models, and adds
 external_source, external_id, and source_removed fields to Certificate.
+
+NOTE: This migration depends on 0009 (not on 0010/0011/0012) because the
+v0.8 feature branches were developed in parallel:
+  - 0010: certificate_archive_fields (#50)
+  - 0011: certificatelifecycleevent (#49)
+  - 0012: renewal_instructions (#47)
+  - 0013: external_source_framework (#62, this file)
+Migration 0014 is the merge point that combines all four branches.
 """
 
 import django.db.models.deletion

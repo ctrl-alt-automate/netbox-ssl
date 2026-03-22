@@ -1121,12 +1121,20 @@ class ExternalSourceViewSet(NetBoxModelViewSet):
         source = self.get_object()
         try:
             from ..adapters import get_adapter_for_source
+            from ..utils.credential_resolver import CredentialResolveError
 
             adapter = get_adapter_for_source(source)
             success, message = adapter.test_connection()
             return Response(
                 {"success": success, "message": message},
                 status=status.HTTP_200_OK,
+            )
+        except CredentialResolveError as e:
+            # HIGH-1: Do not leak env var names to API response.
+            logger.error("Credential resolution failed for source '%s': %s", source.name, e)
+            return Response(
+                {"success": False, "message": "Credential resolution failed."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
         except ValueError as e:
             return Response(
@@ -1146,15 +1154,26 @@ class ExternalSourceViewSet(NetBoxModelViewSet):
         if not request.user.has_perm("netbox_ssl.change_externalsource"):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
+        from ..models.external_source import SyncStatusChoices
+        from ..utils.credential_resolver import CredentialResolveError
+
         source = self.get_object()
-        dry_run = request.data.get("dry_run", False)
+
+        # HIGH-2: Validate dry_run is a boolean.
+        raw_dry_run = request.data.get("dry_run", False)
+        if not isinstance(raw_dry_run, bool):
+            return Response(
+                {"detail": "dry_run must be a boolean."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        dry_run: bool = raw_dry_run
 
         try:
             from ..adapters import get_adapter_for_source
             from ..utils.sync_engine import build_plan, execute_plan
 
-            # Update sync status
-            source.sync_status = "syncing"
+            # Update sync status — use choice constant (LOW-7)
+            source.sync_status = SyncStatusChoices.STATUS_SYNCING
             source.save(update_fields=["sync_status", "last_updated"])
 
             # Fetch certificates
@@ -1182,8 +1201,18 @@ class ExternalSourceViewSet(NetBoxModelViewSet):
                 },
                 status=status.HTTP_200_OK,
             )
+        except CredentialResolveError as e:
+            # HIGH-1: Do not leak env var names to API response.
+            logger.error("Credential resolution failed for source '%s': %s", source.name, e)
+            source.sync_status = SyncStatusChoices.STATUS_ERROR
+            source.last_sync_message = "Credential resolution failed."
+            source.save(update_fields=["sync_status", "last_sync_message", "last_updated"])
+            return Response(
+                {"success": False, "message": "Credential resolution failed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except ValueError as e:
-            source.sync_status = "error"
+            source.sync_status = SyncStatusChoices.STATUS_ERROR
             source.last_sync_message = str(e)
             source.save(update_fields=["sync_status", "last_sync_message", "last_updated"])
             return Response(
@@ -1192,7 +1221,7 @@ class ExternalSourceViewSet(NetBoxModelViewSet):
             )
         except Exception as e:
             logger.error("Sync failed for source '%s': %s", source.name, e)
-            source.sync_status = "error"
+            source.sync_status = SyncStatusChoices.STATUS_ERROR
             source.last_sync_message = "Sync failed due to an internal error."
             source.save(update_fields=["sync_status", "last_sync_message", "last_updated"])
             return Response(

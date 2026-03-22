@@ -3,19 +3,19 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 import requests
 
 from .base import (
-    CONNECT_TIMEOUT,
-    MAX_SYNC_RESPONSE_BYTES,
-    READ_TIMEOUT,
     BaseAdapter,
     FetchedCertificate,
 )
 
 logger = logging.getLogger("netbox_ssl.adapters.lemur")
+
+# Safety limit: stop following pagination after this many pages
+MAX_PAGES: int = 1000
 
 
 class LemurAdapter(BaseAdapter):
@@ -25,37 +25,37 @@ class LemurAdapter(BaseAdapter):
     Uses GET {base_url}/api/1/certificates with Bearer auth.
     """
 
-    def _make_request(self, url: str, params: dict | None = None) -> requests.Response:
-        """Make an authenticated HTTP request to the Lemur API.
+    def _validate_pagination_url(self, next_url: str) -> bool:
+        """Validate that a pagination URL shares the same origin as the base URL.
+
+        Prevents SSRF by ensuring ``next`` links do not redirect to
+        arbitrary hosts.
 
         Args:
-            url: Full URL to request.
-            params: Optional query parameters.
+            next_url: The URL from a pagination ``next`` field.
 
         Returns:
-            The HTTP response.
-
-        Raises:
-            requests.RequestException: On network or HTTP errors.
-            ValueError: If response exceeds size limit.
+            True if the URL is safe to follow.
         """
-        headers = self._get_headers()
-        response = requests.get(
-            url,
-            headers=headers,
-            params=params,
-            timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
-            allow_redirects=False,
-            verify=self.source.verify_ssl,
-        )
-        # Check response size
-        content_length = len(response.content)
-        if content_length > MAX_SYNC_RESPONSE_BYTES:
-            raise ValueError(
-                f"Response size ({content_length} bytes) exceeds maximum ({MAX_SYNC_RESPONSE_BYTES} bytes)"
-            )
-        response.raise_for_status()
-        return response
+        try:
+            base_parsed = urlparse(self.source.base_url)
+            next_parsed = urlparse(next_url)
+            if next_parsed.scheme != "https":
+                logger.warning(
+                    "Pagination URL rejected: scheme '%s' is not https",
+                    next_parsed.scheme,
+                )
+                return False
+            if next_parsed.netloc != base_parsed.netloc:
+                logger.warning(
+                    "Pagination URL rejected: netloc '%s' != '%s'",
+                    next_parsed.netloc,
+                    base_parsed.netloc,
+                )
+                return False
+            return True
+        except Exception:
+            return False
 
     def test_connection(self) -> tuple[bool, str]:
         """Test connectivity to the Lemur API.
@@ -82,8 +82,17 @@ class LemurAdapter(BaseAdapter):
         """
         certificates: list[FetchedCertificate] = []
         url: str | None = f"{self.source.base_url.rstrip('/')}/api/1/certificates"
+        pages_fetched = 0
 
         while url:
+            if pages_fetched >= MAX_PAGES:
+                logger.warning(
+                    "Reached maximum pagination limit (%d pages) for Lemur '%s'",
+                    MAX_PAGES,
+                    self.source.name,
+                )
+                break
+
             try:
                 response = self._make_request(url)
                 data = response.json()
@@ -94,14 +103,17 @@ class LemurAdapter(BaseAdapter):
                 logger.error("Invalid response from Lemur '%s': %s", self.source.name, e)
                 break
 
+            pages_fetched += 1
+
             items = data.get("items", [])
             for item in items:
                 cert = self._parse_lemur_certificate(item)
                 if cert is not None:
                     certificates.append(cert)
 
-            # Handle pagination
-            url = data.get("next")
+            # Handle pagination — validate next URL against SSRF
+            next_url = data.get("next")
+            url = next_url if next_url and self._validate_pagination_url(next_url) else None
 
         logger.info("Fetched %d certificates from Lemur '%s'", len(certificates), self.source.name)
         return certificates
@@ -148,8 +160,8 @@ class LemurAdapter(BaseAdapter):
             valid_from_str = data.get("notBefore", "") or data.get("not_before", "")
             valid_to_str = data.get("notAfter", "") or data.get("not_after", "")
 
-            valid_from = _parse_datetime(valid_from_str) if valid_from_str else None
-            valid_to = _parse_datetime(valid_to_str) if valid_to_str else None
+            valid_from = BaseAdapter._parse_datetime(valid_from_str) if valid_from_str else None
+            valid_to = BaseAdapter._parse_datetime(valid_to_str) if valid_to_str else None
 
             if not valid_from or not valid_to:
                 return None
@@ -179,15 +191,20 @@ class LemurAdapter(BaseAdapter):
             elif "EC" in key_type or "ECDSA" in key_type:
                 algorithm = "ecdsa"
 
+            # MED-9: Prefer SHA256 fingerprint; Lemur's "fingerprint" field is
+            # often SHA1.  Use SHA256 if available, else fall back to the
+            # generic fingerprint field as a last resort.
+            fingerprint = data.get("sha256", "") or data.get("fingerprint", "")
+
             return FetchedCertificate(
                 external_id=external_id,
                 common_name=data.get("cn", "") or data.get("commonName", "") or data.get("common_name", ""),
                 serial_number=data.get("serialNumber", "") or data.get("serial_number", ""),
-                fingerprint_sha256=data.get("fingerprint", "") or data.get("sha256", ""),
+                fingerprint_sha256=fingerprint,
                 issuer=data.get("issuer", ""),
                 valid_from=valid_from,
                 valid_to=valid_to,
-                sans=sans,
+                sans=tuple(sans),
                 key_size=data.get("bits") or data.get("keySize") or data.get("key_size"),
                 algorithm=algorithm,
                 pem_content=data.get("body", "") or data.get("pem", ""),
@@ -196,32 +213,3 @@ class LemurAdapter(BaseAdapter):
         except (KeyError, TypeError, ValueError) as e:
             logger.warning("Failed to parse Lemur certificate: %s", e)
             return None
-
-
-def _parse_datetime(value: str) -> datetime | None:
-    """Parse a datetime string from Lemur API.
-
-    Args:
-        value: ISO 8601 datetime string.
-
-    Returns:
-        datetime object or None if parsing fails.
-    """
-    if not value:
-        return None
-    try:
-        # Try ISO format first (Python 3.11+)
-        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except (ValueError, AttributeError):
-        pass
-    # Try common Lemur date formats
-    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S.%f"):
-        try:
-            dt = datetime.strptime(value, fmt)
-            return dt.replace(tzinfo=timezone.utc)
-        except ValueError:
-            continue
-    return None

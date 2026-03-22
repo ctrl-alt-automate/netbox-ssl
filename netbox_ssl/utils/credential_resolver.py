@@ -40,6 +40,11 @@ class CredentialResolver:
             raise CredentialResolveError("Empty credential reference")
 
         if ":" not in reference:
+            logger.info(
+                "Resolving bare credential reference '%s' as env var. Consider using the 'env:%s' prefix for clarity.",
+                reference,
+                reference,
+            )
             return cls._resolve_env(reference)
 
         scheme, _, path = reference.partition(":")

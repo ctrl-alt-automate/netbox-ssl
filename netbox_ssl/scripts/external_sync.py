@@ -64,6 +64,7 @@ class ExternalSourceSync(Script):
         from netbox_ssl.adapters import get_adapter_for_source
         from netbox_ssl.models import ExternalSource
         from netbox_ssl.models.certificates import Certificate
+        from netbox_ssl.models.external_source import SyncStatusChoices
         from netbox_ssl.utils.sync_engine import build_plan, execute_plan
 
         # Determine which sources to sync
@@ -76,10 +77,11 @@ class ExternalSourceSync(Script):
 
         if not sources:
             self.log_warning("  No sources to sync.")
-            return {"synced": 0, "skipped": 0}
+            return {"synced": 0, "skipped": 0, "failed": 0}
 
         total_synced = 0
         total_skipped = 0
+        total_failed = 0
         results = []
 
         for src in sources:
@@ -94,9 +96,9 @@ class ExternalSourceSync(Script):
                 continue
 
             try:
-                # Update status to syncing
+                # Update status to syncing (LOW-7: use choice constant)
                 if not dry_run and commit:
-                    src.sync_status = "syncing"
+                    src.sync_status = SyncStatusChoices.STATUS_SYNCING
                     src.save(update_fields=["sync_status", "last_updated"])
 
                 # Fetch certificates
@@ -143,10 +145,11 @@ class ExternalSourceSync(Script):
                 self.log_failure(f"  Sync failed: {e}")
                 logger.error("Sync failed for source '%s': %s", src.name, e)
                 if not dry_run and commit:
-                    src.sync_status = "error"
+                    src.sync_status = SyncStatusChoices.STATUS_ERROR
                     src.last_sync_message = f"Sync failed: {type(e).__name__}"
                     src.save(update_fields=["sync_status", "last_sync_message", "last_updated"])
-                total_synced += 1
+                # LOW-6: Count failures separately; don't increment total_synced.
+                total_failed += 1
                 results.append(
                     {
                         "source": src.name,
@@ -160,6 +163,7 @@ class ExternalSourceSync(Script):
         self.log_info("SYNC SUMMARY")
         self.log_info(f"{'=' * 50}")
         self.log_info(f"  Sources synced: {total_synced}")
+        self.log_info(f"  Sources failed: {total_failed}")
         self.log_info(f"  Sources skipped: {total_skipped}")
         if dry_run:
             self.log_warning("  DRY RUN — no changes were applied")
@@ -167,6 +171,7 @@ class ExternalSourceSync(Script):
         return {
             "synced_at": now.isoformat(),
             "sources_synced": total_synced,
+            "sources_failed": total_failed,
             "sources_skipped": total_skipped,
             "dry_run": dry_run,
             "force": force,
