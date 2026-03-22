@@ -2,6 +2,7 @@
 Views for ExternalSource model.
 """
 
+from django.db.models import Count
 from netbox.views import generic
 
 from ..filtersets import ExternalSourceFilterSet
@@ -17,7 +18,9 @@ from ..tables import ExternalSourceTable
 class ExternalSourceListView(generic.ObjectListView):
     """List all External Sources."""
 
-    queryset = ExternalSource.objects.prefetch_related("tenant", "tags")
+    queryset = ExternalSource.objects.prefetch_related("tenant", "tags").annotate(
+        certificate_count=Count("certificates")
+    )
     filterset = ExternalSourceFilterSet
     filterset_form = ExternalSourceFilterForm
     table = ExternalSourceTable
