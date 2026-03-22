@@ -10,12 +10,20 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-try:
-    from conftest import get_plugin_source_dir
-except ImportError:
-    from tests.conftest import get_plugin_source_dir
+
+def _get_plugin_source_dir():
+    """Find the netbox_ssl source directory (local or Docker CI)."""
+    local = Path(__file__).resolve().parent.parent / "netbox_ssl"
+    if local.is_dir():
+        return local
+    docker = Path("/opt/netbox/netbox/netbox_ssl")
+    if docker.is_dir():
+        return docker
+    return local
+
+
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -33,15 +41,30 @@ if not _NETBOX_AVAILABLE and "netbox" not in sys.modules:
     _django_utils_timezone.now.return_value = datetime(2026, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
 
     for mod in [
-        "django", "django.conf", "django.db", "django.db.models",
-        "django.db.models.functions", "django.db.models.expressions",
-        "django.utils", "django.utils.timezone", "django.utils.translation",
-        "django.contrib", "django.contrib.contenttypes",
-        "django.contrib.contenttypes.fields", "django.contrib.contenttypes.models",
-        "django.contrib.postgres", "django.contrib.postgres.fields",
-        "django.contrib.postgres.indexes", "django.core", "django.core.exceptions",
-        "django.urls", "netbox", "netbox.models", "netbox.plugins",
-        "utilities", "utilities.choices",
+        "django",
+        "django.conf",
+        "django.db",
+        "django.db.models",
+        "django.db.models.functions",
+        "django.db.models.expressions",
+        "django.utils",
+        "django.utils.timezone",
+        "django.utils.translation",
+        "django.contrib",
+        "django.contrib.contenttypes",
+        "django.contrib.contenttypes.fields",
+        "django.contrib.contenttypes.models",
+        "django.contrib.postgres",
+        "django.contrib.postgres.fields",
+        "django.contrib.postgres.indexes",
+        "django.core",
+        "django.core.exceptions",
+        "django.urls",
+        "netbox",
+        "netbox.models",
+        "netbox.plugins",
+        "utilities",
+        "utilities.choices",
     ]:
         sys.modules.setdefault(mod, MagicMock())
     sys.modules["django.utils.timezone"] = _django_utils_timezone
@@ -66,7 +89,7 @@ class TestStatusArchivedChoice:
 
     def _read_certificates_source(self) -> str:
         """Read the certificates.py source code for inspection."""
-        source_path = get_plugin_source_dir() /  "models" / "certificates.py"
+        source_path = _get_plugin_source_dir() / "models" / "certificates.py"
         return source_path.read_text()
 
     def test_status_archived_constant_exists(self):
@@ -101,7 +124,7 @@ class TestArchiveFields:
     """Test that archive_pinned and archived_at fields are defined on Certificate."""
 
     def _read_certificates_source(self) -> str:
-        source_path = get_plugin_source_dir() /  "models" / "certificates.py"
+        source_path = _get_plugin_source_dir() / "models" / "certificates.py"
         return source_path.read_text()
 
     def test_archive_pinned_field_exists(self):
@@ -201,7 +224,7 @@ class TestArchivedAtAutoSet:
 
     def test_save_method_contains_archived_at_logic(self):
         """Certificate.save() should contain archived_at auto-set logic."""
-        source_path = get_plugin_source_dir() /  "models" / "certificates.py"
+        source_path = _get_plugin_source_dir() / "models" / "certificates.py"
         source = source_path.read_text()
         assert "is_becoming_archived" in source
         assert "STATUS_ARCHIVED" in source
@@ -415,7 +438,7 @@ class TestAutoArchiveScriptSource:
     """Test the auto-archive script structure via source inspection."""
 
     def _read_script_source(self) -> str:
-        source_path = get_plugin_source_dir() /  "scripts" / "auto_archive.py"
+        source_path = _get_plugin_source_dir() / "scripts" / "auto_archive.py"
         return source_path.read_text()
 
     def test_script_imports_correct_event(self):
@@ -458,7 +481,7 @@ class TestAutoArchiveScriptSource:
 
     def test_script_registered_in_init(self):
         """CertificateAutoArchive should be registered in scripts/__init__.py."""
-        init_path = get_plugin_source_dir() /  "scripts" / "__init__.py"
+        init_path = _get_plugin_source_dir() / "scripts" / "__init__.py"
         source = init_path.read_text()
         assert "CertificateAutoArchive" in source
         assert "from .auto_archive import CertificateAutoArchive" in source
@@ -475,7 +498,7 @@ class TestPluginSettings:
 
     def test_auto_archive_settings_in_init(self):
         """Plugin __init__.py should define auto_archive settings."""
-        init_path = get_plugin_source_dir() /  "__init__.py"
+        init_path = _get_plugin_source_dir() / "__init__.py"
         source = init_path.read_text()
         assert '"auto_archive_enabled": False' in source
         assert '"auto_archive_after_days": 90' in source
@@ -492,28 +515,19 @@ class TestMigration:
 
     def test_migration_file_exists(self):
         """Migration 0010 for archive fields should exist."""
-        migration_path = (
-            get_plugin_source_dir() /  "migrations"
-            / "0010_certificate_archive_fields.py"
-        )
+        migration_path = _get_plugin_source_dir() / "migrations" / "0010_certificate_archive_fields.py"
         assert migration_path.exists()
 
     def test_migration_adds_archive_pinned(self):
         """Migration should add archive_pinned field."""
-        migration_path = (
-            get_plugin_source_dir() /  "migrations"
-            / "0010_certificate_archive_fields.py"
-        )
+        migration_path = _get_plugin_source_dir() / "migrations" / "0010_certificate_archive_fields.py"
         source = migration_path.read_text()
         assert "archive_pinned" in source
         assert "BooleanField" in source
 
     def test_migration_adds_archived_at(self):
         """Migration should add archived_at field."""
-        migration_path = (
-            get_plugin_source_dir() /  "migrations"
-            / "0010_certificate_archive_fields.py"
-        )
+        migration_path = _get_plugin_source_dir() / "migrations" / "0010_certificate_archive_fields.py"
         source = migration_path.read_text()
         assert "archived_at" in source
         assert "DateTimeField" in source

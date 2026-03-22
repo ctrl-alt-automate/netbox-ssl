@@ -1,15 +1,3 @@
-from pathlib import Path
-
-try:
-    from conftest import get_plugin_source_dir
-except ImportError:
-    def get_plugin_source_dir():
-        local = Path(__file__).parent.parent / "netbox_ssl"
-        if local.is_dir(): return local
-        docker = Path("/opt/netbox/netbox/netbox_ssl")
-        if docker.is_dir(): return docker
-        return local
-
 """
 Unit tests for renewal reminders feature (#47).
 
@@ -22,7 +10,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -40,32 +28,54 @@ if not _NETBOX_AVAILABLE and "netbox" not in sys.modules:
     _django_utils_timezone.now.return_value = datetime(2026, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
 
     for mod in [
-        "django", "django.conf", "django.db", "django.db.models",
-        "django.db.models.functions", "django.db.models.lookups",
-        "django.utils", "django.utils.timezone", "django.utils.translation",
-        "django.contrib", "django.contrib.contenttypes",
-        "django.contrib.contenttypes.fields", "django.contrib.contenttypes.models",
-        "django.contrib.postgres", "django.contrib.postgres.fields",
-        "django.contrib.postgres.indexes", "django.core", "django.core.exceptions",
+        "django",
+        "django.conf",
+        "django.db",
+        "django.db.models",
+        "django.db.models.functions",
+        "django.db.models.lookups",
+        "django.utils",
+        "django.utils.timezone",
+        "django.utils.translation",
+        "django.contrib",
+        "django.contrib.contenttypes",
+        "django.contrib.contenttypes.fields",
+        "django.contrib.contenttypes.models",
+        "django.contrib.postgres",
+        "django.contrib.postgres.fields",
+        "django.contrib.postgres.indexes",
+        "django.core",
+        "django.core.exceptions",
         "django.core.validators",
-        "django.urls", "django.http",
-        "netbox", "netbox.models", "netbox.plugins",
-        "netbox.api", "netbox.api.serializers",
-        "netbox.graphql", "netbox.graphql.types",
-        "rest_framework", "rest_framework.serializers",
-        "tenancy", "tenancy.models", "tenancy.api", "tenancy.api.serializers",
-        "strawberry", "strawberry_django",
-        "utilities", "utilities.choices",
+        "django.urls",
+        "django.http",
+        "netbox",
+        "netbox.models",
+        "netbox.plugins",
+        "netbox.api",
+        "netbox.api.serializers",
+        "netbox.graphql",
+        "netbox.graphql.types",
+        "rest_framework",
+        "rest_framework.serializers",
+        "tenancy",
+        "tenancy.models",
+        "tenancy.api",
+        "tenancy.api.serializers",
+        "strawberry",
+        "strawberry_django",
+        "utilities",
+        "utilities.choices",
     ]:
         sys.modules.setdefault(mod, MagicMock())
     sys.modules["django.utils.timezone"] = _django_utils_timezone
 
 from netbox_ssl.utils.events import build_certificate_event_payload
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_certificate(
     pk: int = 1,
@@ -120,6 +130,7 @@ def _make_ca(
 # Tests: Model field existence (source inspection)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.unit
 class TestModelFields:
     """Verify renewal fields exist in model source files."""
@@ -156,6 +167,7 @@ class TestModelFields:
 # ---------------------------------------------------------------------------
 # Tests: Event payload enrichment
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.unit
 class TestEventPayloadRenewalInstructions:
@@ -209,6 +221,7 @@ class TestEventPayloadRenewalInstructions:
 # Tests: Serializer computed field
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.unit
 class TestEffectiveRenewalInstructionsSerializer:
     """Test the effective_renewal_instructions serializer method logic."""
@@ -248,6 +261,7 @@ class TestEffectiveRenewalInstructionsSerializer:
 # ---------------------------------------------------------------------------
 # Tests: Migration file existence
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.unit
 class TestMigration:

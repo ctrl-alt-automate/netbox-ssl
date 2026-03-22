@@ -9,10 +9,18 @@ or djangorestframework installed.
 import importlib.util
 from pathlib import Path
 
-try:
-    from conftest import get_plugin_source_dir
-except ImportError:
-    from tests.conftest import get_plugin_source_dir
+
+def _get_plugin_source_dir():
+    """Find the netbox_ssl source directory (local or Docker CI)."""
+    local = Path(__file__).resolve().parent.parent / "netbox_ssl"
+    if local.is_dir():
+        return local
+    docker = Path("/opt/netbox/netbox/netbox_ssl")
+    if docker.is_dir():
+        return docker
+    return local
+
+
 from types import ModuleType
 from unittest.mock import MagicMock
 
@@ -27,6 +35,7 @@ try:
     if _NETBOX_AVAILABLE:
         # Verify Django settings are actually configured (not just importable)
         from django.conf import settings
+
         _ = settings.USE_I18N  # noqa: F841
 except (ValueError, ModuleNotFoundError, Exception):
     _NETBOX_AVAILABLE = False
@@ -131,7 +140,7 @@ def _load_serializer_classes() -> tuple:
     }
 
     # Read the source and strip import lines so our injected names are used
-    source_path = get_plugin_source_dir() /  "api" / "serializers" / "certificates.py"
+    source_path = _get_plugin_source_dir() / "api" / "serializers" / "certificates.py"
     if not source_path.exists():
         # Docker CI: tests at /tmp/plugin_tests/, plugin at /opt/netbox/netbox/netbox_ssl/
         source_path = Path("/opt/netbox/netbox/netbox_ssl/api/serializers/certificates.py")
