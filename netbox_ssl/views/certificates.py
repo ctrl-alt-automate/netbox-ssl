@@ -66,11 +66,14 @@ class CertificateView(generic.ObjectView):
     )
 
     def get_extra_context(self, request, instance):
-        """Add assignments to context."""
+        """Add assignments and lifecycle events to context."""
         assignments = instance.assignments.all()
+        # Add lifecycle events for timeline tab
+        lifecycle_events = instance.lifecycle_events.all()[:50]
         return {
             "assignments": assignments,
             "assignments_count": assignments.count(),
+            "lifecycle_events": lifecycle_events,
         }
 
 

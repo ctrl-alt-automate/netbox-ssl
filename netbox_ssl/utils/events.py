@@ -19,6 +19,7 @@ EVENT_CERTIFICATE_EXPIRED = "certificate_expired"
 EVENT_CERTIFICATE_EXPIRING_SOON = "certificate_expiring_soon"
 EVENT_CERTIFICATE_RENEWED = "certificate_renewed"
 EVENT_CERTIFICATE_REVOKED = "certificate_revoked"
+EVENT_CERTIFICATE_ARCHIVED = "certificate_archived"
 
 
 def build_certificate_event_payload(
@@ -74,6 +75,17 @@ def build_certificate_event_payload(
         logger.warning("Failed to retrieve assignments for certificate %s: %s", certificate.pk, e)
         payload["assigned_objects"] = []
         payload["assignment_count"] = 0
+
+    # Renewal instructions fallback: cert note > CA instructions > empty
+    renewal_instructions = ""
+    if hasattr(certificate, "renewal_note") and certificate.renewal_note:
+        renewal_instructions = certificate.renewal_note
+    elif hasattr(certificate, "issuing_ca") and certificate.issuing_ca:
+        ca = certificate.issuing_ca
+        if hasattr(ca, "renewal_instructions") and ca.renewal_instructions:
+            renewal_instructions = ca.renewal_instructions
+    if renewal_instructions:
+        payload["renewal_instructions"] = renewal_instructions
 
     if extra:
         payload.update(extra)

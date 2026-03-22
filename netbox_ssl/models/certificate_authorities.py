@@ -75,6 +75,11 @@ class CertificateAuthority(NetBoxModel):
         help_text="Contact email for CA issues",
     )
 
+    renewal_instructions = models.TextField(
+        blank=True,
+        help_text="Renewal instructions in Markdown format. Included in expiry event payloads.",
+    )
+
     # Status
     is_approved = models.BooleanField(
         default=True,

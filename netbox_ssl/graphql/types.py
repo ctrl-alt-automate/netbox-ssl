@@ -9,7 +9,14 @@ import strawberry_django
 from netbox.graphql.types import NetBoxObjectType
 
 from .. import filtersets
-from ..models import Certificate, CertificateAssignment, CertificateAuthority, CertificateSigningRequest
+from ..models import (
+    Certificate,
+    CertificateAssignment,
+    CertificateAuthority,
+    CertificateLifecycleEvent,
+    CertificateSigningRequest,
+    ExternalSource,
+)
 
 
 @strawberry_django.type(
@@ -21,6 +28,7 @@ from ..models import Certificate, CertificateAssignment, CertificateAuthority, C
         "issuer_pattern",
         "website",
         "is_acme",
+        "renewal_instructions",
         "tags",
         "created",
         "last_updated",
@@ -37,7 +45,47 @@ class CertificateAuthorityType(NetBoxObjectType):
     website_url: str
     portal_url: str
     contact_email: str
+    renewal_instructions: str
     is_approved: bool
+
+    @strawberry_django.field
+    def certificate_count(self) -> int:
+        return self.certificates.count()
+
+
+@strawberry_django.type(
+    ExternalSource,
+    fields=[
+        "id",
+        "name",
+        "source_type",
+        "base_url",
+        "auth_method",
+        "sync_interval_minutes",
+        "enabled",
+        "sync_status",
+        "last_synced",
+        "verify_ssl",
+        "tags",
+        "created",
+        "last_updated",
+    ],
+    filters=filtersets.ExternalSourceFilterSet,
+)
+class ExternalSourceType(NetBoxObjectType):
+    """GraphQL type for ExternalSource model.
+
+    Note: auth_credentials_reference is intentionally excluded for security.
+    """
+
+    name: str
+    source_type: str
+    base_url: str
+    auth_method: str
+    sync_interval_minutes: int
+    enabled: bool
+    sync_status: str
+    verify_ssl: bool
 
     @strawberry_django.field
     def certificate_count(self) -> int:
@@ -60,6 +108,12 @@ class CertificateAuthorityType(NetBoxObjectType):
         "sans",
         "tenant",
         "issuing_ca",
+        "archive_pinned",
+        "archived_at",
+        "renewal_note",
+        "external_source",
+        "external_id",
+        "source_removed",
         "tags",
         "comments",
         "created",
@@ -80,7 +134,22 @@ class CertificateType(NetBoxObjectType):
     key_size: int | None
     algorithm: str
     status: str
+    archive_pinned: bool
+    archived_at: str | None
+    renewal_note: str
     issuing_ca: Annotated["CertificateAuthorityType", strawberry.lazy(".types")] | None
+    external_source: Annotated["ExternalSourceType", strawberry.lazy(".types")] | None
+    external_id: str
+    source_removed: bool
+
+    @strawberry_django.field
+    def effective_renewal_instructions(self) -> str:
+        """Get renewal instructions with fallback: cert note > CA instructions > empty."""
+        if self.renewal_note:
+            return self.renewal_note
+        if self.issuing_ca and hasattr(self.issuing_ca, "renewal_instructions"):
+            return self.issuing_ca.renewal_instructions or ""
+        return ""
 
     @strawberry_django.field
     def days_remaining(self) -> int | None:
@@ -177,3 +246,26 @@ class CertificateSigningRequestType(NetBoxObjectType):
         if self.country:
             parts.append(f"C={self.country}")
         return ", ".join(parts) if parts else ""
+
+
+@strawberry_django.type(
+    CertificateLifecycleEvent,
+    fields=[
+        "id",
+        "event_type",
+        "timestamp",
+        "description",
+        "old_status",
+        "new_status",
+        "actor",
+    ],
+)
+class CertificateLifecycleEventType:
+    """GraphQL type for CertificateLifecycleEvent model."""
+
+    event_type: str
+    timestamp: str
+    description: str
+    old_status: str
+    new_status: str
+    actor: str

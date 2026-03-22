@@ -29,6 +29,7 @@ class CertificateAuthoritySerializer(NetBoxModelSerializer):
             "website_url",
             "portal_url",
             "contact_email",
+            "renewal_instructions",
             "is_approved",
             "certificate_count",
             "tags",

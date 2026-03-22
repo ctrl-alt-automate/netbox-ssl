@@ -10,6 +10,7 @@ from tenancy.models import Tenant
 from ...models import Certificate, CertificateStatusChoices
 from ...utils import CertificateParseError, CertificateParser, detect_issuing_ca
 from .certificate_authorities import CertificateAuthoritySerializer
+from .external_sources import ExternalSourceSerializer
 
 
 class CertificateSerializer(NetBoxModelSerializer):
@@ -20,6 +21,7 @@ class CertificateSerializer(NetBoxModelSerializer):
     )
     tenant = TenantSerializer(nested=True, required=False, allow_null=True)
     issuing_ca = CertificateAuthoritySerializer(nested=True, required=False, allow_null=True)
+    external_source = ExternalSourceSerializer(nested=True, required=False, allow_null=True, read_only=True)
     days_remaining = serializers.IntegerField(read_only=True)
     is_expired = serializers.BooleanField(read_only=True)
     is_expiring_soon = serializers.BooleanField(read_only=True)
@@ -29,6 +31,7 @@ class CertificateSerializer(NetBoxModelSerializer):
     chain_needs_validation = serializers.BooleanField(read_only=True)
     acme_renewal_due = serializers.BooleanField(read_only=True)
     acme_renewal_status = serializers.CharField(read_only=True)
+    effective_renewal_instructions = serializers.SerializerMethodField()
 
     class Meta:
         model = Certificate
@@ -53,6 +56,8 @@ class CertificateSerializer(NetBoxModelSerializer):
             "algorithm",
             "status",
             "private_key_location",
+            "renewal_note",
+            "effective_renewal_instructions",
             "replaced_by",
             "tenant",
             "pem_content",
@@ -75,6 +80,13 @@ class CertificateSerializer(NetBoxModelSerializer):
             "acme_renewal_days",
             "acme_renewal_due",
             "acme_renewal_status",
+            # Archival fields
+            "archive_pinned",
+            "archived_at",
+            # External source fields
+            "external_source",
+            "external_id",
+            "source_removed",
             "tags",
             "custom_fields",
             "created",
@@ -96,6 +108,14 @@ class CertificateSerializer(NetBoxModelSerializer):
     def get_assignment_count(self, obj):
         """Get the number of assignments for this certificate."""
         return obj.assignments.count()
+
+    def get_effective_renewal_instructions(self, obj) -> str:
+        """Get renewal instructions with fallback: cert note > CA instructions > empty."""
+        if obj.renewal_note:
+            return obj.renewal_note
+        if obj.issuing_ca and hasattr(obj.issuing_ca, "renewal_instructions"):
+            return obj.issuing_ca.renewal_instructions or ""
+        return ""
 
 
 class CertificateImportSerializer(serializers.Serializer):
@@ -189,3 +209,37 @@ class CertificateImportSerializer(serializers.Serializer):
         certificate.auto_detect_acme(save=True)
 
         return certificate
+
+
+class BulkStatusUpdateSerializer(serializers.Serializer):
+    """Serializer for bulk status update."""
+
+    ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        allow_empty=False,
+        help_text="List of certificate IDs to update.",
+    )
+    status = serializers.ChoiceField(
+        choices=CertificateStatusChoices,
+        help_text="New status to set.",
+    )
+
+
+class BulkAssignSerializer(serializers.Serializer):
+    """Serializer for bulk certificate assignment."""
+
+    certificate_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        allow_empty=False,
+        help_text="List of certificate IDs to assign.",
+    )
+    assigned_object_type = serializers.CharField(
+        help_text="Content type (e.g., 'dcim.device', 'dcim.service', 'virtualization.virtualmachine').",
+    )
+    assigned_object_id = serializers.IntegerField(
+        help_text="ID of the object to assign certificates to.",
+    )
+    is_primary = serializers.BooleanField(
+        default=True,
+        help_text="Whether this is the primary certificate for the object.",
+    )

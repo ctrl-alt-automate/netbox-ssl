@@ -1,6 +1,11 @@
 from .assignments import CertificateAssignmentSerializer
 from .certificate_authorities import CertificateAuthoritySerializer
-from .certificates import CertificateImportSerializer, CertificateSerializer
+from .certificates import (
+    BulkAssignSerializer,
+    BulkStatusUpdateSerializer,
+    CertificateImportSerializer,
+    CertificateSerializer,
+)
 from .compliance import (
     BulkComplianceRunSerializer,
     ComplianceCheckSerializer,
@@ -9,10 +14,13 @@ from .compliance import (
     ComplianceRunSerializer,
 )
 from .csr import CertificateSigningRequestSerializer, CSRImportSerializer
+from .external_sources import ExternalSourceSerializer, ExternalSourceSyncLogSerializer
 
 __all__ = [
     "CertificateSerializer",
     "CertificateImportSerializer",
+    "BulkStatusUpdateSerializer",
+    "BulkAssignSerializer",
     "CertificateAssignmentSerializer",
     "CertificateAuthoritySerializer",
     "CertificateSigningRequestSerializer",
@@ -22,4 +30,6 @@ __all__ = [
     "ComplianceRunSerializer",
     "BulkComplianceRunSerializer",
     "ComplianceReportSerializer",
+    "ExternalSourceSerializer",
+    "ExternalSourceSyncLogSerializer",
 ]

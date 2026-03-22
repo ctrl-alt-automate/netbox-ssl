@@ -5,6 +5,7 @@ REST API views for NetBox SSL plugin.
 import logging
 
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Count
 from django.http import HttpResponse
@@ -20,19 +21,25 @@ from ..filtersets import (
     CertificateSigningRequestFilterSet,
     ComplianceCheckFilterSet,
     CompliancePolicyFilterSet,
+    ExternalSourceFilterSet,
 )
 from ..models import (
     Certificate,
     CertificateAssignment,
     CertificateAuthority,
     CertificateSigningRequest,
+    CertificateStatusChoices,
     ComplianceCheck,
     CompliancePolicy,
+    ExternalSource,
 )
 from ..utils import CertificateExporter, ComplianceChecker, ExportFormatChoices
 from ..utils.bulk_parser import parse as bulk_parse
+from ..utils.events import fire_certificate_event
 from .serializers import (
+    BulkAssignSerializer,
     BulkComplianceRunSerializer,
+    BulkStatusUpdateSerializer,
     CertificateAssignmentSerializer,
     CertificateAuthoritySerializer,
     CertificateImportSerializer,
@@ -42,6 +49,8 @@ from .serializers import (
     CompliancePolicySerializer,
     ComplianceRunSerializer,
     CSRImportSerializer,
+    ExternalSourceSerializer,
+    ExternalSourceSyncLogSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -538,6 +547,27 @@ class CertificateViewSet(NetBoxModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=["get"], url_path="lifecycle")
+    def lifecycle(self, request, pk=None):
+        """Get lifecycle events for a certificate."""
+        certificate = self.get_object()
+        events = certificate.lifecycle_events.all()[:50]
+        data = [
+            {
+                "id": event.pk,
+                "event_type": event.event_type,
+                "event_type_display": event.get_event_type_display(),
+                "timestamp": event.timestamp.isoformat(),
+                "description": event.description,
+                "old_status": event.old_status,
+                "new_status": event.new_status,
+                "related_certificate_id": event.related_certificate_id,
+                "actor": event.actor,
+            }
+            for event in events
+        ]
+        return Response({"certificate_id": certificate.pk, "events": data}, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=["post"], url_path="detect-acme")
     def detect_acme(self, request, pk=None):
         """
@@ -817,6 +847,185 @@ class CertificateViewSet(NetBoxModelViewSet):
 
         return Response(results, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=["post"], url_path="bulk-status-update")
+    def bulk_status_update(self, request):
+        """
+        Update the status of multiple certificates at once.
+
+        Performs individual saves to trigger status tracking hooks and fires
+        certificate events for status changes.
+
+        Example payload:
+        {
+            "ids": [1, 2, 3],
+            "status": "revoked"
+        }
+        """
+        if not request.user.has_perm("netbox_ssl.change_certificate"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = BulkStatusUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        ids = serializer.validated_data["ids"]
+        new_status = serializer.validated_data["status"]
+
+        # Limit batch size
+        plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+        max_batch_size = plugin_settings.get("bulk_status_update_max_batch_size", 100)
+        if len(ids) > max_batch_size:
+            raise serializers.ValidationError(
+                {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
+            )
+
+        certificates = list(Certificate.objects.restrict(request.user, "change").filter(pk__in=ids))
+        found_ids = {cert.pk for cert in certificates}
+        not_found_ids = [pk for pk in ids if pk not in found_ids]
+
+        results = []
+        for cert in certificates:
+            old_status = cert.status
+            cert.status = new_status
+            cert.save()
+
+            # Fire event for meaningful status transitions
+            event_map = {
+                CertificateStatusChoices.STATUS_REVOKED: "certificate_revoked",
+                CertificateStatusChoices.STATUS_EXPIRED: "certificate_expired",
+                CertificateStatusChoices.STATUS_REPLACED: "certificate_renewed",
+            }
+            event_type = event_map.get(new_status)
+            if event_type and old_status != new_status:
+                try:
+                    fire_certificate_event(
+                        cert,
+                        event_type,
+                        extra={"old_status": old_status, "new_status": new_status},
+                    )
+                except Exception as e:
+                    logger.warning("Failed to fire event for certificate %s: %s", cert.pk, e)
+
+            results.append(
+                {
+                    "id": cert.pk,
+                    "common_name": cert.common_name,
+                    "old_status": old_status,
+                    "new_status": new_status,
+                }
+            )
+
+        return Response(
+            {
+                "updated_count": len(results),
+                "not_found_ids": not_found_ids,
+                "results": results,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["post"], url_path="bulk-assign")
+    def bulk_assign(self, request):
+        """
+        Assign multiple certificates to a single target object.
+
+        Creates CertificateAssignment records for each certificate. Duplicate
+        assignments are silently skipped.
+
+        Example payload:
+        {
+            "certificate_ids": [1, 2, 3],
+            "assigned_object_type": "dcim.device",
+            "assigned_object_id": 42,
+            "is_primary": true
+        }
+        """
+        if not request.user.has_perm("netbox_ssl.add_certificateassignment"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = BulkAssignSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        certificate_ids = serializer.validated_data["certificate_ids"]
+        object_type_str = serializer.validated_data["assigned_object_type"]
+        assigned_object_id = serializer.validated_data["assigned_object_id"]
+        is_primary = serializer.validated_data["is_primary"]
+
+        # Limit batch size
+        plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+        max_batch_size = plugin_settings.get("bulk_assign_max_batch_size", 100)
+        if len(certificate_ids) > max_batch_size:
+            raise serializers.ValidationError(
+                {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
+            )
+
+        # Resolve and validate content type
+        allowed_types = {"dcim.device", "dcim.service", "virtualization.virtualmachine"}
+        if object_type_str not in allowed_types:
+            raise serializers.ValidationError(
+                {"assigned_object_type": (f"Invalid content type. Must be one of: {sorted(allowed_types)}")}
+            )
+
+        try:
+            app_label, model = object_type_str.split(".")
+            content_type = ContentType.objects.get(app_label=app_label, model=model)
+        except (ValueError, ContentType.DoesNotExist) as e:
+            raise serializers.ValidationError({"assigned_object_type": "Could not resolve content type."}) from e
+
+        # Verify target object exists
+        model_class = content_type.model_class()
+        if not model_class.objects.filter(pk=assigned_object_id).exists():
+            raise serializers.ValidationError(
+                {"assigned_object_id": (f"{content_type.model} with ID {assigned_object_id} does not exist.")}
+            )
+
+        # Get certificates accessible to user
+        certificates = list(Certificate.objects.restrict(request.user, "view").filter(pk__in=certificate_ids))
+        found_ids = {cert.pk for cert in certificates}
+        not_found_ids = [pk for pk in certificate_ids if pk not in found_ids]
+
+        created_count = 0
+        skipped_count = 0
+
+        try:
+            with transaction.atomic():
+                for cert in certificates:
+                    # Check for existing assignment (skip duplicates)
+                    exists = CertificateAssignment.objects.filter(
+                        certificate=cert,
+                        assigned_object_type=content_type,
+                        assigned_object_id=assigned_object_id,
+                    ).exists()
+                    if exists:
+                        skipped_count += 1
+                        continue
+
+                    CertificateAssignment.objects.create(
+                        certificate=cert,
+                        assigned_object_type=content_type,
+                        assigned_object_id=assigned_object_id,
+                        is_primary=is_primary,
+                    )
+                    created_count += 1
+        except IntegrityError as e:
+            logger.error("Bulk assign IntegrityError: %s", e)
+            raise serializers.ValidationError(
+                {"detail": "A database constraint error occurred during bulk assignment."}
+            ) from e
+        except DatabaseError as e:
+            logger.error("Bulk assign DatabaseError: %s", e)
+            raise serializers.ValidationError(
+                {"detail": "A database error occurred during bulk assignment. Please try again."}
+            ) from e
+
+        return Response(
+            {
+                "created_count": created_count,
+                "skipped_count": skipped_count,
+                "not_found_ids": not_found_ids,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
 
 class CertificateAssignmentViewSet(NetBoxModelViewSet):
     """API viewset for CertificateAssignment model."""
@@ -891,3 +1100,131 @@ class ComplianceCheckViewSet(NetBoxModelViewSet):
     ).prefetch_related("tags")
     serializer_class = ComplianceCheckSerializer
     filterset_class = ComplianceCheckFilterSet
+
+
+class ExternalSourceViewSet(NetBoxModelViewSet):
+    """API viewset for ExternalSource model."""
+
+    queryset = ExternalSource.objects.prefetch_related(
+        "tenant",
+        "tags",
+    )
+    serializer_class = ExternalSourceSerializer
+    filterset_class = ExternalSourceFilterSet
+
+    @action(detail=True, methods=["post"], url_path="test-connection")
+    def test_connection(self, request, pk=None):
+        """Test connectivity to the external source."""
+        if not request.user.has_perm("netbox_ssl.change_externalsource"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        source = self.get_object()
+        try:
+            from ..adapters import get_adapter_for_source
+            from ..utils.credential_resolver import CredentialResolveError
+
+            adapter = get_adapter_for_source(source)
+            success, message = adapter.test_connection()
+            return Response(
+                {"success": success, "message": message},
+                status=status.HTTP_200_OK,
+            )
+        except CredentialResolveError as e:
+            # HIGH-1: Do not leak env var names to API response.
+            logger.error("Credential resolution failed for source '%s': %s", source.name, e)
+            return Response(
+                {"success": False, "message": "Credential resolution failed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ValueError as e:
+            return Response(
+                {"success": False, "message": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            logger.error("Connection test failed for source '%s': %s", source.name, e)
+            return Response(
+                {"success": False, "message": "Connection test failed due to an internal error."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"], url_path="sync")
+    def sync(self, request, pk=None):
+        """Trigger a sync for the external source."""
+        if not request.user.has_perm("netbox_ssl.change_externalsource"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        from ..models.external_source import SyncStatusChoices
+        from ..utils.credential_resolver import CredentialResolveError
+
+        source = self.get_object()
+
+        # HIGH-2: Validate dry_run is a boolean.
+        raw_dry_run = request.data.get("dry_run", False)
+        if not isinstance(raw_dry_run, bool):
+            return Response(
+                {"detail": "dry_run must be a boolean."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        dry_run: bool = raw_dry_run
+
+        try:
+            from ..adapters import get_adapter_for_source
+            from ..utils.sync_engine import build_plan, execute_plan
+
+            # Update sync status — use choice constant (LOW-7)
+            source.sync_status = SyncStatusChoices.STATUS_SYNCING
+            source.save(update_fields=["sync_status", "last_updated"])
+
+            # Fetch certificates
+            adapter = get_adapter_for_source(source)
+            fetched_certs = adapter.fetch_certificates()
+
+            # Build and execute plan
+            local_certs = Certificate.objects.filter(external_source=source)
+            plan = build_plan(fetched_certs, local_certs, source)
+            log = execute_plan(plan, source, dry_run=dry_run)
+
+            log_serializer = ExternalSourceSyncLogSerializer(log)
+            return Response(
+                {
+                    "success": log.success,
+                    "message": log.message,
+                    "log": log_serializer.data if not dry_run else None,
+                    "plan_summary": {
+                        "creates": len(plan.creates),
+                        "updates": len(plan.updates),
+                        "renewals": len(plan.renewals),
+                        "removals": len(plan.removals),
+                        "unchanged": plan.unchanged,
+                    },
+                },
+                status=status.HTTP_200_OK,
+            )
+        except CredentialResolveError as e:
+            # HIGH-1: Do not leak env var names to API response.
+            logger.error("Credential resolution failed for source '%s': %s", source.name, e)
+            source.sync_status = SyncStatusChoices.STATUS_ERROR
+            source.last_sync_message = "Credential resolution failed."
+            source.save(update_fields=["sync_status", "last_sync_message", "last_updated"])
+            return Response(
+                {"success": False, "message": "Credential resolution failed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ValueError as e:
+            source.sync_status = SyncStatusChoices.STATUS_ERROR
+            source.last_sync_message = str(e)
+            source.save(update_fields=["sync_status", "last_sync_message", "last_updated"])
+            return Response(
+                {"success": False, "message": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            logger.error("Sync failed for source '%s': %s", source.name, e)
+            source.sync_status = SyncStatusChoices.STATUS_ERROR
+            source.last_sync_message = "Sync failed due to an internal error."
+            source.save(update_fields=["sync_status", "last_sync_message", "last_updated"])
+            return Response(
+                {"success": False, "message": "Sync failed due to an internal error."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

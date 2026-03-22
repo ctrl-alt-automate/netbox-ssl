@@ -178,6 +178,48 @@ urlpatterns = [
         name="certificateauthority_changelog",
         kwargs={"model": models.CertificateAuthority},
     ),
+    # ExternalSource URLs
+    path(
+        "external-sources/",
+        views.ExternalSourceListView.as_view(),
+        name="externalsource_list",
+    ),
+    path(
+        "external-sources/add/",
+        views.ExternalSourceEditView.as_view(),
+        name="externalsource_add",
+    ),
+    path(
+        "external-sources/edit/",
+        views.ExternalSourceBulkEditView.as_view(),
+        name="externalsource_bulk_edit",
+    ),
+    path(
+        "external-sources/delete/",
+        views.ExternalSourceBulkDeleteView.as_view(),
+        name="externalsource_bulk_delete",
+    ),
+    path(
+        "external-sources/<int:pk>/",
+        views.ExternalSourceView.as_view(),
+        name="externalsource",
+    ),
+    path(
+        "external-sources/<int:pk>/edit/",
+        views.ExternalSourceEditView.as_view(),
+        name="externalsource_edit",
+    ),
+    path(
+        "external-sources/<int:pk>/delete/",
+        views.ExternalSourceDeleteView.as_view(),
+        name="externalsource_delete",
+    ),
+    path(
+        "external-sources/<int:pk>/changelog/",
+        ObjectChangeLogView.as_view(),
+        name="externalsource_changelog",
+        kwargs={"model": models.ExternalSource},
+    ),
     # CertificateAssignment URLs
     path(
         "assignments/",

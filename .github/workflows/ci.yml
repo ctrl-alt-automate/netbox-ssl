@@ -252,7 +252,7 @@ jobs:
           NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d postgres redis redis-cache netbox
 
           echo "Waiting for NetBox to be healthy..."
-          timeout 900 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting for NetBox..."; sleep 15; done'
+          timeout 1800 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting for NetBox..."; sleep 15; done'
           echo "NetBox is ready!"
 
       - name: Create superuser for v4.5

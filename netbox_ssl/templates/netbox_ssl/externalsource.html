@@ -1,0 +1,204 @@
+{% extends 'generic/object.html' %}
+{% load helpers %}
+{% load plugins %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  {{ block.super }}
+  <li class="breadcrumb-item">
+    <a href="{% url 'plugins:netbox_ssl:externalsource_list' %}">External Sources</a>
+  </li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col col-md-6">
+    <div class="card">
+      <h5 class="card-header">Source Configuration</h5>
+      <div class="card-body">
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Name</th>
+            <td>{{ object.name }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Type</th>
+            <td>{% badge object.get_source_type_display %}</td>
+          </tr>
+          <tr>
+            <th scope="row">Base URL</th>
+            <td>
+              <a href="{{ object.base_url }}" target="_blank" rel="noopener noreferrer">{{ object.base_url }}</a>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Auth Method</th>
+            <td>{{ object.get_auth_method_display }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Enabled</th>
+            <td>
+              {% if object.enabled %}
+                <span class="badge text-bg-success">Enabled</span>
+              {% else %}
+                <span class="badge text-bg-danger">Disabled</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Verify TLS</th>
+            <td>
+              {% if object.verify_ssl %}
+                <span class="badge text-bg-success">Yes</span>
+              {% else %}
+                <span class="badge text-bg-warning">No</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Sync Interval</th>
+            <td>
+              {% if object.sync_interval_minutes == 0 %}
+                Manual only
+              {% else %}
+                {{ object.sync_interval_minutes }} minutes
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Tenant</th>
+            <td>
+              {% if object.tenant %}
+                <a href="{{ object.tenant.get_absolute_url }}">{{ object.tenant }}</a>
+              {% else %}
+                <span class="text-muted">None</span>
+              {% endif %}
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col col-md-6">
+    <div class="card">
+      <h5 class="card-header">Sync Status</h5>
+      <div class="card-body">
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Status</th>
+            <td>
+              {% if object.sync_status == 'ok' %}
+                <span class="badge text-bg-success">{{ object.get_sync_status_display }}</span>
+              {% elif object.sync_status == 'error' %}
+                <span class="badge text-bg-danger">{{ object.get_sync_status_display }}</span>
+              {% elif object.sync_status == 'syncing' %}
+                <span class="badge text-bg-warning">{{ object.get_sync_status_display }}</span>
+              {% else %}
+                <span class="badge text-bg-info">{{ object.get_sync_status_display }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Last Synced</th>
+            <td>
+              {% if object.last_synced %}
+                {{ object.last_synced|date:"Y-m-d H:i:s" }}
+              {% else %}
+                <span class="text-muted">Never</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Certificates</th>
+            <td>{{ certificate_count }}</td>
+          </tr>
+          {% if object.last_sync_message %}
+          <tr>
+            <th scope="row">Last Message</th>
+            <td>{{ object.last_sync_message }}</td>
+          </tr>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+    {% if perms.netbox_ssl.change_externalsource %}
+    <div class="card mt-3">
+      <div class="card-body">
+        <form method="post" action="{% url 'plugins-api:netbox_ssl-api:externalsource-sync' pk=object.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary">
+            <i class="mdi mdi-sync"></i> Sync Now
+          </button>
+          <button type="submit" name="dry_run" value="true" class="btn btn-outline-secondary ms-2">
+            <i class="mdi mdi-eye"></i> Dry Run
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if sync_logs %}
+<div class="row mb-3">
+  <div class="col col-12">
+    <div class="card">
+      <h5 class="card-header">Recent Sync Logs</h5>
+      <div class="card-body">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Started</th>
+              <th>Finished</th>
+              <th>Status</th>
+              <th>Dry Run</th>
+              <th>Fetched</th>
+              <th>Created</th>
+              <th>Updated</th>
+              <th>Renewed</th>
+              <th>Removed</th>
+              <th>Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in sync_logs %}
+            <tr>
+              <td>{{ log.started_at|date:"Y-m-d H:i" }}</td>
+              <td>
+                {% if log.finished_at %}
+                  {{ log.finished_at|date:"Y-m-d H:i" }}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if log.success %}
+                  <span class="badge text-bg-success">OK</span>
+                {% else %}
+                  <span class="badge text-bg-danger">Failed</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if log.dry_run %}
+                  <span class="badge text-bg-info">Yes</span>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>{{ log.certificates_fetched }}</td>
+              <td>{{ log.certificates_created }}</td>
+              <td>{{ log.certificates_updated }}</td>
+              <td>{{ log.certificates_renewed }}</td>
+              <td>{{ log.certificates_removed }}</td>
+              <td>{{ log.message|truncatewords:20 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock content %}

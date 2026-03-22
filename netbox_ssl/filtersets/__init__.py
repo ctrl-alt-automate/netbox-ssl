@@ -3,6 +3,7 @@ from .certificate_authorities import CertificateAuthorityFilterSet
 from .certificates import CertificateFilterSet
 from .compliance import ComplianceCheckFilterSet, CompliancePolicyFilterSet
 from .csr import CertificateSigningRequestFilterSet
+from .external_sources import ExternalSourceFilterSet
 
 __all__ = [
     "CertificateFilterSet",
@@ -11,4 +12,5 @@ __all__ = [
     "CertificateSigningRequestFilterSet",
     "CompliancePolicyFilterSet",
     "ComplianceCheckFilterSet",
+    "ExternalSourceFilterSet",
 ]

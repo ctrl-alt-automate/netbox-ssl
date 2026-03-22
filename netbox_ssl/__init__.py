@@ -7,7 +7,7 @@ Provides a "Single Source of Truth" for certificate inventory and lifecycle mana
 
 from netbox.plugins import PluginConfig
 
-__version__ = "0.7.5"
+__version__ = "0.8.0"
 
 
 class NetBoxSSLConfig(PluginConfig):
@@ -31,11 +31,18 @@ class NetBoxSSLConfig(PluginConfig):
         "bulk_validate_max_batch_size": 100,
         "bulk_compliance_max_batch_size": 100,
         "bulk_detect_max_batch_size": 100,
+        "bulk_status_update_max_batch_size": 100,
+        "bulk_assign_max_batch_size": 100,
         "notification_email_enabled": False,
         "notification_email_recipients": [],
         "notification_email_subject_prefix": "[NetBox SSL]",
         "expiry_scan_thresholds": [14, 30, 60, 90],
         "expiry_scan_cooldown_hours": 24,
+        "auto_archive_enabled": False,
+        "auto_archive_after_days": 90,
+        "external_source_sync_enabled": True,
+        "external_source_default_interval": 1440,
+        "external_source_never_fetch_keys": True,
     }
 
     def ready(self):

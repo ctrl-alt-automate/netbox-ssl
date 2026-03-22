@@ -68,6 +68,10 @@ class CertificateForm(NetBoxModelForm):
             name=_("Certificate Data"),
         ),
         FieldSet(
+            "renewal_note",
+            name=_("Renewal"),
+        ),
+        FieldSet(
             "is_acme",
             "acme_provider",
             "acme_account_email",
@@ -76,6 +80,10 @@ class CertificateForm(NetBoxModelForm):
             "acme_auto_renewal",
             "acme_renewal_days",
             name=_("ACME"),
+        ),
+        FieldSet(
+            "archive_pinned",
+            name=_("Archival"),
         ),
         FieldSet(
             "tags",
@@ -99,6 +107,7 @@ class CertificateForm(NetBoxModelForm):
             "algorithm",
             "status",
             "private_key_location",
+            "renewal_note",
             "tenant",
             "pem_content",
             "is_acme",
@@ -108,6 +117,7 @@ class CertificateForm(NetBoxModelForm):
             "acme_server_url",
             "acme_auto_renewal",
             "acme_renewal_days",
+            "archive_pinned",
             "tags",
             "comments",
         ]
@@ -123,6 +133,9 @@ class CertificateForm(NetBoxModelForm):
             ),
             "issuer_chain": forms.Textarea(
                 attrs={"rows": 10, "class": "font-monospace"},
+            ),
+            "renewal_note": forms.Textarea(
+                attrs={"rows": 5},
             ),
         }
 
@@ -224,6 +237,10 @@ class CertificateFilterForm(NetBoxModelFilterSetForm):
             "acme_provider",
             name=_("ACME"),
         ),
+        FieldSet(
+            "archive_pinned",
+            name=_("Archival"),
+        ),
     )
 
     common_name = forms.CharField(
@@ -267,6 +284,10 @@ class CertificateFilterForm(NetBoxModelFilterSetForm):
         required=False,
         label=_("ACME Provider"),
     )
+    archive_pinned = forms.NullBooleanField(
+        required=False,
+        label=_("Archive Pinned"),
+    )
     tag = TagFilterField(model)
 
 
@@ -295,6 +316,10 @@ class CertificateBulkEditForm(NetBoxModelBulkEditForm):
         required=False,
         label=_("Private Key Location"),
     )
+    archive_pinned = forms.NullBooleanField(
+        required=False,
+        label=_("Archive Pinned"),
+    )
 
     fieldsets = (
         FieldSet(
@@ -302,6 +327,7 @@ class CertificateBulkEditForm(NetBoxModelBulkEditForm):
             "tenant",
             "issuing_ca",
             "private_key_location",
+            "archive_pinned",
         ),
     )
 
