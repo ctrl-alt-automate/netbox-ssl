@@ -127,6 +127,9 @@ def _load_serializer_classes() -> tuple:
 
     # Read the source and strip import lines so our injected names are used
     source_path = Path(__file__).parent.parent / "netbox_ssl" / "api" / "serializers" / "certificates.py"
+    if not source_path.exists():
+        # Docker CI: tests at /tmp/plugin_tests/, plugin at /opt/netbox/netbox/netbox_ssl/
+        source_path = Path("/opt/netbox/netbox/netbox_ssl/api/serializers/certificates.py")
     source = source_path.read_text()
 
     lines = source.split("\n")
