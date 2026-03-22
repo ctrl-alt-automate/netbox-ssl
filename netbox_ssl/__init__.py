@@ -7,7 +7,7 @@ Provides a "Single Source of Truth" for certificate inventory and lifecycle mana
 
 from netbox.plugins import PluginConfig
 
-__version__ = "0.7.5"
+__version__ = "0.8.0"
 
 
 class NetBoxSSLConfig(PluginConfig):
