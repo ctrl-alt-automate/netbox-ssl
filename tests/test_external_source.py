@@ -222,7 +222,12 @@ class TestExternalSourceSyncLogFields:
 
     def test_sync_log_module_importable(self):
         """Test that the sync log class is importable."""
-        assert hasattr(_es_mod, "ExternalSourceSyncLog")
+        if _NETBOX_AVAILABLE:
+            from netbox_ssl.models.external_source import ExternalSourceSyncLog
+
+            assert ExternalSourceSyncLog is not None
+        else:
+            assert hasattr(_es_mod, "ExternalSourceSyncLog")
 
 
 @pytest.mark.unit

@@ -9,10 +9,23 @@ import importlib.util
 import os
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+
+
+def _get_plugin_source_dir() -> Path:
+    """Find the netbox_ssl source directory (local or Docker CI)."""
+    local = Path(__file__).resolve().parent.parent / "netbox_ssl"
+    if local.is_dir():
+        return local
+    docker = Path("/opt/netbox/netbox/netbox_ssl")
+    if docker.is_dir():
+        return docker
+    return local
+
 
 # ---------------------------------------------------------------------------
 # Mock Django/NetBox before importing plugin code
@@ -138,9 +151,7 @@ class TestModelFields:
     def test_renewal_instructions_field_in_ca_model_source(self) -> None:
         """CertificateAuthority model source contains renewal_instructions field."""
         ca_source_path = os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "netbox_ssl",
+            str(_get_plugin_source_dir()),
             "models",
             "certificate_authorities.py",
         )
@@ -152,9 +163,7 @@ class TestModelFields:
     def test_renewal_note_field_in_certificate_model_source(self) -> None:
         """Certificate model source contains renewal_note field."""
         cert_source_path = os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "netbox_ssl",
+            str(_get_plugin_source_dir()),
             "models",
             "certificates.py",
         )
@@ -269,9 +278,7 @@ class TestMigration:
 
     def test_migration_file_exists(self) -> None:
         migration_path = os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "netbox_ssl",
+            str(_get_plugin_source_dir()),
             "migrations",
             "0012_renewal_instructions.py",
         )
@@ -279,9 +286,7 @@ class TestMigration:
 
     def test_migration_contains_renewal_instructions_field(self) -> None:
         migration_path = os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "netbox_ssl",
+            str(_get_plugin_source_dir()),
             "migrations",
             "0012_renewal_instructions.py",
         )
