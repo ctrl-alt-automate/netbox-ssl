@@ -81,21 +81,29 @@ if not _NETBOX_AVAILABLE:
     sys.modules["utilities.choices"] = _utilities_choices
     sys.modules["netbox.models"] = _netbox_models
 
-# Load external_source module directly to avoid triggering models/__init__.py
-# which imports all other models requiring complex metaclass mocking.
-_es_spec = importlib.util.spec_from_file_location(
-    "netbox_ssl.models.external_source",
-    os.path.join(os.path.dirname(os.path.dirname(__file__)), "netbox_ssl", "models", "external_source.py"),
-    submodule_search_locations=[],
-)
-_es_mod = importlib.util.module_from_spec(_es_spec)
-sys.modules["netbox_ssl.models.external_source"] = _es_mod
-_es_spec.loader.exec_module(_es_mod)
+if _NETBOX_AVAILABLE:
+    from netbox_ssl.models.external_source import (
+        AuthMethodChoices,
+        ExternalSourceTypeChoices,
+        SyncStatusChoices,
+        validate_external_source_url,
+    )
+else:
+    # Load external_source module directly to avoid triggering models/__init__.py
+    # which imports all other models requiring complex metaclass mocking.
+    _es_spec = importlib.util.spec_from_file_location(
+        "netbox_ssl.models.external_source",
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "netbox_ssl", "models", "external_source.py"),
+        submodule_search_locations=[],
+    )
+    _es_mod = importlib.util.module_from_spec(_es_spec)
+    sys.modules["netbox_ssl.models.external_source"] = _es_mod
+    _es_spec.loader.exec_module(_es_mod)
 
-AuthMethodChoices = _es_mod.AuthMethodChoices
-ExternalSourceTypeChoices = _es_mod.ExternalSourceTypeChoices
-SyncStatusChoices = _es_mod.SyncStatusChoices
-validate_external_source_url = _es_mod.validate_external_source_url
+    AuthMethodChoices = _es_mod.AuthMethodChoices
+    ExternalSourceTypeChoices = _es_mod.ExternalSourceTypeChoices
+    SyncStatusChoices = _es_mod.SyncStatusChoices
+    validate_external_source_url = _es_mod.validate_external_source_url
 
 
 @pytest.mark.unit
@@ -209,12 +217,18 @@ class TestMigrationExists:
 
     def test_migration_0013_exists(self):
         """Test that migration 0013 exists."""
+        # Support both local (tests/ next to netbox_ssl/) and Docker (/tmp/plugin_tests/)
+        base = os.path.dirname(os.path.dirname(__file__))
         migration_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "netbox_ssl",
-            "migrations",
-            "0013_external_source_framework.py",
+            base, "netbox_ssl", "migrations", "0013_external_source_framework.py"
         )
+        if not os.path.exists(migration_path) and _NETBOX_AVAILABLE:
+            import netbox_ssl
+            migration_path = os.path.join(
+                os.path.dirname(netbox_ssl.__file__),
+                "migrations",
+                "0013_external_source_framework.py",
+            )
         assert os.path.exists(migration_path), f"Migration not found at {migration_path}"
 
 
@@ -224,11 +238,11 @@ class TestPluginSettings:
 
     def test_plugin_settings_defined(self):
         """Test that the plugin __init__ defines external source settings."""
-        init_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "netbox_ssl",
-            "__init__.py",
-        )
+        base = os.path.dirname(os.path.dirname(__file__))
+        init_path = os.path.join(base, "netbox_ssl", "__init__.py")
+        if not os.path.exists(init_path) and _NETBOX_AVAILABLE:
+            import netbox_ssl
+            init_path = os.path.join(os.path.dirname(netbox_ssl.__file__), "__init__.py")
         with open(init_path) as f:
             content = f.read()
 
