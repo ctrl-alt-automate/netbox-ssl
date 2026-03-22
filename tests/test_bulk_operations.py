@@ -19,7 +19,11 @@ import pytest
 try:
     _spec = importlib.util.find_spec("netbox")
     _NETBOX_AVAILABLE = _spec is not None and _spec.origin is not None
-except (ValueError, ModuleNotFoundError):
+    if _NETBOX_AVAILABLE:
+        # Verify Django settings are actually configured (not just importable)
+        from django.conf import settings
+        _ = settings.USE_I18N  # noqa: F841
+except (ValueError, ModuleNotFoundError, Exception):
     _NETBOX_AVAILABLE = False
 
 
