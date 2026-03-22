@@ -31,6 +31,8 @@ class NetBoxSSLConfig(PluginConfig):
         "bulk_validate_max_batch_size": 100,
         "bulk_compliance_max_batch_size": 100,
         "bulk_detect_max_batch_size": 100,
+        "bulk_status_update_max_batch_size": 100,
+        "bulk_assign_max_batch_size": 100,
         "notification_email_enabled": False,
         "notification_email_recipients": [],
         "notification_email_subject_prefix": "[NetBox SSL]",

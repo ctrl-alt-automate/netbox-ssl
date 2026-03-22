@@ -5,6 +5,7 @@ REST API views for NetBox SSL plugin.
 import logging
 
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Count
 from django.http import HttpResponse
@@ -26,13 +27,17 @@ from ..models import (
     CertificateAssignment,
     CertificateAuthority,
     CertificateSigningRequest,
+    CertificateStatusChoices,
     ComplianceCheck,
     CompliancePolicy,
 )
 from ..utils import CertificateExporter, ComplianceChecker, ExportFormatChoices
 from ..utils.bulk_parser import parse as bulk_parse
+from ..utils.events import fire_certificate_event
 from .serializers import (
+    BulkAssignSerializer,
     BulkComplianceRunSerializer,
+    BulkStatusUpdateSerializer,
     CertificateAssignmentSerializer,
     CertificateAuthoritySerializer,
     CertificateImportSerializer,
@@ -837,6 +842,185 @@ class CertificateViewSet(NetBoxModelViewSet):
             Certificate.objects.bulk_update(certs_to_update, ["is_acme", "acme_provider"])
 
         return Response(results, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="bulk-status-update")
+    def bulk_status_update(self, request):
+        """
+        Update the status of multiple certificates at once.
+
+        Performs individual saves to trigger status tracking hooks and fires
+        certificate events for status changes.
+
+        Example payload:
+        {
+            "ids": [1, 2, 3],
+            "status": "revoked"
+        }
+        """
+        if not request.user.has_perm("netbox_ssl.change_certificate"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = BulkStatusUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        ids = serializer.validated_data["ids"]
+        new_status = serializer.validated_data["status"]
+
+        # Limit batch size
+        plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+        max_batch_size = plugin_settings.get("bulk_status_update_max_batch_size", 100)
+        if len(ids) > max_batch_size:
+            raise serializers.ValidationError(
+                {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
+            )
+
+        certificates = list(Certificate.objects.restrict(request.user, "change").filter(pk__in=ids))
+        found_ids = {cert.pk for cert in certificates}
+        not_found_ids = [pk for pk in ids if pk not in found_ids]
+
+        results = []
+        for cert in certificates:
+            old_status = cert.status
+            cert.status = new_status
+            cert.save()
+
+            # Fire event for meaningful status transitions
+            event_map = {
+                CertificateStatusChoices.STATUS_REVOKED: "certificate_revoked",
+                CertificateStatusChoices.STATUS_EXPIRED: "certificate_expired",
+                CertificateStatusChoices.STATUS_REPLACED: "certificate_renewed",
+            }
+            event_type = event_map.get(new_status)
+            if event_type and old_status != new_status:
+                try:
+                    fire_certificate_event(
+                        cert,
+                        event_type,
+                        extra={"old_status": old_status, "new_status": new_status},
+                    )
+                except Exception as e:
+                    logger.warning("Failed to fire event for certificate %s: %s", cert.pk, e)
+
+            results.append(
+                {
+                    "id": cert.pk,
+                    "common_name": cert.common_name,
+                    "old_status": old_status,
+                    "new_status": new_status,
+                }
+            )
+
+        return Response(
+            {
+                "updated_count": len(results),
+                "not_found_ids": not_found_ids,
+                "results": results,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["post"], url_path="bulk-assign")
+    def bulk_assign(self, request):
+        """
+        Assign multiple certificates to a single target object.
+
+        Creates CertificateAssignment records for each certificate. Duplicate
+        assignments are silently skipped.
+
+        Example payload:
+        {
+            "certificate_ids": [1, 2, 3],
+            "assigned_object_type": "dcim.device",
+            "assigned_object_id": 42,
+            "is_primary": true
+        }
+        """
+        if not request.user.has_perm("netbox_ssl.add_certificateassignment"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = BulkAssignSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        certificate_ids = serializer.validated_data["certificate_ids"]
+        object_type_str = serializer.validated_data["assigned_object_type"]
+        assigned_object_id = serializer.validated_data["assigned_object_id"]
+        is_primary = serializer.validated_data["is_primary"]
+
+        # Limit batch size
+        plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+        max_batch_size = plugin_settings.get("bulk_assign_max_batch_size", 100)
+        if len(certificate_ids) > max_batch_size:
+            raise serializers.ValidationError(
+                {"detail": f"Batch size exceeds maximum of {max_batch_size} certificates."}
+            )
+
+        # Resolve and validate content type
+        allowed_types = {"dcim.device", "dcim.service", "virtualization.virtualmachine"}
+        if object_type_str not in allowed_types:
+            raise serializers.ValidationError(
+                {"assigned_object_type": (f"Invalid content type. Must be one of: {sorted(allowed_types)}")}
+            )
+
+        try:
+            app_label, model = object_type_str.split(".")
+            content_type = ContentType.objects.get(app_label=app_label, model=model)
+        except (ValueError, ContentType.DoesNotExist) as e:
+            raise serializers.ValidationError({"assigned_object_type": "Could not resolve content type."}) from e
+
+        # Verify target object exists
+        model_class = content_type.model_class()
+        if not model_class.objects.filter(pk=assigned_object_id).exists():
+            raise serializers.ValidationError(
+                {"assigned_object_id": (f"{content_type.model} with ID {assigned_object_id} does not exist.")}
+            )
+
+        # Get certificates accessible to user
+        certificates = list(Certificate.objects.restrict(request.user, "view").filter(pk__in=certificate_ids))
+        found_ids = {cert.pk for cert in certificates}
+        not_found_ids = [pk for pk in certificate_ids if pk not in found_ids]
+
+        created_count = 0
+        skipped_count = 0
+
+        try:
+            with transaction.atomic():
+                for cert in certificates:
+                    # Check for existing assignment (skip duplicates)
+                    exists = CertificateAssignment.objects.filter(
+                        certificate=cert,
+                        assigned_object_type=content_type,
+                        assigned_object_id=assigned_object_id,
+                    ).exists()
+                    if exists:
+                        skipped_count += 1
+                        continue
+
+                    CertificateAssignment.objects.create(
+                        certificate=cert,
+                        assigned_object_type=content_type,
+                        assigned_object_id=assigned_object_id,
+                        is_primary=is_primary,
+                    )
+                    created_count += 1
+        except IntegrityError as e:
+            logger.error("Bulk assign IntegrityError: %s", e)
+            raise serializers.ValidationError(
+                {"detail": "A database constraint error occurred during bulk assignment."}
+            ) from e
+        except DatabaseError as e:
+            logger.error("Bulk assign DatabaseError: %s", e)
+            raise serializers.ValidationError(
+                {"detail": "A database error occurred during bulk assignment. Please try again."}
+            ) from e
+
+        return Response(
+            {
+                "created_count": created_count,
+                "skipped_count": skipped_count,
+                "not_found_ids": not_found_ids,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class CertificateAssignmentViewSet(NetBoxModelViewSet):
