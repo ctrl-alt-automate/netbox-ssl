@@ -20,6 +20,7 @@ from ..filtersets import (
     CertificateSigningRequestFilterSet,
     ComplianceCheckFilterSet,
     CompliancePolicyFilterSet,
+    ExternalSourceFilterSet,
 )
 from ..models import (
     Certificate,
@@ -28,6 +29,7 @@ from ..models import (
     CertificateSigningRequest,
     ComplianceCheck,
     CompliancePolicy,
+    ExternalSource,
 )
 from ..utils import CertificateExporter, ComplianceChecker, ExportFormatChoices
 from ..utils.bulk_parser import parse as bulk_parse
@@ -42,6 +44,8 @@ from .serializers import (
     CompliancePolicySerializer,
     ComplianceRunSerializer,
     CSRImportSerializer,
+    ExternalSourceSerializer,
+    ExternalSourceSyncLogSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -891,3 +895,102 @@ class ComplianceCheckViewSet(NetBoxModelViewSet):
     ).prefetch_related("tags")
     serializer_class = ComplianceCheckSerializer
     filterset_class = ComplianceCheckFilterSet
+
+
+class ExternalSourceViewSet(NetBoxModelViewSet):
+    """API viewset for ExternalSource model."""
+
+    queryset = ExternalSource.objects.prefetch_related(
+        "tenant",
+        "tags",
+    )
+    serializer_class = ExternalSourceSerializer
+    filterset_class = ExternalSourceFilterSet
+
+    @action(detail=True, methods=["post"], url_path="test-connection")
+    def test_connection(self, request, pk=None):
+        """Test connectivity to the external source."""
+        if not request.user.has_perm("netbox_ssl.change_externalsource"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        source = self.get_object()
+        try:
+            from ..adapters import get_adapter_for_source
+
+            adapter = get_adapter_for_source(source)
+            success, message = adapter.test_connection()
+            return Response(
+                {"success": success, "message": message},
+                status=status.HTTP_200_OK,
+            )
+        except ValueError as e:
+            return Response(
+                {"success": False, "message": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            logger.error("Connection test failed for source '%s': %s", source.name, e)
+            return Response(
+                {"success": False, "message": "Connection test failed due to an internal error."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"], url_path="sync")
+    def sync(self, request, pk=None):
+        """Trigger a sync for the external source."""
+        if not request.user.has_perm("netbox_ssl.change_externalsource"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        source = self.get_object()
+        dry_run = request.data.get("dry_run", False)
+
+        try:
+            from ..adapters import get_adapter_for_source
+            from ..utils.sync_engine import build_plan, execute_plan
+
+            # Update sync status
+            source.sync_status = "syncing"
+            source.save(update_fields=["sync_status", "last_updated"])
+
+            # Fetch certificates
+            adapter = get_adapter_for_source(source)
+            fetched_certs = adapter.fetch_certificates()
+
+            # Build and execute plan
+            local_certs = Certificate.objects.filter(external_source=source)
+            plan = build_plan(fetched_certs, local_certs, source)
+            log = execute_plan(plan, source, dry_run=dry_run)
+
+            log_serializer = ExternalSourceSyncLogSerializer(log)
+            return Response(
+                {
+                    "success": log.success,
+                    "message": log.message,
+                    "log": log_serializer.data if not dry_run else None,
+                    "plan_summary": {
+                        "creates": len(plan.creates),
+                        "updates": len(plan.updates),
+                        "renewals": len(plan.renewals),
+                        "removals": len(plan.removals),
+                        "unchanged": plan.unchanged,
+                    },
+                },
+                status=status.HTTP_200_OK,
+            )
+        except ValueError as e:
+            source.sync_status = "error"
+            source.last_sync_message = str(e)
+            source.save(update_fields=["sync_status", "last_sync_message", "last_updated"])
+            return Response(
+                {"success": False, "message": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            logger.error("Sync failed for source '%s': %s", source.name, e)
+            source.sync_status = "error"
+            source.last_sync_message = "Sync failed due to an internal error."
+            source.save(update_fields=["sync_status", "last_sync_message", "last_updated"])
+            return Response(
+                {"success": False, "message": "Sync failed due to an internal error."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

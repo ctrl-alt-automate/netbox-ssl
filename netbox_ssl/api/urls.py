@@ -13,5 +13,6 @@ router.register("certificate-authorities", views.CertificateAuthorityViewSet)
 router.register("csrs", views.CertificateSigningRequestViewSet)
 router.register("compliance-policies", views.CompliancePolicyViewSet)
 router.register("compliance-checks", views.ComplianceCheckViewSet)
+router.register("external-sources", views.ExternalSourceViewSet)
 
 urlpatterns = router.urls

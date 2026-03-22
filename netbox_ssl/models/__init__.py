@@ -22,6 +22,13 @@ from .compliance import (
 from .compliance_trend import ComplianceTrendSnapshot
 from .csr import CertificateSigningRequest, CSRStatusChoices
 from .event_log import CertificateEventLog
+from .external_source import (
+    AuthMethodChoices,
+    ExternalSource,
+    ExternalSourceSyncLog,
+    ExternalSourceTypeChoices,
+    SyncStatusChoices,
+)
 
 __all__ = [
     "Certificate",
@@ -43,4 +50,9 @@ __all__ = [
     "ComplianceResultChoices",
     "CertificateEventLog",
     "ComplianceTrendSnapshot",
+    "ExternalSource",
+    "ExternalSourceSyncLog",
+    "ExternalSourceTypeChoices",
+    "AuthMethodChoices",
+    "SyncStatusChoices",
 ]

@@ -10,6 +10,7 @@ from tenancy.models import Tenant
 from ...models import Certificate, CertificateStatusChoices
 from ...utils import CertificateParseError, CertificateParser, detect_issuing_ca
 from .certificate_authorities import CertificateAuthoritySerializer
+from .external_sources import ExternalSourceSerializer
 
 
 class CertificateSerializer(NetBoxModelSerializer):
@@ -20,6 +21,7 @@ class CertificateSerializer(NetBoxModelSerializer):
     )
     tenant = TenantSerializer(nested=True, required=False, allow_null=True)
     issuing_ca = CertificateAuthoritySerializer(nested=True, required=False, allow_null=True)
+    external_source = ExternalSourceSerializer(nested=True, required=False, allow_null=True, read_only=True)
     days_remaining = serializers.IntegerField(read_only=True)
     is_expired = serializers.BooleanField(read_only=True)
     is_expiring_soon = serializers.BooleanField(read_only=True)
@@ -75,6 +77,10 @@ class CertificateSerializer(NetBoxModelSerializer):
             "acme_renewal_days",
             "acme_renewal_due",
             "acme_renewal_status",
+            # External source fields
+            "external_source",
+            "external_id",
+            "source_removed",
             "tags",
             "custom_fields",
             "created",
