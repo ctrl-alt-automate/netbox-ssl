@@ -118,6 +118,7 @@ def _load_serializer_classes() -> tuple:
         "CertificateParser": MagicMock(),
         "detect_issuing_ca": MagicMock(),
         "CertificateAuthoritySerializer": type("CertificateAuthoritySerializer", (_FakeNetBoxModelSerializer,), {}),
+        "ExternalSourceSerializer": type("ExternalSourceSerializer", (_FakeNetBoxModelSerializer,), {}),
     }
 
     # Read the source and strip import lines so our injected names are used

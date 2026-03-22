@@ -10,6 +10,7 @@ from .types import (
     CertificateAuthorityType,
     CertificateSigningRequestType,
     CertificateType,
+    ExternalSourceType,
 )
 
 
@@ -76,6 +77,21 @@ class NetBoxSSLQuery:
         from ..models import CertificateSigningRequest
 
         return CertificateSigningRequest.objects.restrict(info.context.request.user, "view")
+
+    @strawberry_django.field
+    def external_source(self, info: strawberry.types.Info, id: int) -> ExternalSourceType | None:
+        from ..models import ExternalSource
+
+        try:
+            return ExternalSource.objects.restrict(info.context.request.user, "view").get(pk=id)
+        except ExternalSource.DoesNotExist:
+            return None
+
+    @strawberry_django.field
+    def external_source_list(self, info: strawberry.types.Info) -> list[ExternalSourceType]:
+        from ..models import ExternalSource
+
+        return ExternalSource.objects.restrict(info.context.request.user, "view")
 
 
 schema = [NetBoxSSLQuery]

@@ -33,6 +33,14 @@ from .csr import (
     CertificateSigningRequestView,
     CSRImportView,
 )
+from .external_sources import (
+    ExternalSourceBulkDeleteView,
+    ExternalSourceBulkEditView,
+    ExternalSourceDeleteView,
+    ExternalSourceEditView,
+    ExternalSourceListView,
+    ExternalSourceView,
+)
 
 __all__ = [
     # Certificate views
@@ -66,4 +74,11 @@ __all__ = [
     "CertificateAssignmentEditView",
     "CertificateAssignmentDeleteView",
     "CertificateAssignmentBulkDeleteView",
+    # External Source views
+    "ExternalSourceListView",
+    "ExternalSourceView",
+    "ExternalSourceEditView",
+    "ExternalSourceDeleteView",
+    "ExternalSourceBulkEditView",
+    "ExternalSourceBulkDeleteView",
 ]

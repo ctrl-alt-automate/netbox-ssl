@@ -87,6 +87,19 @@ menu = PluginMenu(
                         ),
                     ),
                 ),
+                PluginMenuItem(
+                    link="plugins:netbox_ssl:externalsource_list",
+                    link_text="External Sources",
+                    permissions=["netbox_ssl.view_externalsource"],
+                    buttons=(
+                        PluginMenuButton(
+                            link="plugins:netbox_ssl:externalsource_add",
+                            title="Add",
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["netbox_ssl.add_externalsource"],
+                        ),
+                    ),
+                ),
             ),
         ),
         (

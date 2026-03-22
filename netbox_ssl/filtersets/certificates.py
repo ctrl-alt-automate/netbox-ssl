@@ -13,6 +13,7 @@ from ..models import (
     CertificateAlgorithmChoices,
     CertificateAuthority,
     CertificateStatusChoices,
+    ExternalSource,
 )
 
 
@@ -111,6 +112,17 @@ class CertificateFilterSet(NetBoxModelFilterSet):
     archive_pinned = django_filters.BooleanFilter(
         label="Archive Pinned",
     )
+    external_source_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=ExternalSource.objects.all(),
+        label="External Source",
+    )
+    has_external_source = django_filters.BooleanFilter(
+        method="filter_has_external_source",
+        label="Has External Source",
+    )
+    source_removed = django_filters.BooleanFilter(
+        label="Removed from Source",
+    )
 
     class Meta:
         model = Certificate
@@ -177,3 +189,9 @@ class CertificateFilterSet(NetBoxModelFilterSet):
         if value:
             return queryset.filter(issuing_ca__isnull=False)
         return queryset.filter(issuing_ca__isnull=True)
+
+    def filter_has_external_source(self, queryset, name, value):
+        """Filter certificates by whether they have an external source."""
+        if value:
+            return queryset.filter(external_source__isnull=False)
+        return queryset.filter(external_source__isnull=True)

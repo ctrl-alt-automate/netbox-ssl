@@ -40,6 +40,9 @@ class NetBoxSSLConfig(PluginConfig):
         "expiry_scan_cooldown_hours": 24,
         "auto_archive_enabled": False,
         "auto_archive_after_days": 90,
+        "external_source_sync_enabled": True,
+        "external_source_default_interval": 1440,
+        "external_source_never_fetch_keys": True,
     }
 
     def ready(self):

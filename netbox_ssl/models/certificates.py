@@ -264,6 +264,25 @@ class Certificate(NetBoxModel):
         help_text="Certificate Authority that issued this certificate",
     )
 
+    # External source tracking
+    external_source = models.ForeignKey(
+        to="netbox_ssl.ExternalSource",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="certificates",
+        help_text="External source this certificate was synced from",
+    )
+    external_id = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Unique identifier in the external source system",
+    )
+    source_removed = models.BooleanField(
+        default=False,
+        help_text="Certificate no longer present in the external source",
+    )
+
     # Raw certificate data (PEM without private key)
     pem_content = models.TextField(
         blank=True,
