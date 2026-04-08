@@ -31,6 +31,8 @@ class CertificateSerializer(NetBoxModelSerializer):
     chain_needs_validation = serializers.BooleanField(read_only=True)
     acme_renewal_due = serializers.BooleanField(read_only=True)
     acme_renewal_status = serializers.CharField(read_only=True)
+    ari_window_active = serializers.BooleanField(read_only=True)
+    ari_status = serializers.CharField(read_only=True)
     effective_renewal_instructions = serializers.SerializerMethodField()
 
     class Meta:
@@ -80,6 +82,15 @@ class CertificateSerializer(NetBoxModelSerializer):
             "acme_renewal_days",
             "acme_renewal_due",
             "acme_renewal_status",
+            # ARI fields (RFC 9773)
+            "ari_cert_id",
+            "ari_suggested_start",
+            "ari_suggested_end",
+            "ari_explanation_url",
+            "ari_last_checked",
+            "ari_retry_after",
+            "ari_window_active",
+            "ari_status",
             # Archival fields
             "archive_pinned",
             "archived_at",

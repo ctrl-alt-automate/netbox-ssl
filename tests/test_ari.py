@@ -7,6 +7,7 @@ and Retry-After header handling.
 
 import base64
 import importlib.util
+import pathlib
 import sys
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
@@ -267,3 +268,116 @@ class TestModelARIProperties:
         source = migration.read_text()
         assert "ari_cert_id" in source
         assert "ari_suggested_start" in source
+
+
+# ─────────────────────────────────────────────
+# Serializer, GraphQL, filterset, script tests
+# ─────────────────────────────────────────────
+
+_PLUGIN_DIR = pathlib.Path(__file__).resolve().parent.parent / "netbox_ssl"
+
+
+def _read_source(path: str) -> str:
+    return (_PLUGIN_DIR / path).read_text()
+
+
+class TestARISerializerFields:
+    """Test ARI fields are exposed in the REST API serializer."""
+
+    @pytest.fixture(autouse=True)
+    def _load_source(self):
+        self.source = _read_source("api/serializers/certificates.py")
+
+    def test_ari_cert_id_in_serializer(self):
+        assert '"ari_cert_id"' in self.source
+
+    def test_ari_suggested_start_in_serializer(self):
+        assert '"ari_suggested_start"' in self.source
+
+    def test_ari_window_active_computed_field(self):
+        assert "ari_window_active" in self.source
+        assert "read_only=True" in self.source
+
+    def test_ari_status_computed_field(self):
+        assert "ari_status" in self.source
+
+
+class TestARIGraphQLFields:
+    """Test ARI fields are exposed in GraphQL schema."""
+
+    @pytest.fixture(autouse=True)
+    def _load_source(self):
+        self.source = _read_source("graphql/types.py")
+
+    def test_ari_fields_in_graphql_type(self):
+        assert '"ari_cert_id"' in self.source
+        assert '"ari_suggested_start"' in self.source
+        assert '"ari_suggested_end"' in self.source
+
+    def test_ari_computed_fields_in_graphql(self):
+        assert "def ari_window_active" in self.source
+        assert "def ari_status" in self.source
+
+
+class TestARIFilterSet:
+    """Test ARI filter on Certificate filterset."""
+
+    @pytest.fixture(autouse=True)
+    def _load_source(self):
+        self.source = _read_source("filtersets/certificates.py")
+
+    def test_has_ari_filter_exists(self):
+        assert "has_ari" in self.source
+
+    def test_has_ari_filter_method(self):
+        assert "def filter_has_ari" in self.source
+        assert "ari_cert_id" in self.source
+
+
+class TestARIPollScript:
+    """Test the CertificateARIPoll NetBox Script."""
+
+    @pytest.fixture(autouse=True)
+    def _load_sources(self):
+        self.script_source = _read_source("scripts/ari_poll.py")
+        self.init_source = _read_source("scripts/__init__.py")
+
+    def test_script_class_exists(self):
+        assert "class CertificateARIPoll" in self.script_source
+
+    def test_script_extends_netbox_script(self):
+        assert "Script" in self.script_source
+
+    def test_script_has_tenant_filter(self):
+        assert "tenant" in self.script_source
+
+    def test_script_has_dry_run(self):
+        assert "dry_run" in self.script_source
+
+    def test_script_uses_build_cert_id(self):
+        assert "build_cert_id" in self.script_source
+
+    def test_script_uses_discover_and_poll(self):
+        assert "discover_ari_endpoint" in self.script_source
+        assert "poll_ari" in self.script_source
+
+    def test_script_respects_retry_after(self):
+        assert "ari_retry_after" in self.script_source
+
+    def test_script_fires_window_shift_event(self):
+        assert "ari_window_shifted" in self.script_source
+        assert "fire_certificate_event" in self.script_source
+
+    def test_script_caches_endpoints_per_provider(self):
+        assert "ari_endpoints" in self.script_source
+
+    def test_script_registered_in_init(self):
+        assert "CertificateARIPoll" in self.init_source
+
+
+class TestRequestsDependency:
+    """Test that requests is declared as a dependency."""
+
+    def test_requests_in_pyproject(self):
+        source = (_PLUGIN_DIR.parent / "pyproject.toml").read_text()
+        assert "requests" in source
