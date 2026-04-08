@@ -75,7 +75,7 @@ class CertificateViewSet(NetBoxModelViewSet):
         Accepts raw PEM content and automatically parses all X.509 attributes.
         Private keys are rejected for security reasons.
         """
-        if not request.user.has_perm("netbox_ssl.add_certificate"):
+        if not request.user.has_perm("netbox_ssl.import_certificate"):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = CertificateImportSerializer(data=request.data)
@@ -107,7 +107,7 @@ class CertificateViewSet(NetBoxModelViewSet):
             }
         ]
         """
-        if not request.user.has_perm("netbox_ssl.add_certificate"):
+        if not request.user.has_perm("netbox_ssl.import_certificate"):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
         # Validate input is a list
@@ -188,7 +188,7 @@ class CertificateViewSet(NetBoxModelViewSet):
             "on_duplicate": "skip"
         }
         """
-        if not request.user.has_perm("netbox_ssl.add_certificate"):
+        if not request.user.has_perm("netbox_ssl.import_certificate"):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
         content = request.data.get("content", "")
@@ -309,6 +309,8 @@ class CertificateViewSet(NetBoxModelViewSet):
         Performs chain validation and updates the certificate's chain_status,
         chain_validation_message, chain_validated_at, and chain_depth fields.
         """
+        if not request.user.has_perm("netbox_ssl.change_certificate"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
         certificate = self.get_object()
 
         if not certificate.pem_content:
@@ -507,6 +509,8 @@ class CertificateViewSet(NetBoxModelViewSet):
             "policy_ids": [1, 2, 3]
         }
         """
+        if not request.user.has_perm("netbox_ssl.manage_compliance"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
         certificate = self.get_object()
         serializer = ComplianceRunSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -578,6 +582,8 @@ class CertificateViewSet(NetBoxModelViewSet):
 
         Returns the detection result and updated certificate data.
         """
+        if not request.user.has_perm("netbox_ssl.change_certificate"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
         certificate = self.get_object()
         result = certificate.auto_detect_acme(save=True)
 
@@ -689,6 +695,8 @@ class CertificateViewSet(NetBoxModelViewSet):
             "policy_ids": [1, 2]  // optional
         }
         """
+        if not request.user.has_perm("netbox_ssl.manage_compliance"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
         serializer = BulkComplianceRunSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 

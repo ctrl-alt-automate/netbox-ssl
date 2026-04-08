@@ -364,6 +364,11 @@ class Certificate(NetBoxModel):
         indexes = [
             GinIndex(fields=["sans"], name="netbox_ssl_cert_sans_gin"),
         ]
+        permissions = [
+            ("import_certificate", "Can import certificates from PEM/DER/PKCS7"),
+            ("renew_certificate", "Can perform certificate renewal"),
+            ("bulk_operations", "Can perform bulk certificate operations"),
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
