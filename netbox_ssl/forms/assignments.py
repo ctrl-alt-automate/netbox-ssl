@@ -130,14 +130,17 @@ class CertificateAssignmentForm(NetBoxModelForm):
         vm = self.cleaned_data.get("virtual_machine")
         certificate = self.cleaned_data.get("certificate")
 
-        # Validate that at least one target is selected
-        if not service and not device and not vm:
+        has_new_target = service or device or vm
+        has_existing_target = self.instance.pk and self.instance.assigned_object_type_id
+
+        # Validate that at least one target is selected (new) or already exists (edit)
+        if not has_new_target and not has_existing_target:
             raise forms.ValidationError(
                 _("Please select a Device, Virtual Machine, or Service to assign the certificate to.")
             )
 
-        # Check for duplicate assignment
-        if certificate:
+        # Check for duplicate assignment (only when target is changing)
+        if certificate and has_new_target:
             # Determine what we're assigning to
             if service:
                 content_type = ContentType.objects.get_for_model(Service)
@@ -147,7 +150,7 @@ class CertificateAssignmentForm(NetBoxModelForm):
                 content_type = ContentType.objects.get_for_model(Device)
                 object_id = device.pk
                 target_name = str(device)
-            elif vm:
+            else:
                 content_type = ContentType.objects.get_for_model(VirtualMachine)
                 object_id = vm.pk
                 target_name = str(vm)
@@ -177,7 +180,9 @@ class CertificateAssignmentForm(NetBoxModelForm):
         device = self.cleaned_data.get("device")
         vm = self.cleaned_data.get("virtual_machine")
 
-        # Determine assignment type automatically based on what's selected
+        # Determine assignment type automatically based on what's selected.
+        # If no target is selected (edit without changing target), preserve
+        # the existing assigned_object_type and assigned_object_id.
         if service:
             # Service-level assignment (most specific, recommended)
             instance.assigned_object_type = ContentType.objects.get_for_model(Service)
@@ -190,6 +195,13 @@ class CertificateAssignmentForm(NetBoxModelForm):
             # VM-level assignment
             instance.assigned_object_type = ContentType.objects.get_for_model(VirtualMachine)
             instance.assigned_object_id = vm.pk
+        elif not instance.pk:
+            # New assignment without any target — shouldn't happen (clean() validates),
+            # but guard against it.
+            raise forms.ValidationError(
+                _("No assignment target selected.")
+            )
+        # else: editing an existing assignment without changing the target — keep as-is
 
         if commit:
             instance.save()
