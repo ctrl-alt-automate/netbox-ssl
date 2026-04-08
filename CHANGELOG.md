@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-04-08
+
+### Fixed
+
+- **Assignment edit does not save** ([#85](https://github.com/ctrl-alt-automate/netbox-ssl/issues/85)):
+  - Form `clean()` now allows editing assignments without re-selecting the target device/VM/service
+  - Form `save()` preserves existing `assigned_object_type` and `assigned_object_id` when target is unchanged
+  - Duplicate check only runs when the assignment target is actually changing
+
+- **Assignment list FieldError** ([#86](https://github.com/ctrl-alt-automate/netbox-ssl/issues/86)):
+  - Added `orderable=False` to the `assigned_object` table column to prevent django-tables2 from attempting `order_by()` on a `GenericForeignKey`, which does not support reverse queries
+
 ## [0.7.0] - 2026-03-12
 
 ### Added
