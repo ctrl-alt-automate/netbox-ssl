@@ -6,19 +6,19 @@ This document tracks compatibility between NetBox SSL plugin versions and NetBox
 
 | Plugin Version | NetBox Version | Python Version | Status |
 |:--------------:|:--------------:|:--------------:|:------:|
-| 0.7.x          | 4.5.x          | 3.10 - 3.12   | Primary |
-| 0.7.x          | 4.4.x          | 3.10 - 3.12   | Supported |
-| 0.6.x          | 4.5.x          | 3.10 - 3.12   | Supported |
-| 0.6.x          | 4.4.x          | 3.10 - 3.12   | Supported |
+| 1.0.x          | 4.5.x          | 3.10 - 3.12   | Primary |
+| 1.0.x          | 4.4.x          | 3.10 - 3.12   | Supported |
+| 0.9.x          | 4.5.x          | 3.10 - 3.12   | Supported |
+| 0.9.x          | 4.4.x          | 3.10 - 3.12   | Supported |
 
 ## End of Life
 
 | Plugin Version | NetBox Version | Notes |
 |:--------------:|:--------------:|:------|
-| 0.5.x          | 4.5.x          | Upgrade to 0.7.x recommended |
-| 0.5.x          | 4.4.x          | Upgrade to 0.7.x recommended |
-| 0.4.x          | 4.4.x          | Upgrade to 0.7.x recommended |
-| 0.3.x          | 4.4.x          | Upgrade to 0.7.x recommended |
+| 0.8.x          | 4.5.x / 4.4.x | Upgrade to 1.0.x recommended |
+| 0.7.x          | 4.5.x / 4.4.x | Upgrade to 1.0.x recommended |
+| 0.6.x          | 4.5.x / 4.4.x | Upgrade to 1.0.x recommended |
+| 0.5.x          | 4.5.x / 4.4.x | Upgrade to 1.0.x recommended |
 | any            | 4.3.x or older | Unsupported |
 
 ## Version Policy
@@ -28,3 +28,7 @@ This document tracks compatibility between NetBox SSL plugin versions and NetBox
 - **End of Life**: No longer tested or maintained
 
 Each plugin release is tested against all supported NetBox versions via GitHub Actions CI.
+
+## Upgrade Path
+
+For upgrade instructions, see [docs/upgrading.md](docs/upgrading.md).

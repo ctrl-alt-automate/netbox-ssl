@@ -24,9 +24,9 @@ Track certificates, monitor expiration dates, and never lose sight of where your
 |:---------------:|:-----------:|:--------:|:---------:|
 | [Installation](installation.md) | [Usage Guide](usage.md) | [Analytics Dashboard](usage.md#analytics-dashboard) | [API](api.md) |
 | [Configuration](configuration.md) | [Janus Renewal](usage.md#janus-renewal-workflow) | [Compliance Report](usage.md#compliance-report) | [Data Models](data-models.md) |
-| | [CSR Management](usage.md#certificate-signing-requests-csrs) | [Certificate Map](usage.md#certificate-map) | [Webhooks](webhooks.md) |
-| | [Compliance](usage.md#compliance-policies) | | |
-| | [Scripts](scripts.md) | | |
+| [Upgrading](upgrading.md) | [CSR Management](usage.md#certificate-signing-requests-csrs) | [Certificate Map](usage.md#certificate-map) | [Webhooks](webhooks.md) |
+| [Troubleshooting](troubleshooting.md) | [Compliance](usage.md#compliance-policies) | | [Permissions](permissions.md) |
+| | [Scripts](scripts.md) | | [Security](security-review.md) |
 
 ## What Can You Do?
 
