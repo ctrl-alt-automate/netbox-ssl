@@ -43,8 +43,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="certificate",
-            index=models.Index(
-                fields=["is_acme", "acme_auto_renewal"], name="idx_cert_acme_renewal"
-            ),
+            index=models.Index(fields=["is_acme", "acme_auto_renewal"], name="idx_cert_acme_renewal"),
         ),
     ]
