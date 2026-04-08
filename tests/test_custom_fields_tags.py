@@ -10,7 +10,7 @@ import io
 import json
 import sys
 from datetime import datetime
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -55,7 +55,7 @@ if not _NETBOX_AVAILABLE and "netbox" not in sys.modules:
         if mod not in sys.modules:
             sys.modules[mod] = MagicMock()
 
-from netbox_ssl.utils.compliance_checker import ComplianceChecker
+from netbox_ssl.utils.compliance_checker import CheckResult, ComplianceChecker
 from netbox_ssl.utils.export import CertificateExporter
 
 # Mark all tests in this module as unit tests
@@ -71,7 +71,7 @@ class MockTag:
 
 
 class MockM2MManager:
-    """Mock M2M manager that supports values_list."""
+    """Mock M2M manager that supports values_list and all."""
 
     def __init__(self, items: list):
         self._items = items
@@ -84,9 +84,12 @@ class MockM2MManager:
     def count(self):
         return len(self._items)
 
+    def all(self):
+        return self._items
+
 
 class MockCertificate:
-    """Mock certificate for compliance testing."""
+    """Mock certificate for compliance and export testing."""
 
     def __init__(self, common_name: str = "example.com", tags: list | None = None, **kwargs):
         self.common_name = common_name
@@ -110,6 +113,7 @@ class MockCertificate:
         self.tags = MockM2MManager(tags or [])
         self.assignments = MagicMock()
         self.assignments.count.return_value = 0
+        self.assignments.all.return_value = []
 
     @property
     def days_remaining(self):
@@ -157,35 +161,27 @@ class MockPolicy:
 # Tag-based compliance filtering tests
 # ─────────────────────────────────────────────
 
-
-def _filter_policies_by_tags(policies, certificate):
-    """
-    Replicate the tag-filtering logic from ComplianceChecker.run_all_checks.
-
-    This avoids calling into check_certificate which triggers Django model imports.
-    """
-    cert_tag_ids = set(certificate.tags.values_list("pk", flat=True))
-    filtered = []
-    for policy in policies:
-        required_tag_ids = set(policy.tag_filter.values_list("pk", flat=True))
-        if required_tag_ids and not required_tag_ids.issubset(cert_tag_ids):
-            continue
-        filtered.append(policy)
-    return filtered
+# We patch check_certificate to return a simple CheckResult, avoiding
+# the model imports that check_certificate triggers internally.
+_MOCK_PASS = CheckResult(passed=True, message="OK", checked_value="4096 bits", expected_value=">= 2048 bits")
 
 
 class TestTagBasedComplianceFiltering:
-    """Test that policies with tag_filter only apply to matching certificates."""
+    """Test that run_all_checks respects tag_filter on policies."""
 
-    def test_policy_without_tags_applies_to_all(self):
+    @patch.object(ComplianceChecker, "check_certificate", return_value=_MOCK_PASS)
+    def test_policy_without_tags_applies_to_all(self, mock_check):
         """Policy with empty tag_filter applies to every certificate."""
         cert = MockCertificate(key_size=4096)
         policy = MockPolicy(tag_filter_tags=[])
 
-        filtered = _filter_policies_by_tags([policy], cert)
-        assert len(filtered) == 1
+        results = ComplianceChecker.run_all_checks(cert, policies=[policy])
+        assert len(results) == 1
+        assert results[0][1].passed is True
+        mock_check.assert_called_once_with(cert, policy)
 
-    def test_policy_with_matching_tags_applies(self):
+    @patch.object(ComplianceChecker, "check_certificate", return_value=_MOCK_PASS)
+    def test_policy_with_matching_tags_applies(self, mock_check):
         """Policy with tag_filter applies when certificate has ALL required tags."""
         tag_prod = MockTag(pk=1, name="production")
         tag_ext = MockTag(pk=2, name="external")
@@ -193,10 +189,12 @@ class TestTagBasedComplianceFiltering:
         cert = MockCertificate(key_size=4096, tags=[tag_prod, tag_ext])
         policy = MockPolicy(tag_filter_tags=[tag_prod])
 
-        filtered = _filter_policies_by_tags([policy], cert)
-        assert len(filtered) == 1
+        results = ComplianceChecker.run_all_checks(cert, policies=[policy])
+        assert len(results) == 1
+        mock_check.assert_called_once()
 
-    def test_policy_with_all_required_tags_applies(self):
+    @patch.object(ComplianceChecker, "check_certificate", return_value=_MOCK_PASS)
+    def test_policy_with_all_required_tags_applies(self, mock_check):
         """Policy applies when certificate has ALL of its required tags."""
         tag_prod = MockTag(pk=1, name="production")
         tag_ext = MockTag(pk=2, name="external")
@@ -204,10 +202,11 @@ class TestTagBasedComplianceFiltering:
         cert = MockCertificate(key_size=4096, tags=[tag_prod, tag_ext])
         policy = MockPolicy(tag_filter_tags=[tag_prod, tag_ext])
 
-        filtered = _filter_policies_by_tags([policy], cert)
-        assert len(filtered) == 1
+        results = ComplianceChecker.run_all_checks(cert, policies=[policy])
+        assert len(results) == 1
 
-    def test_policy_skipped_when_cert_lacks_required_tags(self):
+    @patch.object(ComplianceChecker, "check_certificate", return_value=_MOCK_PASS)
+    def test_policy_skipped_when_cert_lacks_required_tags(self, mock_check):
         """Policy is skipped when certificate doesn't have all required tags."""
         tag_prod = MockTag(pk=1, name="production")
         tag_ext = MockTag(pk=2, name="external")
@@ -215,20 +214,24 @@ class TestTagBasedComplianceFiltering:
         cert = MockCertificate(key_size=4096, tags=[tag_prod])
         policy = MockPolicy(tag_filter_tags=[tag_prod, tag_ext])
 
-        filtered = _filter_policies_by_tags([policy], cert)
-        assert len(filtered) == 0
+        results = ComplianceChecker.run_all_checks(cert, policies=[policy])
+        assert len(results) == 0
+        mock_check.assert_not_called()
 
-    def test_policy_skipped_when_cert_has_no_tags(self):
+    @patch.object(ComplianceChecker, "check_certificate", return_value=_MOCK_PASS)
+    def test_policy_skipped_when_cert_has_no_tags(self, mock_check):
         """Policy with tags is skipped for certificate without any tags."""
         tag_prod = MockTag(pk=1, name="production")
 
         cert = MockCertificate(key_size=4096, tags=[])
         policy = MockPolicy(tag_filter_tags=[tag_prod])
 
-        filtered = _filter_policies_by_tags([policy], cert)
-        assert len(filtered) == 0
+        results = ComplianceChecker.run_all_checks(cert, policies=[policy])
+        assert len(results) == 0
+        mock_check.assert_not_called()
 
-    def test_mixed_policies_some_filtered(self):
+    @patch.object(ComplianceChecker, "check_certificate", return_value=_MOCK_PASS)
+    def test_mixed_policies_some_filtered(self, mock_check):
         """Mix of tagged and untagged policies: only matching ones apply."""
         tag_prod = MockTag(pk=1, name="production")
         tag_staging = MockTag(pk=3, name="staging")
@@ -239,21 +242,27 @@ class TestTagBasedComplianceFiltering:
         prod_policy = MockPolicy(name="Production", tag_filter_tags=[tag_prod])
         staging_policy = MockPolicy(name="Staging", tag_filter_tags=[tag_staging])
 
-        filtered = _filter_policies_by_tags([global_policy, prod_policy, staging_policy], cert)
-        assert len(filtered) == 2
-        policy_names = [p.name for p in filtered]
+        results = ComplianceChecker.run_all_checks(cert, policies=[global_policy, prod_policy, staging_policy])
+        assert len(results) == 2
+        policy_names = [r[0].name for r in results]
         assert "Global" in policy_names
         assert "Production" in policy_names
         assert "Staging" not in policy_names
+        # check_certificate should have been called twice (Global + Production)
+        assert mock_check.call_count == 2
 
-    def test_source_code_uses_tag_filter(self):
-        """Verify run_all_checks source contains our tag_filter logic."""
-        import inspect
+    @patch.object(ComplianceChecker, "check_certificate", return_value=_MOCK_PASS)
+    def test_cert_with_superset_of_required_tags(self, mock_check):
+        """Certificate with more tags than required still matches."""
+        tag_a = MockTag(pk=1, name="a")
+        tag_b = MockTag(pk=2, name="b")
+        tag_c = MockTag(pk=3, name="c")
 
-        source = inspect.getsource(ComplianceChecker.run_all_checks)
-        assert "tag_filter" in source
-        assert "cert_tag_ids" in source
-        assert "issubset" in source
+        cert = MockCertificate(tags=[tag_a, tag_b, tag_c])
+        policy = MockPolicy(tag_filter_tags=[tag_a, tag_b])
+
+        results = ComplianceChecker.run_all_checks(cert, policies=[policy])
+        assert len(results) == 1
 
 
 # ─────────────────────────────────────────────
@@ -261,51 +270,60 @@ class TestTagBasedComplianceFiltering:
 # ─────────────────────────────────────────────
 
 
-class TestCustomFieldExport:
-    """Test custom_fields in certificate exports."""
+class TestCustomFieldExportJSON:
+    """Test custom_fields in JSON exports."""
 
-    def test_custom_fields_in_json_export(self):
+    def test_custom_fields_included(self):
         """Custom field data is included in JSON export."""
         cert = MockCertificate(
             custom_field_data={"environment": "production", "team": "platform"},
         )
-
-        result = CertificateExporter.export_to_json(
-            [cert],
-            fields=CertificateExporter.EXTENDED_FIELDS,
-        )
+        result = CertificateExporter.export_to_json([cert], fields=CertificateExporter.EXTENDED_FIELDS)
         data = json.loads(result)
-        assert len(data) == 1
         assert data[0]["custom_fields"] == {"environment": "production", "team": "platform"}
 
     def test_custom_fields_empty_dict_when_none(self):
         """Custom fields default to empty dict when no data."""
         cert = MockCertificate(custom_field_data=None)
-
-        result = CertificateExporter.export_to_json(
-            [cert],
-            fields=["common_name", "custom_fields"],
-        )
+        result = CertificateExporter.export_to_json([cert], fields=["common_name", "custom_fields"])
         data = json.loads(result)
         assert data[0]["custom_fields"] == {}
 
-    def test_custom_fields_flattened_in_csv(self):
+    def test_custom_fields_not_in_default_fields(self):
+        """Default fields export does not include custom_fields."""
+        cert = MockCertificate(custom_field_data={"environment": "production"})
+        result = CertificateExporter.export_to_json([cert], fields=CertificateExporter.DEFAULT_FIELDS)
+        data = json.loads(result)
+        assert "custom_fields" not in data[0]
+
+    def test_custom_fields_with_various_types(self):
+        """Custom fields support different value types."""
+        cert = MockCertificate(
+            custom_field_data={"count": 42, "active": True, "label": "test"},
+        )
+        result = CertificateExporter.export_to_json([cert], fields=["common_name", "custom_fields"])
+        data = json.loads(result)
+        assert data[0]["custom_fields"]["count"] == 42
+        assert data[0]["custom_fields"]["active"] is True
+
+
+class TestCustomFieldExportCSV:
+    """Test custom_fields flattening in CSV exports."""
+
+    def test_custom_fields_flattened_with_prefix(self):
         """Custom fields appear as cf_ prefixed columns in CSV."""
         cert = MockCertificate(
             custom_field_data={"environment": "production", "team": "platform"},
         )
-
-        result = CertificateExporter.export_to_csv(
-            [cert],
-            fields=["common_name", "custom_fields"],
-        )
+        result = CertificateExporter.export_to_csv([cert], fields=["common_name", "custom_fields"])
         reader = csv.DictReader(io.StringIO(result))
         rows = list(reader)
         assert len(rows) == 1
         assert rows[0]["cf_environment"] == "production"
         assert rows[0]["cf_team"] == "platform"
+        assert rows[0]["common_name"] == "example.com"
 
-    def test_csv_custom_fields_consistent_columns(self):
+    def test_csv_consistent_columns_across_certs(self):
         """All CSV rows have same custom field columns even if values differ."""
         cert1 = MockCertificate(
             common_name="cert1.com",
@@ -315,11 +333,7 @@ class TestCustomFieldExport:
             common_name="cert2.com",
             custom_field_data={"environment": "staging", "team": "infra"},
         )
-
-        result = CertificateExporter.export_to_csv(
-            [cert1, cert2],
-            fields=["common_name", "custom_fields"],
-        )
+        result = CertificateExporter.export_to_csv([cert1, cert2], fields=["common_name", "custom_fields"])
         reader = csv.DictReader(io.StringIO(result))
         rows = list(reader)
         assert len(rows) == 2
@@ -329,20 +343,30 @@ class TestCustomFieldExport:
         assert rows[0]["cf_team"] == ""  # cert1 has no team
         assert rows[1]["cf_team"] == "infra"
 
-    def test_custom_fields_not_in_default_fields(self):
-        """Default fields export does not include custom_fields."""
-        cert = MockCertificate(
-            custom_field_data={"environment": "production"},
-        )
+    def test_csv_no_cf_columns_without_custom_fields_in_fields(self):
+        """No cf_ columns when custom_fields not in requested fields."""
+        cert = MockCertificate(custom_field_data={"environment": "production"})
+        result = CertificateExporter.export_to_csv([cert], fields=["common_name", "status"])
+        reader = csv.DictReader(io.StringIO(result))
+        rows = list(reader)
+        assert "cf_environment" not in rows[0]
 
-        result = CertificateExporter.export_to_json(
-            [cert],
-            fields=CertificateExporter.DEFAULT_FIELDS,
-        )
-        data = json.loads(result)
-        assert "custom_fields" not in data[0]
+    def test_csv_empty_custom_fields_no_cf_columns(self):
+        """No cf_ columns when all certs have empty custom field data."""
+        cert = MockCertificate(custom_field_data={})
+        result = CertificateExporter.export_to_csv([cert], fields=["common_name", "custom_fields"])
+        header = result.split("\n")[0]
+        assert "cf_" not in header
+
+
+class TestCustomFieldExportAllowlist:
+    """Test that custom_fields is properly in the allowlist."""
 
     def test_custom_fields_in_extended_fields(self):
-        """Extended fields include custom_fields."""
         assert "custom_fields" in CertificateExporter.EXTENDED_FIELDS
+
+    def test_custom_fields_in_allowed_fields(self):
         assert "custom_fields" in CertificateExporter.ALLOWED_FIELDS
+
+    def test_custom_fields_not_in_default_fields(self):
+        assert "custom_fields" not in CertificateExporter.DEFAULT_FIELDS
