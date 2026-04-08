@@ -8,6 +8,7 @@ These tests read source files directly to avoid needing Django/NetBox imports.
 """
 
 import pathlib
+import re
 
 import pytest
 
@@ -26,66 +27,103 @@ def _read_source(relative_path: str) -> str:
 class TestCustomPermissionsOnModels:
     """Test that custom permissions are defined in model Meta."""
 
+    @pytest.fixture(autouse=True)
+    def _load_sources(self):
+        self.cert_source = _read_source("models/certificates.py")
+        self.compliance_source = _read_source("models/compliance.py")
+
     def test_certificate_model_has_import_permission(self):
-        """Certificate Meta.permissions includes import_certificate."""
-        source = _read_source("models/certificates.py")
-        assert "import_certificate" in source
-        assert "Can import certificates" in source
+        assert "import_certificate" in self.cert_source
+        assert "Can import certificates" in self.cert_source
 
     def test_certificate_model_has_renew_permission(self):
-        """Certificate Meta.permissions includes renew_certificate."""
-        source = _read_source("models/certificates.py")
-        assert "renew_certificate" in source
-        assert "Can perform certificate renewal" in source
+        assert "renew_certificate" in self.cert_source
+        assert "Can perform certificate renewal" in self.cert_source
 
     def test_certificate_model_has_bulk_permission(self):
-        """Certificate Meta.permissions includes bulk_operations."""
-        source = _read_source("models/certificates.py")
-        assert "bulk_operations" in source
-        assert "Can perform bulk certificate operations" in source
+        assert "bulk_operations" in self.cert_source
+        assert "Can perform bulk certificate operations" in self.cert_source
 
     def test_compliance_policy_has_manage_permission(self):
-        """CompliancePolicy Meta.permissions includes manage_compliance."""
-        source = _read_source("models/compliance.py")
-        assert "manage_compliance" in source
-        assert "Can run compliance checks" in source
+        assert "manage_compliance" in self.compliance_source
+        assert "Can run compliance checks" in self.compliance_source
 
 
-class TestAPIPermissionChecks:
-    """Test that API endpoints have correct has_perm checks via source inspection."""
+class TestBulkOperationsPermission:
+    """Test that all bulk endpoints require bulk_operations permission."""
 
     @pytest.fixture(autouse=True)
     def _load_api_source(self):
         self.api_source = _read_source("api/views.py")
 
-    def test_import_endpoint_uses_import_permission(self):
-        """Import endpoint checks import_certificate permission."""
+    def test_check_bulk_perm_helper_exists(self):
+        """The _check_bulk_perm helper function is defined."""
+        assert "def _check_bulk_perm(" in self.api_source
+        assert "netbox_ssl.bulk_operations" in self.api_source
+
+    def test_all_bulk_endpoints_use_check_bulk_perm(self):
+        """Every bulk endpoint uses _check_bulk_perm, not raw has_perm."""
+        lines = self.api_source.split("\n")
+        bulk_endpoints = []
+        for i, line in enumerate(lines):
+            if "@action" in line and 'url_path="bulk-' in line:
+                bulk_endpoints.append(i)
+
+        assert len(bulk_endpoints) >= 5, "Expected at least 5 bulk endpoints"
+
+        for ep_line in bulk_endpoints:
+            # Check next 30 lines for _check_bulk_perm
+            context = "\n".join(lines[ep_line : ep_line + 30])
+            assert "_check_bulk_perm" in context, (
+                f"Bulk endpoint at line {ep_line + 1} does not use _check_bulk_perm:\n{lines[ep_line].strip()}"
+            )
+
+    def test_bulk_import_requires_import_and_bulk(self):
+        """bulk-import checks both bulk_operations and import_certificate."""
+        assert '_check_bulk_perm(request, "netbox_ssl.import_certificate")' in self.api_source
+
+    def test_bulk_validate_requires_change_and_bulk(self):
+        """bulk-validate-chain checks both bulk_operations and change_certificate."""
+        assert '_check_bulk_perm(request, "netbox_ssl.change_certificate")' in self.api_source
+
+    def test_bulk_compliance_requires_manage_and_bulk(self):
+        """bulk-compliance-check checks both bulk_operations and manage_compliance."""
+        assert '_check_bulk_perm(request, "netbox_ssl.manage_compliance")' in self.api_source
+
+    def test_bulk_assign_requires_add_assignment_and_bulk(self):
+        """bulk-assign checks both bulk_operations and add_certificateassignment."""
+        assert '_check_bulk_perm(request, "netbox_ssl.add_certificateassignment")' in self.api_source
+
+
+class TestSingleEndpointPermissions:
+    """Test that non-bulk endpoints have correct direct has_perm checks."""
+
+    @pytest.fixture(autouse=True)
+    def _load_api_source(self):
+        self.api_source = _read_source("api/views.py")
+
+    def test_import_uses_import_permission(self):
         assert 'has_perm("netbox_ssl.import_certificate")' in self.api_source
 
-    def test_validate_chain_has_permission_check(self):
-        """validate_chain endpoint has a permission check."""
-        assert 'has_perm("netbox_ssl.change_certificate")' in self.api_source
-
     def test_compliance_check_uses_manage_permission(self):
-        """compliance_check endpoint uses manage_compliance permission."""
         assert 'has_perm("netbox_ssl.manage_compliance")' in self.api_source
 
-    def test_detect_acme_has_permission_check(self):
-        """detect_acme endpoint has a change_certificate check."""
-        # At least 3 occurrences: validate_chain, detect_acme, bulk_validate_chain
-        assert self.api_source.count('has_perm("netbox_ssl.change_certificate")') >= 3
+    def test_validate_chain_has_change_permission(self):
+        assert 'has_perm("netbox_ssl.change_certificate")' in self.api_source
 
-    def test_bulk_compliance_has_manage_permission(self):
-        """bulk_compliance_check uses manage_compliance permission."""
-        # manage_compliance should appear at least twice (single + bulk)
-        assert self.api_source.count('has_perm("netbox_ssl.manage_compliance")') >= 2
+    def test_detect_acme_has_change_permission(self):
+        # detect_acme is a POST that modifies the certificate
+        # Check there are at least 2 direct has_perm calls for change_certificate
+        # (validate_chain + detect_acme, separate from bulk endpoints)
+        direct_checks = re.findall(r'has_perm\("netbox_ssl\.change_certificate"\)', self.api_source)
+        assert len(direct_checks) >= 2
 
     def test_no_add_certificate_in_import_endpoints(self):
-        """Import endpoints no longer use generic add_certificate."""
+        """Import endpoints use import_certificate, not add_certificate."""
         assert 'has_perm("netbox_ssl.add_certificate")' not in self.api_source
 
     def test_all_post_actions_have_permission_checks(self):
-        """Every POST @action should have a has_perm check nearby."""
+        """Every POST @action has a has_perm or _check_bulk_perm within 30 lines."""
         lines = self.api_source.split("\n")
         action_lines = []
         for i, line in enumerate(lines):
@@ -93,46 +131,63 @@ class TestAPIPermissionChecks:
                 action_lines.append(i)
 
         for action_line in action_lines:
-            # Check the next 30 lines for a has_perm call (docstrings can be long)
             context = "\n".join(lines[action_line : action_line + 30])
-            assert "has_perm" in context or "get_object" in context, (
-                f"POST @action at line {action_line + 1} may be missing permission check:\n"
-                f"{lines[action_line].strip()}"
+            assert "has_perm" in context or "_check_bulk_perm" in context or "get_object" in context, (
+                f"POST @action at line {action_line + 1} missing permission check:\n{lines[action_line].strip()}"
             )
 
 
 class TestViewPermissionChecks:
-    """Test that web views have correct permission checks via source inspection."""
+    """Test that web views have correct permission checks."""
 
     @pytest.fixture(autouse=True)
     def _load_views_source(self):
         self.views_source = _read_source("views/certificates.py")
 
     def test_import_view_checks_import_permission(self):
-        """CertificateImportView checks import_certificate."""
         assert "import_certificate" in self.views_source
 
     def test_renew_view_checks_renew_permission(self):
-        """CertificateRenewView checks renew_certificate."""
         assert "renew_certificate" in self.views_source
 
     def test_bulk_import_view_checks_import_permission(self):
-        """CertificateBulkDataImportView checks add_certificate or import_certificate."""
-        assert "import_certificate" in self.views_source or "add_certificate" in self.views_source
+        assert "import_certificate" in self.views_source
+
+
+class TestDocumentation:
+    """Test that permission documentation exists and is complete."""
+
+    def test_permissions_doc_exists(self):
+        doc_path = _PLUGIN_DIR.parent / "docs" / "permissions.md"
+        assert doc_path.exists()
+
+    def test_permissions_doc_covers_custom_permissions(self):
+        source = (_PLUGIN_DIR.parent / "docs" / "permissions.md").read_text()
+        assert "import_certificate" in source
+        assert "renew_certificate" in source
+        assert "bulk_operations" in source
+        assert "manage_compliance" in source
+
+    def test_permissions_doc_covers_bulk_endpoints(self):
+        source = (_PLUGIN_DIR.parent / "docs" / "permissions.md").read_text()
+        assert "bulk-import" in source
+        assert "bulk-status-update" in source
+        assert "bulk-assign" in source
+
+    def test_permissions_doc_covers_tenant_scoping(self):
+        source = (_PLUGIN_DIR.parent / "docs" / "permissions.md").read_text()
+        assert "Tenant" in source or "tenant" in source
+        assert "ObjectPermission" in source
 
 
 class TestMigrationExists:
     """Test that the permissions migration is properly defined."""
 
     def test_migration_0016_exists(self):
-        """Migration 0016 for custom permissions exists."""
         migration_path = _PLUGIN_DIR / "migrations" / "0016_custom_permissions.py"
         assert migration_path.exists()
 
-    def test_migration_contains_permissions(self):
-        """Migration 0016 includes the permission definitions."""
+    def test_migration_contains_all_permissions(self):
         source = _read_source("migrations/0016_custom_permissions.py")
-        assert "import_certificate" in source
-        assert "renew_certificate" in source
-        assert "bulk_operations" in source
-        assert "manage_compliance" in source
+        for perm in ["import_certificate", "renew_certificate", "bulk_operations", "manage_compliance"]:
+            assert perm in source, f"Missing permission in migration: {perm}"

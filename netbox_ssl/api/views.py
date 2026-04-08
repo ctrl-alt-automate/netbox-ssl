@@ -56,6 +56,15 @@ from .serializers import (
 logger = logging.getLogger(__name__)
 
 
+def _check_bulk_perm(request, extra_perm: str) -> Response | None:
+    """Check bulk_operations permission plus an extra permission. Returns 403 Response or None."""
+    if not request.user.has_perm("netbox_ssl.bulk_operations"):
+        return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+    if not request.user.has_perm(extra_perm):
+        return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+    return None
+
+
 class CertificateViewSet(NetBoxModelViewSet):
     """API viewset for Certificate model."""
 
@@ -107,8 +116,9 @@ class CertificateViewSet(NetBoxModelViewSet):
             }
         ]
         """
-        if not request.user.has_perm("netbox_ssl.import_certificate"):
-            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        denied = _check_bulk_perm(request, "netbox_ssl.import_certificate")
+        if denied:
+            return denied
 
         # Validate input is a list
         if not isinstance(request.data, list):
@@ -188,8 +198,9 @@ class CertificateViewSet(NetBoxModelViewSet):
             "on_duplicate": "skip"
         }
         """
-        if not request.user.has_perm("netbox_ssl.import_certificate"):
-            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        denied = _check_bulk_perm(request, "netbox_ssl.import_certificate")
+        if denied:
+            return denied
 
         content = request.data.get("content", "")
         fmt = request.data.get("format", "auto")
@@ -620,8 +631,9 @@ class CertificateViewSet(NetBoxModelViewSet):
             "ids": [1, 2, 3, 4, 5]
         }
         """
-        if not request.user.has_perm("netbox_ssl.change_certificate"):
-            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        denied = _check_bulk_perm(request, "netbox_ssl.change_certificate")
+        if denied:
+            return denied
 
         certificate_ids = request.data.get("ids", [])
 
@@ -695,8 +707,9 @@ class CertificateViewSet(NetBoxModelViewSet):
             "policy_ids": [1, 2]  // optional
         }
         """
-        if not request.user.has_perm("netbox_ssl.manage_compliance"):
-            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        denied = _check_bulk_perm(request, "netbox_ssl.manage_compliance")
+        if denied:
+            return denied
         serializer = BulkComplianceRunSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -788,8 +801,9 @@ class CertificateViewSet(NetBoxModelViewSet):
             "ids": [1, 2, 3, 4, 5]
         }
         """
-        if not request.user.has_perm("netbox_ssl.change_certificate"):
-            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        denied = _check_bulk_perm(request, "netbox_ssl.change_certificate")
+        if denied:
+            return denied
 
         ids = request.data.get("ids", [])
 
@@ -869,8 +883,9 @@ class CertificateViewSet(NetBoxModelViewSet):
             "status": "revoked"
         }
         """
-        if not request.user.has_perm("netbox_ssl.change_certificate"):
-            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        denied = _check_bulk_perm(request, "netbox_ssl.change_certificate")
+        if denied:
+            return denied
 
         serializer = BulkStatusUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -947,8 +962,9 @@ class CertificateViewSet(NetBoxModelViewSet):
             "is_primary": true
         }
         """
-        if not request.user.has_perm("netbox_ssl.add_certificateassignment"):
-            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        denied = _check_bulk_perm(request, "netbox_ssl.add_certificateassignment")
+        if denied:
+            return denied
 
         serializer = BulkAssignSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
