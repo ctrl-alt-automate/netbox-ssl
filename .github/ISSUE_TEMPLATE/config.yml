@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & Discussions
+    url: https://github.com/ctrl-alt-automate/netbox-ssl/discussions
+    about: Ask questions and discuss ideas (don't open an issue for questions)
+  - name: Security Vulnerabilities
+    url: https://github.com/ctrl-alt-automate/netbox-ssl/security/advisories/new
+    about: Report security vulnerabilities privately
