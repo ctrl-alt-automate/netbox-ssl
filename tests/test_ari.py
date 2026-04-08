@@ -243,9 +243,7 @@ class TestModelARIProperties:
     """Test ARI-related properties on Certificate model via source inspection."""
 
     def test_ari_fields_in_model(self):
-        import pathlib
-
-        source = (pathlib.Path(__file__).parent.parent / "netbox_ssl" / "models" / "certificates.py").read_text()
+        source = _read_source("models/certificates.py")
         assert "ari_cert_id" in source
         assert "ari_suggested_start" in source
         assert "ari_suggested_end" in source
@@ -254,16 +252,12 @@ class TestModelARIProperties:
         assert "ari_retry_after" in source
 
     def test_ari_properties_in_model(self):
-        import pathlib
-
-        source = (pathlib.Path(__file__).parent.parent / "netbox_ssl" / "models" / "certificates.py").read_text()
+        source = _read_source("models/certificates.py")
         assert "def ari_window_active" in source
         assert "def ari_status" in source
 
     def test_migration_exists(self):
-        import pathlib
-
-        migration = pathlib.Path(__file__).parent.parent / "netbox_ssl" / "migrations" / "0018_ari_fields.py"
+        migration = _PLUGIN_DIR / "migrations" / "0018_ari_fields.py"
         assert migration.exists()
         source = migration.read_text()
         assert "ari_cert_id" in source
@@ -390,7 +384,10 @@ class TestRequestsDependency:
     """Test that requests is declared as a dependency."""
 
     def test_requests_in_pyproject(self):
-        source = (_PLUGIN_DIR.parent / "pyproject.toml").read_text()
+        pyproject = _PLUGIN_DIR.parent / "pyproject.toml"
+        if not pyproject.exists():
+            pytest.skip("pyproject.toml not available in this environment")
+        source = pyproject.read_text()
         assert "requests" in source
 
 
