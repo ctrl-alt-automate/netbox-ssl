@@ -363,6 +363,15 @@ class Certificate(NetBoxModel):
         ]
         indexes = [
             GinIndex(fields=["sans"], name="netbox_ssl_cert_sans_gin"),
+            models.Index(fields=["common_name"], name="idx_cert_common_name"),
+            models.Index(fields=["status"], name="idx_cert_status"),
+            models.Index(fields=["valid_to"], name="idx_cert_valid_to"),
+            models.Index(fields=["issuer"], name="idx_cert_issuer"),
+            models.Index(fields=["algorithm"], name="idx_cert_algorithm"),
+            models.Index(fields=["tenant_id"], name="idx_cert_tenant"),
+            models.Index(fields=["fingerprint_sha256"], name="idx_cert_fingerprint"),
+            models.Index(fields=["status", "valid_to"], name="idx_cert_status_valid_to"),
+            models.Index(fields=["is_acme", "acme_auto_renewal"], name="idx_cert_acme_renewal"),
         ]
 
     def __init__(self, *args, **kwargs):

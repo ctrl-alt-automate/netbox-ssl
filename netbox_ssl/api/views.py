@@ -67,6 +67,15 @@ class CertificateViewSet(NetBoxModelViewSet):
     serializer_class = CertificateSerializer
     filterset_class = CertificateFilterSet
 
+    # Heavy text fields deferred in list views for performance
+    _DEFERRED_FIELDS = ("pem_content", "issuer_chain", "chain_validation_message")
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.action == "list":
+            qs = qs.defer(*self._DEFERRED_FIELDS)
+        return qs
+
     @action(detail=False, methods=["post"], url_path="import")
     def import_certificate(self, request):
         """

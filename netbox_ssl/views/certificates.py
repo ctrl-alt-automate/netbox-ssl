@@ -50,7 +50,9 @@ def _get_assigned_object_tenant(obj):
 class CertificateListView(generic.ObjectListView):
     """List all certificates."""
 
-    queryset = Certificate.objects.prefetch_related("tenant", "assignments")
+    queryset = Certificate.objects.defer(
+        "pem_content", "issuer_chain", "chain_validation_message"
+    ).prefetch_related("tenant", "assignments")
     filterset = CertificateFilterSet
     filterset_form = CertificateFilterForm
     table = CertificateTable
