@@ -268,14 +268,25 @@ class TestExportDiff:
 # ─────────────────────────────────────────────
 
 
+def _get_plugin_source_dir():
+    """Resolve plugin source directory for both local and Docker CI environments."""
+    import pathlib
+
+    local = pathlib.Path(__file__).resolve().parent.parent / "netbox_ssl"
+    if local.is_dir():
+        return local
+    docker = pathlib.Path("/opt/netbox/netbox/netbox_ssl")
+    if docker.is_dir():
+        return docker
+    return local
+
+
 class TestAPIEndpoints:
     """Verify import-file and diff API endpoints exist in source."""
 
     @pytest.fixture(autouse=True)
     def _load_source(self):
-        import pathlib
-
-        self.source = (pathlib.Path(__file__).parent.parent / "netbox_ssl" / "api" / "views.py").read_text()
+        self.source = (_get_plugin_source_dir() / "api" / "views.py").read_text()
 
     def test_import_file_endpoint_exists(self):
         assert 'url_path="import-file"' in self.source
@@ -314,9 +325,7 @@ class TestScheduledExportScript:
 
     @pytest.fixture(autouse=True)
     def _load_sources(self):
-        import pathlib
-
-        plugin_dir = pathlib.Path(__file__).parent.parent / "netbox_ssl"
+        plugin_dir = _get_plugin_source_dir()
         self.script_source = (plugin_dir / "scripts" / "scheduled_export.py").read_text()
         self.init_source = (plugin_dir / "scripts" / "__init__.py").read_text()
 
