@@ -36,6 +36,7 @@ from ..models import (
 from ..utils import CertificateExporter, ComplianceChecker, ExportFormatChoices
 from ..utils.bulk_parser import parse as bulk_parse
 from ..utils.events import fire_certificate_event
+from ..utils.parser import CertificateParseError, CertificateParser, PrivateKeyDetectedError
 from .serializers import (
     BulkAssignSerializer,
     BulkComplianceRunSerializer,
@@ -1074,6 +1075,149 @@ class CertificateViewSet(NetBoxModelViewSet):
             },
             status=status.HTTP_201_CREATED,
         )
+
+    @action(detail=False, methods=["post"], url_path="import-file")
+    def import_file(self, request):
+        """
+        Import certificate(s) from uploaded file with auto-format detection.
+
+        Supports PEM, DER, and PKCS#7 formats. The format is auto-detected.
+        PKCS#7 containers may yield multiple certificates.
+
+        Upload the file as multipart form data with field name 'file'.
+        """
+        if not request.user.has_perm("netbox_ssl.import_certificate"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response(
+                {"detail": "No file uploaded. Send file as multipart form data."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Size guard
+        max_size = CertificateParser.MAX_PEM_INPUT_BYTES
+        if uploaded_file.size > max_size:
+            return Response(
+                {"detail": f"File too large ({uploaded_file.size} bytes). Maximum is {max_size} bytes."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        raw_data = uploaded_file.read()
+        try:
+            parsed_list = CertificateParser.parse_auto(raw_data)
+        except PrivateKeyDetectedError:
+            return Response(
+                {"detail": "Private key detected in file. Private keys cannot be stored."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except CertificateParseError as e:
+            logger.warning("File import parse error: %s", e)
+            return Response(
+                {"detail": "Failed to parse certificate file. Ensure the file is a valid certificate."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Optional tenant from request data
+        tenant = None
+        tenant_id = request.data.get("tenant")
+        if tenant_id:
+            from tenancy.models import Tenant
+
+            tenant = Tenant.objects.restrict(request.user, "view").filter(pk=tenant_id).first()
+
+        created = []
+        duplicates = []
+
+        with transaction.atomic():
+            for parsed in parsed_list:
+                # Check for duplicates
+                existing = Certificate.objects.filter(
+                    serial_number=parsed.serial_number,
+                    issuer=parsed.issuer,
+                ).first()
+
+                if existing:
+                    duplicates.append(parsed.common_name)
+                    continue
+
+                cert = Certificate(
+                    common_name=parsed.common_name,
+                    serial_number=parsed.serial_number,
+                    fingerprint_sha256=parsed.fingerprint_sha256,
+                    issuer=parsed.issuer,
+                    valid_from=parsed.valid_from,
+                    valid_to=parsed.valid_to,
+                    sans=parsed.sans,
+                    key_size=parsed.key_size,
+                    algorithm=parsed.algorithm,
+                    pem_content=parsed.pem_content,
+                    issuer_chain=parsed.issuer_chain,
+                    status="active",
+                    tenant=tenant,
+                )
+                cert.save()
+
+                # Auto-detect CA and ACME provider (same as PEM import)
+                from ..utils import detect_issuing_ca
+
+                issuing_ca = detect_issuing_ca(cert.issuer)
+                if issuing_ca:
+                    cert.issuing_ca = issuing_ca
+                cert.auto_detect_acme(save=False)
+                cert.save(update_fields=["issuing_ca", "is_acme", "acme_provider"])
+
+                created.append(cert)
+
+        output = CertificateSerializer(created, many=True, context={"request": request})
+        return Response(
+            {
+                "created_count": len(created),
+                "duplicate_count": len(duplicates),
+                "duplicates": duplicates,
+                "certificates": output.data,
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["post"], url_path="diff")
+    def diff_snapshots(self, request):
+        """
+        Compare two export snapshots and return differences.
+
+        Accepts 'old' and 'new' as JSON arrays of certificate dicts.
+        Returns added, removed, and changed certificates.
+
+        Example payload:
+        {
+            "old": [{"fingerprint_sha256": "AA:BB", "status": "active", ...}],
+            "new": [{"fingerprint_sha256": "AA:BB", "status": "expired", ...}]
+        }
+        """
+        if not request.user.has_perm("netbox_ssl.view_certificate"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        old_snapshot = request.data.get("old")
+        new_snapshot = request.data.get("new")
+
+        if not isinstance(old_snapshot, list) or not isinstance(new_snapshot, list):
+            return Response(
+                {"detail": "Both 'old' and 'new' must be JSON arrays."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        max_items = settings.PLUGINS_CONFIG.get("netbox_ssl", {}).get("max_export_size", 1000)
+        if len(old_snapshot) > max_items or len(new_snapshot) > max_items:
+            return Response(
+                {"detail": f"Snapshots exceed maximum size of {max_items} items."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from ..utils.diff import ExportDiffer
+
+        result = ExportDiffer.compare(old_snapshot, new_snapshot)
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class CertificateAssignmentViewSet(NetBoxModelViewSet):

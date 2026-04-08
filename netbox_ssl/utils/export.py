@@ -73,6 +73,7 @@ class CertificateExporter:
         "private_key_location",
         "assignment_count",
         "custom_fields",
+        "assignments",
         "created",
         "last_updated",
     ]
@@ -128,6 +129,18 @@ class CertificateExporter:
                     data[field] = certificate.assignments.count()
             elif field == "custom_fields":
                 data[field] = getattr(certificate, "custom_field_data", None) or {}
+            elif field == "assignments":
+                assignments = certificate.assignments.all()
+                data[field] = [
+                    {
+                        "type": str(getattr(a, "assigned_object_type", "unknown")),
+                        "id": getattr(a, "assigned_object_id", None),
+                        "name": str(a.assigned_object)
+                        if hasattr(a, "assigned_object") and a.assigned_object
+                        else "Unknown",
+                    }
+                    for a in assignments
+                ]
             elif field == "days_remaining":
                 data[field] = certificate.days_remaining
             elif field == "is_expired":
