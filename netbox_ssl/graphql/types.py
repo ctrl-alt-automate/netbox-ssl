@@ -114,6 +114,12 @@ class ExternalSourceType(NetBoxObjectType):
         "external_source",
         "external_id",
         "source_removed",
+        "ari_cert_id",
+        "ari_suggested_start",
+        "ari_suggested_end",
+        "ari_explanation_url",
+        "ari_last_checked",
+        "ari_retry_after",
         "tags",
         "comments",
         "created",
@@ -141,6 +147,16 @@ class CertificateType(NetBoxObjectType):
     external_source: Annotated["ExternalSourceType", strawberry.lazy(".types")] | None
     external_id: str
     source_removed: bool
+    ari_cert_id: str
+    ari_explanation_url: str
+
+    @strawberry_django.field
+    def ari_window_active(self) -> bool:
+        return self.ari_window_active
+
+    @strawberry_django.field
+    def ari_status(self) -> str:
+        return self.ari_status
 
     @strawberry_django.field
     def effective_renewal_instructions(self) -> str:
