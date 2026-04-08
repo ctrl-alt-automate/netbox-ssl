@@ -121,6 +121,16 @@ class CertificateImportView(LoginRequiredMixin, View):
 
     template_name = "netbox_ssl/certificate_import.html"
 
+    def dispatch(self, request, *args, **kwargs):
+        """Check import permission before dispatching (with v0.8.x fallback)."""
+        has_perm = request.user.has_perm("netbox_ssl.import_certificate") or request.user.has_perm(
+            "netbox_ssl.add_certificate"
+        )
+        if not has_perm:
+            messages.error(request, _("You do not have permission to import certificates."))
+            return redirect(reverse("plugins:netbox_ssl:certificate_list"))
+        return super().dispatch(request, *args, **kwargs)
+
     def get(self, request):
         """Display the import form."""
         form = CertificateImportForm()
@@ -284,9 +294,7 @@ class CertificateRenewView(LoginRequiredMixin, View):
 
     def dispatch(self, request, *args, **kwargs):
         """Check permissions before dispatching."""
-        if not request.user.has_perm("netbox_ssl.add_certificate") or not request.user.has_perm(
-            "netbox_ssl.change_certificate"
-        ):
+        if not request.user.has_perm("netbox_ssl.renew_certificate"):
             messages.error(request, _("You do not have permission to renew certificates."))
             return redirect(reverse("plugins:netbox_ssl:certificate_list"))
         return super().dispatch(request, *args, **kwargs)
@@ -486,8 +494,11 @@ class CertificateBulkDataImportView(LoginRequiredMixin, View):
     MAX_SESSION_ROWS = 500
 
     def dispatch(self, request, *args, **kwargs):
-        """Check permissions before dispatching."""
-        if not request.user.has_perm("netbox_ssl.add_certificate"):
+        """Check permissions before dispatching (with v0.8.x fallback)."""
+        has_perm = request.user.has_perm("netbox_ssl.import_certificate") or request.user.has_perm(
+            "netbox_ssl.add_certificate"
+        )
+        if not has_perm:
             messages.error(request, _("You do not have permission to import certificates."))
             return redirect(reverse("plugins:netbox_ssl:certificate_list"))
         return super().dispatch(request, *args, **kwargs)

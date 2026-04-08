@@ -139,6 +139,9 @@ class CompliancePolicy(NetBoxModel):
     class Meta:
         ordering = ["name"]
         verbose_name_plural = "compliance policies"
+        permissions = [
+            ("manage_compliance", "Can run compliance checks and manage policies"),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.get_policy_type_display()})"
