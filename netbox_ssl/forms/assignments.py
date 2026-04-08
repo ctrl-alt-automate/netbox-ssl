@@ -198,9 +198,7 @@ class CertificateAssignmentForm(NetBoxModelForm):
         elif not instance.pk:
             # New assignment without any target — shouldn't happen (clean() validates),
             # but guard against it.
-            raise forms.ValidationError(
-                _("No assignment target selected.")
-            )
+            raise forms.ValidationError(_("No assignment target selected."))
         # else: editing an existing assignment without changing the target — keep as-is
 
         if commit:
