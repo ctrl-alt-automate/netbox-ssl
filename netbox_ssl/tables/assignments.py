@@ -22,6 +22,7 @@ class CertificateAssignmentTable(NetBoxTable):
         verbose_name="Assigned To",
         linkify=False,  # We handle linking manually
         accessor="assigned_object",
+        orderable=False,  # GenericForeignKey cannot be used in order_by()
     )
     is_primary = columns.BooleanColumn(
         verbose_name="Primary",
