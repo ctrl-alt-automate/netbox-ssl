@@ -122,39 +122,7 @@ class CertificateParser:
         # Extract chain (remaining certificates)
         chain_pem = "\n".join(cert_blocks[1:]) if len(cert_blocks) > 1 else ""
 
-        # Extract Common Name
-        common_name = cls._extract_common_name(cert)
-
-        # Extract issuer
-        issuer = cls._extract_issuer(cert)
-
-        # Extract SANs
-        sans = cls._extract_sans(cert)
-
-        # Extract key info
-        key_size, algorithm = cls._extract_key_info(cert)
-
-        # Calculate fingerprint
-        fingerprint = cls._calculate_fingerprint(cert)
-
-        # Format serial number as hex
-        serial_hex = format(cert.serial_number, "x").upper()
-        # Add colons for readability
-        serial_formatted = ":".join(serial_hex[i : i + 2] for i in range(0, len(serial_hex), 2))
-
-        return ParsedCertificate(
-            common_name=common_name,
-            serial_number=serial_formatted,
-            fingerprint_sha256=fingerprint,
-            issuer=issuer,
-            valid_from=cert.not_valid_before_utc,
-            valid_to=cert.not_valid_after_utc,
-            sans=sans,
-            key_size=key_size,
-            algorithm=algorithm,
-            pem_content=leaf_pem,
-            issuer_chain=chain_pem,
-        )
+        return cls._build_parsed(cert, leaf_pem, chain_pem)
 
     @classmethod
     def _build_parsed(cls, cert: x509.Certificate, pem_content: str, chain: str) -> ParsedCertificate:

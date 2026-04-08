@@ -1070,6 +1070,14 @@ class CertificateViewSet(NetBoxModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Optional tenant from request data
+        tenant = None
+        tenant_id = request.data.get("tenant")
+        if tenant_id:
+            from tenancy.models import Tenant
+
+            tenant = Tenant.objects.restrict(request.user, "view").filter(pk=tenant_id).first()
+
         created = []
         duplicates = []
 
@@ -1098,8 +1106,19 @@ class CertificateViewSet(NetBoxModelViewSet):
                     pem_content=parsed.pem_content,
                     issuer_chain=parsed.issuer_chain,
                     status="active",
+                    tenant=tenant,
                 )
                 cert.save()
+
+                # Auto-detect CA and ACME provider (same as PEM import)
+                from ..utils import detect_issuing_ca
+
+                issuing_ca = detect_issuing_ca(cert.issuer)
+                if issuing_ca:
+                    cert.issuing_ca = issuing_ca
+                cert.auto_detect_acme(save=False)
+                cert.save(update_fields=["issuing_ca", "is_acme", "acme_provider"])
+
                 created.append(cert)
 
         output = CertificateSerializer(created, many=True, context={"request": request})
