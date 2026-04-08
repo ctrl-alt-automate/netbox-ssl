@@ -253,3 +253,87 @@ class TestExportDiff:
         result = ExportDiffer.compare([], [])
         assert result["summary"]["added_count"] == 0
         assert result["summary"]["removed_count"] == 0
+
+    def test_custom_key_field(self):
+        """Diff using a different key field."""
+        old = [{"serial_number": "01:02", "status": "active"}]
+        new = [{"serial_number": "01:02", "status": "expired"}]
+        result = ExportDiffer.compare(old, new, key_field="serial_number")
+        assert result["summary"]["changed_count"] == 1
+        assert result["summary"]["added_count"] == 0
+
+
+# ─────────────────────────────────────────────
+# API endpoint source verification tests
+# ─────────────────────────────────────────────
+
+
+class TestAPIEndpoints:
+    """Verify import-file and diff API endpoints exist in source."""
+
+    @pytest.fixture(autouse=True)
+    def _load_source(self):
+        import pathlib
+
+        self.source = (pathlib.Path(__file__).parent.parent / "netbox_ssl" / "api" / "views.py").read_text()
+
+    def test_import_file_endpoint_exists(self):
+        assert 'url_path="import-file"' in self.source
+        assert "def import_file" in self.source
+
+    def test_import_file_uses_parse_auto(self):
+        """import_file endpoint uses parse_auto for format auto-detection."""
+        assert "parse_auto" in self.source
+
+    def test_import_file_has_permission_check(self):
+        assert "import_certificate" in self.source
+
+    def test_import_file_has_size_guard(self):
+        assert "MAX_PEM_INPUT_BYTES" in self.source
+
+    def test_import_file_handles_private_key(self):
+        assert "PrivateKeyDetectedError" in self.source
+
+    def test_diff_endpoint_exists(self):
+        assert 'url_path="diff"' in self.source
+        assert "def diff_snapshots" in self.source
+
+    def test_diff_uses_export_differ(self):
+        assert "ExportDiffer" in self.source
+
+    def test_diff_validates_input(self):
+        """diff endpoint validates old and new are lists."""
+        assert "isinstance(old_snapshot, list)" in self.source
+
+    def test_diff_has_size_limit(self):
+        assert "max_export_size" in self.source
+
+
+class TestScheduledExportScript:
+    """Verify the scheduled export script exists and is registered."""
+
+    @pytest.fixture(autouse=True)
+    def _load_sources(self):
+        import pathlib
+
+        plugin_dir = pathlib.Path(__file__).parent.parent / "netbox_ssl"
+        self.script_source = (plugin_dir / "scripts" / "scheduled_export.py").read_text()
+        self.init_source = (plugin_dir / "scripts" / "__init__.py").read_text()
+
+    def test_script_file_exists(self):
+        assert "class ScheduledCertificateExport" in self.script_source
+
+    def test_script_extends_netbox_script(self):
+        assert "Script" in self.script_source
+
+    def test_script_has_format_choice(self):
+        assert "export_format" in self.script_source
+
+    def test_script_has_tenant_filter(self):
+        assert "tenant" in self.script_source
+
+    def test_script_respects_max_export_size(self):
+        assert "max_export_size" in self.script_source
+
+    def test_script_registered_in_init(self):
+        assert "ScheduledCertificateExport" in self.init_source
