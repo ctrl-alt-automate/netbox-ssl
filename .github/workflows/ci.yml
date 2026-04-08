@@ -21,14 +21,17 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install ruff
-        run: pip install ruff
+      - name: Install tools
+        run: pip install ruff bandit
 
       - name: Run ruff check
         run: ruff check netbox_ssl/
 
       - name: Run ruff format check
         run: ruff format --check netbox_ssl/
+
+      - name: Run bandit security scan
+        run: bandit -r netbox_ssl/ -x netbox_ssl/migrations,netbox_ssl/tests -s B101 -q
 
   package-check:
     name: Package Contents

@@ -1,0 +1,26 @@
+[run]
+source = netbox_ssl/utils
+omit =
+    # Django ORM-heavy utilities — covered by Docker integration tests
+    netbox_ssl/utils/analytics.py
+    netbox_ssl/utils/bulk_parser.py
+    netbox_ssl/utils/compliance_reporter.py
+    netbox_ssl/utils/email.py
+    netbox_ssl/utils/sync_engine.py
+    netbox_ssl/utils/topology.py
+
+[report]
+# Unit test coverage for testable utility modules
+# Full coverage (including views, models, API) is measured via Docker integration tests
+fail_under = 70
+show_missing = true
+skip_empty = true
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    pass
+    \.\.\.
+    raise NotImplementedError
+
+[html]
+directory = htmlcov
