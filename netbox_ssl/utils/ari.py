@@ -7,17 +7,16 @@ issuance or private key operations.
 """
 
 import base64
-import ipaddress
 import logging
-import socket
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any
-from urllib.parse import urlparse
 
 import requests
 from cryptography import x509
 from cryptography.x509.oid import ExtensionOID
+
+from .url_validation import URLValidationError, validate_https_url
 
 logger = logging.getLogger("netbox_ssl.ari")
 
@@ -39,24 +38,11 @@ class ARIError(Exception):
 
 
 def _validate_url(url: str) -> None:
-    """Validate URL is HTTPS and not targeting private IP ranges."""
-    parsed = urlparse(url)
-    if parsed.scheme != "https":
-        raise ARIError(f"Only HTTPS URLs are allowed, got: {parsed.scheme}")
-
-    hostname = parsed.hostname
-    if not hostname:
-        raise ARIError("URL has no hostname")
-
-    # Resolve and check for private IPs
+    """Validate URL using shared SSRF protection. Wraps URLValidationError as ARIError."""
     try:
-        addrs = socket.getaddrinfo(hostname, None)
-        for _, _, _, _, sockaddr in addrs:
-            ip = ipaddress.ip_address(sockaddr[0])
-            if ip.is_private or ip.is_loopback or ip.is_reserved:
-                raise ARIError(f"URL resolves to private/reserved IP: {ip}")
-    except socket.gaierror as e:
-        raise ARIError(f"DNS resolution failed for {hostname}: {e}") from e
+        validate_https_url(url)
+    except URLValidationError as e:
+        raise ARIError(str(e)) from e
 
 
 def build_cert_id(pem_content: str) -> str:

@@ -16,7 +16,7 @@ from extras.scripts import BooleanVar, ObjectVar, Script
 
 from netbox_ssl.models import Certificate
 from netbox_ssl.utils.ari import ARI_DIRECTORIES, ARIError, build_cert_id, discover_ari_endpoint, poll_ari
-from netbox_ssl.utils.events import fire_certificate_event
+from netbox_ssl.utils.events import EVENT_ARI_WINDOW_SHIFTED, fire_certificate_event
 
 
 class CertificateARIPoll(Script):
@@ -127,7 +127,7 @@ class CertificateARIPoll(Script):
                     if old_start and new_start and new_start < old_start:
                         fire_certificate_event(
                             cert,
-                            "ari_window_shifted",
+                            EVENT_ARI_WINDOW_SHIFTED,
                             extra={
                                 "old_start": old_start.isoformat(),
                                 "new_start": new_start.isoformat(),

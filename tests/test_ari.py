@@ -365,7 +365,7 @@ class TestARIPollScript:
         assert "ari_retry_after" in self.script_source
 
     def test_script_fires_window_shift_event(self):
-        assert "ari_window_shifted" in self.script_source
+        assert "EVENT_ARI_WINDOW_SHIFTED" in self.script_source
         assert "fire_certificate_event" in self.script_source
 
     def test_script_caches_endpoints_per_provider(self):
@@ -381,3 +381,25 @@ class TestRequestsDependency:
     def test_requests_in_pyproject(self):
         source = (_PLUGIN_DIR.parent / "pyproject.toml").read_text()
         assert "requests" in source
+
+
+class TestSharedSSRFProtection:
+    """Test that ARI reuses shared URL validation instead of duplicating."""
+
+    def test_ari_uses_shared_url_validation(self):
+        """ARI module imports from url_validation, not reimplements."""
+        source = _read_source("utils/ari.py")
+        assert "from .url_validation import" in source
+        assert "validate_https_url" in source
+        # Should NOT have its own ipaddress/socket imports
+        assert "import ipaddress" not in source
+        assert "import socket" not in source
+
+    def test_url_validation_module_exists(self):
+        assert (_PLUGIN_DIR / "utils" / "url_validation.py").exists()
+
+    def test_event_constant_defined(self):
+        """EVENT_ARI_WINDOW_SHIFTED is defined in events.py."""
+        source = _read_source("utils/events.py")
+        assert "EVENT_ARI_WINDOW_SHIFTED" in source
+        assert "ari_window_shifted" in source
