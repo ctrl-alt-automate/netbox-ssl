@@ -72,6 +72,8 @@ class CertificateExporter:
         "expiry_status",
         "private_key_location",
         "assignment_count",
+        "custom_fields",
+        "assignments",
         "created",
         "last_updated",
     ]
@@ -125,6 +127,20 @@ class CertificateExporter:
                 data[field] = getattr(certificate, "_assignment_count", None)
                 if data[field] is None:
                     data[field] = certificate.assignments.count()
+            elif field == "custom_fields":
+                data[field] = getattr(certificate, "custom_field_data", None) or {}
+            elif field == "assignments":
+                assignments = certificate.assignments.all()
+                data[field] = [
+                    {
+                        "type": str(getattr(a, "assigned_object_type", "unknown")),
+                        "id": getattr(a, "assigned_object_id", None),
+                        "name": str(a.assigned_object)
+                        if hasattr(a, "assigned_object") and a.assigned_object
+                        else "Unknown",
+                    }
+                    for a in assignments
+                ]
             elif field == "days_remaining":
                 data[field] = certificate.days_remaining
             elif field == "is_expired":
@@ -166,16 +182,37 @@ class CertificateExporter:
         fields = fields or cls.DEFAULT_FIELDS
 
         # Remove complex fields that don't work well in CSV
-        csv_fields = [f for f in fields if f != "sans"]
+        csv_fields = [f for f in fields if f not in ("sans", "custom_fields")]
+        has_custom_fields = "custom_fields" in fields
+
+        # Pre-scan custom field keys for consistent CSV columns
+        cf_keys: list[str] = []
+        cert_dicts: list[dict[str, Any]] = []
+        for cert in certificates:
+            row = cls.certificate_to_dict(cert, fields=fields)
+            cert_dicts.append(row)
+            if has_custom_fields:
+                for k in row.get("custom_fields", {}):
+                    if k not in cf_keys:
+                        cf_keys.append(k)
+
+        # Build final fieldnames with cf_ prefix for custom fields
+        all_fields = csv_fields + [f"cf_{k}" for k in cf_keys]
 
         output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=csv_fields, extrasaction="ignore")
+        writer = csv.DictWriter(output, fieldnames=all_fields, extrasaction="ignore")
 
         if include_header:
             writer.writeheader()
 
-        for cert in certificates:
-            row = cls.certificate_to_dict(cert, fields=csv_fields)
+        for row in cert_dicts:
+            # Flatten custom fields into cf_ prefixed columns
+            if has_custom_fields:
+                cf_data = row.pop("custom_fields", {})
+                for k in cf_keys:
+                    row[f"cf_{k}"] = cf_data.get(k, "")
+            # Remove non-CSV fields
+            row.pop("sans", None)
             sanitized_row = {k: cls._sanitize_csv_value(v) for k, v in row.items()}
             writer.writerow(sanitized_row)
 

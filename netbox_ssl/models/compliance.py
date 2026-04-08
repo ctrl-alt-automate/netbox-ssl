@@ -128,9 +128,20 @@ class CompliancePolicy(NetBoxModel):
         help_text="Limit policy to specific tenant (null = global)",
     )
 
+    # Tag-based scoping: only apply to certificates with ALL specified tags
+    tag_filter = models.ManyToManyField(
+        to="extras.Tag",
+        blank=True,
+        related_name="+",
+        help_text="Only apply to certificates with ALL of these tags. Empty = apply to all.",
+    )
+
     class Meta:
         ordering = ["name"]
         verbose_name_plural = "compliance policies"
+        permissions = [
+            ("manage_compliance", "Can run compliance checks and manage policies"),
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.get_policy_type_display()})"

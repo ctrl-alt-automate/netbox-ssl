@@ -353,6 +353,38 @@ class Certificate(NetBoxModel):
         help_text="Days before expiry to attempt renewal",
     )
 
+    # ACME Renewal Information (ARI) fields — RFC 9773
+    ari_cert_id = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text="ARI CertID: base64url(AKI).base64url(serial)",
+    )
+    ari_suggested_start = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="ARI suggested renewal window start",
+    )
+    ari_suggested_end = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="ARI suggested renewal window end",
+    )
+    ari_explanation_url = models.URLField(
+        blank=True,
+        max_length=500,
+        help_text="URL explaining why early renewal is suggested",
+    )
+    ari_last_checked = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When ARI was last polled for this certificate",
+    )
+    ari_retry_after = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Earliest time to poll ARI again (from Retry-After header)",
+    )
+
     class Meta:
         ordering = ["-valid_to", "common_name"]
         constraints = [
@@ -363,6 +395,20 @@ class Certificate(NetBoxModel):
         ]
         indexes = [
             GinIndex(fields=["sans"], name="netbox_ssl_cert_sans_gin"),
+            models.Index(fields=["common_name"], name="idx_cert_common_name"),
+            models.Index(fields=["status"], name="idx_cert_status"),
+            models.Index(fields=["valid_to"], name="idx_cert_valid_to"),
+            models.Index(fields=["issuer"], name="idx_cert_issuer"),
+            models.Index(fields=["algorithm"], name="idx_cert_algorithm"),
+            models.Index(fields=["tenant_id"], name="idx_cert_tenant"),
+            models.Index(fields=["fingerprint_sha256"], name="idx_cert_fingerprint"),
+            models.Index(fields=["status", "valid_to"], name="idx_cert_status_valid_to"),
+            models.Index(fields=["is_acme", "acme_auto_renewal"], name="idx_cert_acme_renewal"),
+        ]
+        permissions = [
+            ("import_certificate", "Can import certificates from PEM/DER/PKCS7"),
+            ("renew_certificate", "Can perform certificate renewal"),
+            ("bulk_operations", "Can perform bulk certificate operations"),
         ]
 
     def __init__(self, *args, **kwargs):
@@ -629,6 +675,32 @@ class Certificate(NetBoxModel):
         if self.acme_renewal_due:
             return "due"
         return "ok"
+
+    @property
+    def ari_window_active(self) -> bool:
+        """Check if we're currently within the ARI suggested renewal window."""
+        if not self.ari_suggested_start or not self.ari_suggested_end:
+            return False
+        now = timezone.now()
+        return self.ari_suggested_start <= now <= self.ari_suggested_end
+
+    @property
+    def ari_status(self) -> str:
+        """Get ARI monitoring status string."""
+        if not self.is_acme:
+            return "not_acme"
+        if not self.ari_cert_id:
+            return "no_ari"
+        if not self.ari_suggested_start:
+            return "not_checked"
+        now = timezone.now()
+        if self.ari_suggested_end and now > self.ari_suggested_end:
+            return "window_expired"
+        if self.ari_window_active:
+            return "renewal_window"
+        if now < self.ari_suggested_start:
+            return "ok"
+        return "unknown"
 
     def auto_detect_acme(self, save: bool = True):
         """

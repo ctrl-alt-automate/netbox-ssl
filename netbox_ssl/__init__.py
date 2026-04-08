@@ -7,7 +7,7 @@ Provides a "Single Source of Truth" for certificate inventory and lifecycle mana
 
 from netbox.plugins import PluginConfig
 
-__version__ = "0.8.1"
+__version__ = "0.9.0"
 
 
 class NetBoxSSLConfig(PluginConfig):
@@ -43,6 +43,8 @@ class NetBoxSSLConfig(PluginConfig):
         "external_source_sync_enabled": True,
         "external_source_default_interval": 1440,
         "external_source_never_fetch_keys": True,
+        "performance_prefetch_limit": 1000,
+        "lazy_load_pem_content": True,
     }
 
     def ready(self):

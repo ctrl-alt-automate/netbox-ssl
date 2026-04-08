@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-08
+
+### Added
+
+- **Custom Fields & Tags** ([#54](https://github.com/ctrl-alt-automate/netbox-ssl/issues/54)):
+  - Tag-based compliance policy scoping via `tag_filter` M2M field on CompliancePolicy
+  - Policies with tags only apply to certificates with ALL specified tags (empty = apply to all)
+  - Custom field values included in JSON/YAML exports via `custom_fields` field
+  - CSV exports flatten custom fields as `cf_` prefixed columns
+
+- **Granular Permissions** ([#51](https://github.com/ctrl-alt-automate/netbox-ssl/issues/51)):
+  - Custom permissions: `import_certificate`, `renew_certificate`, `bulk_operations`, `manage_compliance`
+  - All bulk endpoints require `bulk_operations` + operation-specific permission
+  - Backward-compatible fallback: `import_certificate` OR `add_certificate` accepted (deprecated in v1.0)
+  - Permission documentation at `docs/permissions.md`
+
+- **Performance Optimization** ([#52](https://github.com/ctrl-alt-automate/netbox-ssl/issues/52)):
+  - 9 database indexes on Certificate: common_name, status, valid_to, issuer, algorithm, tenant, fingerprint, (status+valid_to), (is_acme+acme_auto_renewal)
+  - Conditional field deferral: pem_content, issuer_chain, chain_validation_message deferred on list views
+  - Plugin settings: `lazy_load_pem_content` (default: True), `performance_prefetch_limit`
+
+- **Import/Export Extensions** ([#53](https://github.com/ctrl-alt-automate/netbox-ssl/issues/53)):
+  - DER format certificate import with automatic PEM conversion
+  - PKCS#7 (.p7b) container import — extracts all certificates from chain bundles
+  - Format auto-detection: `parse_auto()` identifies PEM, DER, PKCS#7 automatically
+  - `POST /import-file/` API endpoint with multipart file upload
+  - `POST /diff/` API endpoint to compare two export snapshots (added/removed/changed)
+  - Export with full assignment details (device/service type, id, name)
+  - `ScheduledCertificateExport` NetBox Script for periodic report generation
+
+- **ACME Renewal Information (ARI) Monitoring** ([#84](https://github.com/ctrl-alt-automate/netbox-ssl/issues/84)):
+  - RFC 9773 support: poll CA-recommended renewal windows for ACME certificates
+  - New fields: `ari_cert_id`, `ari_suggested_start`, `ari_suggested_end`, `ari_explanation_url`, `ari_last_checked`, `ari_retry_after`
+  - `CertificateARIPoll` NetBox Script with tenant filter, dry-run, Retry-After respect
+  - ARI CertID builder: `base64url(AKI).base64url(serial)` per RFC 9773
+  - ACME directory discovery for Let's Encrypt and Google Trust Services
+  - Event firing on unexpected renewal window shift (possible revocation signal)
+  - REST API and GraphQL exposure of all ARI fields + computed `ari_window_active`, `ari_status`
+  - `has_ari` filter on Certificate filterset
+
+### Changed
+
+- Shared SSRF protection: `url_validation.py` module reused by ARI and External Source Framework
+- Parser refactored: `parse()` delegates to `_build_parsed()` — single code path for metadata extraction
+- `requests>=2.28.0` added as explicit dependency
+
+### Migration Notes
+
+- **5 new migrations** (0015–0019): tag_filter, custom permissions, performance indexes, ARI fields, merge
+- **Permissions**: Existing users with `add_certificate` retain import access via backward-compatible fallback. Assign new custom permissions (`import_certificate`, `renew_certificate`, `bulk_operations`, `manage_compliance`) for granular control. The `add_certificate` fallback will be removed in v1.0.
+- No data migration required — all new fields have safe defaults
+
 ## [0.8.1] - 2026-04-08
 
 ### Fixed

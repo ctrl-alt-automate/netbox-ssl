@@ -123,6 +123,10 @@ class CertificateFilterSet(NetBoxModelFilterSet):
     source_removed = django_filters.BooleanFilter(
         label="Removed from Source",
     )
+    has_ari = django_filters.BooleanFilter(
+        method="filter_has_ari",
+        label="Has ARI Data",
+    )
 
     class Meta:
         model = Certificate
@@ -195,3 +199,9 @@ class CertificateFilterSet(NetBoxModelFilterSet):
         if value:
             return queryset.filter(external_source__isnull=False)
         return queryset.filter(external_source__isnull=True)
+
+    def filter_has_ari(self, queryset, name, value):
+        """Filter certificates by whether they have ARI data."""
+        if value:
+            return queryset.exclude(ari_cert_id="")
+        return queryset.filter(ari_cert_id="")

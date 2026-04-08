@@ -10,6 +10,8 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 # ---------------------------------------------------------------------------
 # Mock Django/NetBox before importing plugin code
 # ---------------------------------------------------------------------------
@@ -20,79 +22,86 @@ except (ValueError, ModuleNotFoundError):
     _NETBOX_AVAILABLE = False
 
 if not _NETBOX_AVAILABLE:
-    if "netbox" not in sys.modules:
-        from datetime import datetime
-        from datetime import timezone as tz
+    # Always ensure all required mocks exist, even if another test file
+    # already set up some mocks. Use setdefault to avoid overwriting.
+    from datetime import datetime
+    from datetime import timezone as tz
 
-        _django_utils_timezone = MagicMock()
-        _django_utils_timezone.now.return_value = datetime(2026, 6, 15, 12, 0, 0, tzinfo=tz.utc)
+    _django_utils_timezone = MagicMock()
+    _django_utils_timezone.now.return_value = datetime(2026, 6, 15, 12, 0, 0, tzinfo=tz.utc)
 
-        for mod in [
-            "django",
-            "django.conf",
-            "django.db",
-            "django.db.models",
-            "django.db.models.functions",
-            "django.utils",
-            "django.utils.timezone",
-            "django.utils.translation",
-            "django.contrib",
-            "django.contrib.contenttypes",
-            "django.contrib.contenttypes.fields",
-            "django.contrib.contenttypes.models",
-            "django.contrib.postgres",
-            "django.contrib.postgres.fields",
-            "django.contrib.postgres.indexes",
-            "django.core",
-            "django.core.checks",
-            "django.core.exceptions",
-            "django.urls",
-            "netbox",
-            "netbox.models",
-            "netbox.plugins",
-            "utilities",
-            "utilities.choices",
-        ]:
-            sys.modules.setdefault(mod, MagicMock())
-        sys.modules["django.utils.timezone"] = _django_utils_timezone
+    for mod in [
+        "django",
+        "django.conf",
+        "django.db",
+        "django.db.models",
+        "django.db.models.functions",
+        "django.utils",
+        "django.utils.translation",
+        "django.contrib",
+        "django.contrib.contenttypes",
+        "django.contrib.contenttypes.fields",
+        "django.contrib.contenttypes.models",
+        "django.contrib.postgres",
+        "django.contrib.postgres.fields",
+        "django.contrib.postgres.indexes",
+        "django.core",
+        "django.core.exceptions",
+        "django.urls",
+        "netbox",
+        "netbox.models",
+        "netbox.plugins",
+        "utilities",
+        "utilities.choices",
+    ]:
+        sys.modules.setdefault(mod, MagicMock())
+    # timezone mock must always win (for deterministic timestamps)
+    # Force-set (not setdefault) to ensure deterministic timestamps in checks.
+    sys.modules["django.utils.timezone"] = _django_utils_timezone
 
-        class _CheckMessage:
-            def __init__(self, msg, hint=None, obj=None, id=None):
-                self.msg = msg
-                self.hint = hint
-                self.obj = obj
-                self.id = id
+    # Build django.core.checks mock with proper stub classes
+    class _CheckMessage:
+        def __init__(self, msg, hint=None, obj=None, id=None):
+            self.msg = msg
+            self.hint = hint
+            self.obj = obj
+            self.id = id
 
-        class _Info(_CheckMessage):
-            level = 20  # Match Django's real level integers
+    class _Info(_CheckMessage):
+        level = 20
 
-        class _Warning(_CheckMessage):
-            level = 30
+    class _Warning(_CheckMessage):
+        level = 30
 
-        class _Error(_CheckMessage):
-            level = 40
+    class _Error(_CheckMessage):
+        level = 40
 
-        _checks_mod = sys.modules["django.core.checks"]
-        _checks_mod.Info = _Info
-        _checks_mod.Warning = _Warning
-        _checks_mod.Error = _Error
-        _checks_mod.Tags = SimpleNamespace(
-            models="models",
-            urls="urls",
-            templates="templates",
-            security="security",
-            database="database",
-        )
-        _checks_mod.register = lambda *a, **kw: (lambda f: f)
+    _checks_mod = MagicMock()
+    _checks_mod.Info = _Info
+    _checks_mod.Warning = _Warning
+    _checks_mod.Error = _Error
+    _checks_mod.Tags = SimpleNamespace(
+        models="models",
+        urls="urls",
+        templates="templates",
+        security="security",
+        database="database",
+    )
+    _checks_mod.register = lambda *a, **kw: (lambda f: f)
+    # Force-set (not setdefault) to ensure our stub classes are used,
+    # even if another test file created a bare MagicMock earlier.
+    sys.modules["django.core.checks"] = _checks_mod
 
-    # Always ensure the plugin models module is mocked (even if other test files
-    # already set up base Django mocks)
     sys.modules.setdefault("netbox_ssl.models", MagicMock())
 
-
-from django.core.checks import Info, Warning
+    Info = _Info
+    Warning = _Warning
+else:
+    from django.core.checks import Info, Warning
 
 from netbox_ssl.checks import check_database_tables, check_plugin_ready
+
+pytestmark = pytest.mark.unit
 
 
 def _is_info(result):

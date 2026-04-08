@@ -5,6 +5,8 @@ These tests verify the Certificate and CertificateAssignment models
 work correctly without requiring a full NetBox environment.
 """
 
+import importlib.util
+import os
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -12,23 +14,20 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-# Allow importing modules directly without loading the full netbox_ssl package
 _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-# Check if we're running inside Docker with full NetBox available
-# Detection: Check if NetBox settings module exists
-import os
+# ---------------------------------------------------------------------------
+# Detect NetBox availability via find_spec (consistent with other test files)
+# ---------------------------------------------------------------------------
+try:
+    _spec = importlib.util.find_spec("netbox")
+    _NETBOX_AVAILABLE = _spec is not None and _spec.origin is not None
+except (ValueError, ModuleNotFoundError):
+    _NETBOX_AVAILABLE = False
 
-# Two scenarios:
-# 1. Running locally without NetBox: mock everything
-# 2. Running in Docker with NetBox: use real Django setup
-
-# Try to detect if we're in a NetBox environment by checking for settings
-_in_netbox_env = os.path.exists("/opt/netbox/netbox/netbox/settings.py") or "DJANGO_SETTINGS_MODULE" in os.environ
-
-if _in_netbox_env:
+if _NETBOX_AVAILABLE:
     # Running in Docker with NetBox: set up Django first
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "netbox.settings")
     import contextlib
@@ -37,15 +36,21 @@ if _in_netbox_env:
 
     with contextlib.suppress(RuntimeError):
         django.setup()
-    NETBOX_AVAILABLE = True
-else:
-    # Local testing: mock netbox modules
-    sys.modules["netbox"] = MagicMock()
-    sys.modules["netbox.plugins"] = MagicMock()
-    sys.modules["netbox.models"] = MagicMock()
-    sys.modules["netbox.models.features"] = MagicMock()
 
-    # Configure minimal Django settings
+    try:
+        from netbox_ssl.models import Certificate, CertificateAssignment  # noqa: F401
+    except (ImportError, ModuleNotFoundError):
+        _NETBOX_AVAILABLE = False
+else:
+    # Local testing: mock netbox modules, configure minimal Django
+    for mod in [
+        "netbox",
+        "netbox.plugins",
+        "netbox.models",
+        "netbox.models.features",
+    ]:
+        sys.modules.setdefault(mod, MagicMock())
+
     import django
     from django.conf import settings
 
@@ -57,21 +62,11 @@ else:
             INSTALLED_APPS=[],
             DEFAULT_AUTO_FIELD="django.db.models.BigAutoField",
         )
-    NETBOX_AVAILABLE = False
 
 from django.utils import timezone
 
-# Try to import real NetBox models (only if NETBOX_AVAILABLE)
-if NETBOX_AVAILABLE:
-    try:
-        from netbox_ssl.models import Certificate, CertificateAssignment  # noqa: F401
-    except (ImportError, ModuleNotFoundError) as e:
-        print(f"Warning: Could not import netbox_ssl models: {e}")
-        NETBOX_AVAILABLE = False
-
-# Skip marker for tests that require NetBox
 requires_netbox = pytest.mark.skipif(
-    not NETBOX_AVAILABLE, reason="NetBox not available - run these tests inside Docker container"
+    not _NETBOX_AVAILABLE, reason="NetBox not available - run these tests inside Docker container"
 )
 
 

@@ -1,7 +1,7 @@
 """
 Certificate parsing utilities using the cryptography library.
 
-Handles PEM parsing, validation, and X.509 attribute extraction.
+Handles PEM, DER, and PKCS#7 parsing, validation, and X.509 attribute extraction.
 IMPORTANT: Private keys are rejected for security reasons.
 """
 
@@ -10,8 +10,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from cryptography import x509
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
+from cryptography.hazmat.primitives.serialization import pkcs7 as x509_pkcs7
 from cryptography.x509.oid import ExtensionOID, NameOID
 from django.utils import timezone
 
@@ -121,24 +122,18 @@ class CertificateParser:
         # Extract chain (remaining certificates)
         chain_pem = "\n".join(cert_blocks[1:]) if len(cert_blocks) > 1 else ""
 
-        # Extract Common Name
+        return cls._build_parsed(cert, leaf_pem, chain_pem)
+
+    @classmethod
+    def _build_parsed(cls, cert: x509.Certificate, pem_content: str, chain: str) -> ParsedCertificate:
+        """Build a ParsedCertificate from a cryptography x509.Certificate object."""
         common_name = cls._extract_common_name(cert)
-
-        # Extract issuer
         issuer = cls._extract_issuer(cert)
-
-        # Extract SANs
         sans = cls._extract_sans(cert)
-
-        # Extract key info
         key_size, algorithm = cls._extract_key_info(cert)
-
-        # Calculate fingerprint
         fingerprint = cls._calculate_fingerprint(cert)
 
-        # Format serial number as hex
         serial_hex = format(cert.serial_number, "x").upper()
-        # Add colons for readability
         serial_formatted = ":".join(serial_hex[i : i + 2] for i in range(0, len(serial_hex), 2))
 
         return ParsedCertificate(
@@ -151,9 +146,144 @@ class CertificateParser:
             sans=sans,
             key_size=key_size,
             algorithm=algorithm,
-            pem_content=leaf_pem,
-            issuer_chain=chain_pem,
+            pem_content=pem_content,
+            issuer_chain=chain,
         )
+
+    @classmethod
+    def detect_format(cls, raw_data: bytes) -> str:
+        """
+        Auto-detect certificate format from raw bytes.
+
+        Returns one of: 'pem', 'der', 'pkcs7_pem', 'pkcs7_der', 'unknown'.
+        """
+        # Try to decode as text for PEM detection
+        try:
+            text = raw_data.decode("utf-8", errors="strict")
+        except UnicodeDecodeError:
+            text = None
+
+        if text:
+            if "-----BEGIN PKCS7-----" in text or "-----BEGIN CMS-----" in text:
+                return "pkcs7_pem"
+            if "-----BEGIN CERTIFICATE-----" in text:
+                return "pem"
+
+        # Binary format detection: DER SEQUENCE tag
+        if raw_data[:1] == b"\x30":
+            # Try PKCS#7 DER first
+            try:
+                x509_pkcs7.load_der_pkcs7_certificates(raw_data)
+                return "pkcs7_der"
+            except Exception:
+                pass
+            # Try plain DER certificate
+            try:
+                x509.load_der_x509_certificate(raw_data)
+                return "der"
+            except Exception:
+                pass
+
+        return "unknown"
+
+    @classmethod
+    def parse_der(cls, der_data: bytes) -> ParsedCertificate:
+        """
+        Parse a DER-encoded X.509 certificate.
+
+        Args:
+            der_data: Raw DER bytes
+
+        Returns:
+            ParsedCertificate with extracted metadata
+
+        Raises:
+            CertificateParseError: If parsing fails
+        """
+        if len(der_data) > cls.MAX_PEM_INPUT_BYTES:
+            raise CertificateParseError(
+                f"Input too large ({len(der_data)} bytes). Maximum is {cls.MAX_PEM_INPUT_BYTES} bytes."
+            )
+
+        try:
+            cert = x509.load_der_x509_certificate(der_data)
+        except Exception as e:
+            raise CertificateParseError(f"Failed to parse DER certificate: {e}") from e
+
+        # Convert to PEM for storage
+        pem_content = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
+        return cls._build_parsed(cert, pem_content, "")
+
+    @classmethod
+    def parse_pkcs7(cls, data: bytes, is_pem: bool = True) -> list[ParsedCertificate]:
+        """
+        Parse a PKCS#7 container and extract all certificates.
+
+        Args:
+            data: PKCS#7 data (PEM or DER encoded)
+            is_pem: True for PEM, False for DER encoding
+
+        Returns:
+            List of ParsedCertificate objects
+
+        Raises:
+            CertificateParseError: If parsing fails or container is empty
+        """
+        if len(data) > cls.MAX_PEM_INPUT_BYTES:
+            raise CertificateParseError(
+                f"Input too large ({len(data)} bytes). Maximum is {cls.MAX_PEM_INPUT_BYTES} bytes."
+            )
+
+        # Check for private keys in PEM input
+        if is_pem:
+            text = data.decode("utf-8", errors="replace")
+            if cls.contains_private_key(text):
+                raise PrivateKeyDetectedError("Private key detected in PKCS#7 input. Private keys cannot be stored.")
+
+        try:
+            if is_pem:
+                certs = x509_pkcs7.load_pem_pkcs7_certificates(data)
+            else:
+                certs = x509_pkcs7.load_der_pkcs7_certificates(data)
+        except Exception as e:
+            raise CertificateParseError(f"Failed to parse PKCS#7 container: {e}") from e
+
+        if not certs:
+            raise CertificateParseError("PKCS#7 container contains no certificates")
+
+        results = []
+        for cert in certs:
+            pem_content = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
+            results.append(cls._build_parsed(cert, pem_content, ""))
+
+        return results
+
+    @classmethod
+    def parse_auto(cls, raw_data: bytes) -> list[ParsedCertificate]:
+        """
+        Auto-detect format and parse certificate(s).
+
+        Args:
+            raw_data: Raw certificate data in any supported format
+
+        Returns:
+            List of ParsedCertificate objects
+
+        Raises:
+            CertificateParseError: If format is unknown or parsing fails
+        """
+        fmt = cls.detect_format(raw_data)
+
+        if fmt == "pem":
+            return [cls.parse(raw_data.decode("utf-8", errors="replace"))]
+        elif fmt == "der":
+            return [cls.parse_der(raw_data)]
+        elif fmt == "pkcs7_pem":
+            return cls.parse_pkcs7(raw_data, is_pem=True)
+        elif fmt == "pkcs7_der":
+            return cls.parse_pkcs7(raw_data, is_pem=False)
+        else:
+            raise CertificateParseError("Unrecognized certificate format. Supported formats: PEM, DER, PKCS#7.")
 
     @classmethod
     def _extract_common_name(cls, cert: x509.Certificate) -> str:
