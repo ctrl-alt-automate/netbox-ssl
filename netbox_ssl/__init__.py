@@ -60,5 +60,30 @@ class NetBoxSSLConfig(PluginConfig):
         # Import template extensions
         from .template_content import template_extensions  # noqa: F401
 
+        # Runtime version compatibility check
+        self._check_netbox_version()
+
+    @staticmethod
+    def _check_netbox_version():
+        """Warn if running on an unsupported NetBox version."""
+        import logging
+
+        try:
+            import netbox
+
+            version = getattr(netbox, "VERSION", None)
+            if version:
+                major, minor = version[:2]
+                if major < 4 or (major == 4 and minor < 4):
+                    logger = logging.getLogger("netbox_ssl")
+                    logger.warning(
+                        "NetBox SSL v%s requires NetBox >= 4.4.0 (detected %s). "
+                        "Some features may not work correctly.",
+                        __version__,
+                        ".".join(str(v) for v in version),
+                    )
+        except (ImportError, AttributeError, TypeError):
+            pass  # Can't determine version — skip check
+
 
 config = NetBoxSSLConfig

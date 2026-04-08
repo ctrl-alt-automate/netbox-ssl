@@ -388,3 +388,57 @@ def check_plugin_ready(app_configs, **kwargs):
             )
 
     return infos
+
+
+@register(Tags.database)
+def check_database_integrity(app_configs, **kwargs):
+    """Check database integrity for certificate data."""
+    issues = []
+
+    try:
+        from netbox_ssl.models import Certificate, CertificateAssignment
+
+        # Check for orphaned assignments (pointing to deleted objects)
+        try:
+            orphaned = 0
+            for assignment in CertificateAssignment.objects.select_related("assigned_object_type").iterator():
+                if assignment.assigned_object is None:
+                    orphaned += 1
+            if orphaned > 0:
+                issues.append(
+                    Warning(
+                        f"Found {orphaned} orphaned assignment(s) pointing to deleted objects.",
+                        hint="These assignments reference objects that no longer exist. "
+                        "Consider deleting them via the admin interface.",
+                        id="netbox_ssl.W010",
+                    )
+                )
+        except Exception:
+            pass  # Table may not exist yet
+
+        # Check for duplicate serial_number + issuer combinations
+        try:
+            from django.db.models import Count
+
+            duplicates = (
+                Certificate.objects.values("serial_number", "issuer")
+                .annotate(count=Count("id"))
+                .filter(count__gt=1)
+            )
+            dup_count = duplicates.count()
+            if dup_count > 0:
+                issues.append(
+                    Warning(
+                        f"Found {dup_count} duplicate serial_number + issuer combination(s).",
+                        hint="This may indicate duplicate certificate imports. "
+                        "Review and remove duplicates.",
+                        id="netbox_ssl.W011",
+                    )
+                )
+        except Exception:
+            pass  # Table may not exist yet
+
+    except Exception:
+        pass  # Models not available
+
+    return issues
