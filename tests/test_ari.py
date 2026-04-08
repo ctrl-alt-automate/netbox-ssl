@@ -274,7 +274,18 @@ class TestModelARIProperties:
 # Serializer, GraphQL, filterset, script tests
 # ─────────────────────────────────────────────
 
-_PLUGIN_DIR = pathlib.Path(__file__).resolve().parent.parent / "netbox_ssl"
+def _get_plugin_source_dir() -> pathlib.Path:
+    """Resolve plugin source directory for both local and Docker CI environments."""
+    local = pathlib.Path(__file__).resolve().parent.parent / "netbox_ssl"
+    if local.is_dir():
+        return local
+    docker = pathlib.Path("/opt/netbox/netbox/netbox_ssl")
+    if docker.is_dir():
+        return docker
+    return local
+
+
+_PLUGIN_DIR = _get_plugin_source_dir()
 
 
 def _read_source(path: str) -> str:
