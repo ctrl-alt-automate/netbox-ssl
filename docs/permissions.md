@@ -2,6 +2,12 @@
 
 NetBox SSL provides granular permissions beyond standard Django CRUD for fine-grained access control.
 
+## Upgrading from v0.8.x
+
+v0.9 introduces new custom permissions (`import_certificate`, `renew_certificate`, `bulk_operations`, `manage_compliance`). For backward compatibility, import endpoints accept both the new `import_certificate` permission and the legacy `add_certificate` permission. This fallback will be removed in v1.0.
+
+**Recommended:** Assign the new custom permissions to your users/groups after upgrading. The legacy `add_certificate` fallback is for smooth transitions only.
+
 ## Custom Permissions
 
 ### Certificate Permissions

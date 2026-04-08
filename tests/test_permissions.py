@@ -61,6 +61,16 @@ class TestBulkOperationsPermission:
         assert "def _check_bulk_perm(" in self.api_source
         assert "netbox_ssl.bulk_operations" in self.api_source
 
+    def test_has_import_perm_fallback_helper(self):
+        """_has_import_perm checks both import_certificate and add_certificate."""
+        assert "def _has_import_perm(" in self.api_source
+        assert "import_certificate" in self.api_source
+        assert "add_certificate" in self.api_source
+
+    def test_bulk_perm_uses_import_fallback(self):
+        """_check_bulk_perm uses _has_import_perm for import permission checks."""
+        assert "_has_import_perm" in self.api_source
+
     def test_all_bulk_endpoints_use_check_bulk_perm(self):
         """Every bulk endpoint uses _check_bulk_perm, not raw has_perm."""
         lines = self.api_source.split("\n")
@@ -118,9 +128,10 @@ class TestSingleEndpointPermissions:
         direct_checks = re.findall(r'has_perm\("netbox_ssl\.change_certificate"\)', self.api_source)
         assert len(direct_checks) >= 2
 
-    def test_no_add_certificate_in_import_endpoints(self):
-        """Import endpoints use import_certificate, not add_certificate."""
-        assert 'has_perm("netbox_ssl.add_certificate")' not in self.api_source
+    def test_import_has_backward_compatible_fallback(self):
+        """Import uses _has_import_perm which falls back to add_certificate."""
+        assert "_has_import_perm" in self.api_source
+        assert 'has_perm("netbox_ssl.add_certificate")' in self.api_source  # fallback
 
     def test_all_post_actions_have_permission_checks(self):
         """Every POST @action has a has_perm or _check_bulk_perm within 30 lines."""
@@ -132,7 +143,13 @@ class TestSingleEndpointPermissions:
 
         for action_line in action_lines:
             context = "\n".join(lines[action_line : action_line + 30])
-            assert "has_perm" in context or "_check_bulk_perm" in context or "get_object" in context, (
+            has_check = (
+                "has_perm" in context
+                or "_check_bulk_perm" in context
+                or "_has_import_perm" in context
+                or "get_object" in context
+            )
+            assert has_check, (
                 f"POST @action at line {action_line + 1} missing permission check:\n{lines[action_line].strip()}"
             )
 
@@ -146,6 +163,10 @@ class TestViewPermissionChecks:
 
     def test_import_view_checks_import_permission(self):
         assert "import_certificate" in self.views_source
+
+    def test_import_view_has_add_certificate_fallback(self):
+        """Import views fall back to add_certificate for v0.8.x compatibility."""
+        assert "add_certificate" in self.views_source
 
     def test_renew_view_checks_renew_permission(self):
         assert "renew_certificate" in self.views_source
