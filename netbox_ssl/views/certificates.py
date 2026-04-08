@@ -55,6 +55,13 @@ class CertificateListView(generic.ObjectListView):
     filterset_form = CertificateFilterForm
     table = CertificateTable
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+        if plugin_settings.get("lazy_load_pem_content", True):
+            qs = qs.defer("pem_content", "issuer_chain", "chain_validation_message")
+        return qs
+
 
 class CertificateView(generic.ObjectView):
     """Display a single certificate."""
