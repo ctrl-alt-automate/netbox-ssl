@@ -1,0 +1,51 @@
+name: Feature Request
+description: Suggest a new feature for NetBox SSL
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please fill out the form below.
+
+        **Before submitting**, please check [existing issues](https://github.com/ctrl-alt-automate/netbox-ssl/issues?q=is%3Aissue) to avoid duplicates.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? What use case does it address?
+      placeholder: "As a [role], I need [capability] so that [benefit]..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How would you like this to work?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered other approaches?
+
+  - type: dropdown
+    id: philosophy
+    attributes:
+      label: Passive Administration Fit
+      description: "NetBox SSL is a passive administration tool — it monitors, it doesn't deploy certificates. Does this feature align?"
+      options:
+        - "Yes — this is monitoring/inventory/reporting"
+        - "Partially — has active components but can be opt-in"
+        - "No — this involves active certificate management"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other information, screenshots, or references.

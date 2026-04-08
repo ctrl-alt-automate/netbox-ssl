@@ -1,0 +1,93 @@
+name: Bug Report
+description: Report a bug in NetBox SSL
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the form below.
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin Version
+      description: "Run `pip show netbox-ssl` to find this"
+      placeholder: "e.g., 1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: netbox-version
+    attributes:
+      label: NetBox Version
+      description: "Found in the NetBox footer or `pip show netbox`"
+      placeholder: "e.g., 4.5.4"
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python Version
+      placeholder: "e.g., 3.12.3"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment Method
+      options:
+        - Docker
+        - Bare metal / systemd
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear description of what the bug is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Error Message / Traceback
+      description: If applicable, paste the full error message or traceback.
+      render: shell
+
+  - type: textarea
+    id: health-check
+    attributes:
+      label: Health Check Output
+      description: "Run `python manage.py check --tag netbox_ssl` and paste the output"
+      render: shell
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other information (screenshots, other plugins installed, etc.)
