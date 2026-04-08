@@ -34,6 +34,7 @@ class CompliancePolicySerializer(NetBoxModelSerializer):
             "enabled",
             "parameters",
             "tenant",
+            "tag_filter",
             "check_count",
             "tags",
             "custom_fields",

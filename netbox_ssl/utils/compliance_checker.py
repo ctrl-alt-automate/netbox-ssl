@@ -359,9 +359,9 @@ class ComplianceChecker:
         Returns:
             List of (policy, CheckResult) tuples
         """
-        from ..models import CompliancePolicy
-
         if policies is None:
+            from ..models import CompliancePolicy
+
             # Get all enabled policies, filtering by tenant if applicable
             policies = CompliancePolicy.objects.filter(enabled=True)
 
@@ -372,8 +372,15 @@ class ComplianceChecker:
                 # Only include global policies for certificates without tenant
                 policies = policies.filter(tenant__isnull=True)
 
+        # Filter policies by tag_filter: skip policies whose required tags
+        # are not ALL present on the certificate
+        cert_tag_ids = set(certificate.tags.values_list("pk", flat=True))
+
         results = []
         for policy in policies:
+            required_tag_ids = set(policy.tag_filter.values_list("pk", flat=True))
+            if required_tag_ids and not required_tag_ids.issubset(cert_tag_ids):
+                continue  # certificate lacks required tags for this policy
             result = cls.check_certificate(certificate, policy)
             results.append((policy, result))
 
