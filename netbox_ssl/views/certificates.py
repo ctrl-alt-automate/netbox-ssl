@@ -50,12 +50,17 @@ def _get_assigned_object_tenant(obj):
 class CertificateListView(generic.ObjectListView):
     """List all certificates."""
 
-    queryset = Certificate.objects.defer(
-        "pem_content", "issuer_chain", "chain_validation_message"
-    ).prefetch_related("tenant", "assignments")
+    queryset = Certificate.objects.prefetch_related("tenant", "assignments")
     filterset = CertificateFilterSet
     filterset_form = CertificateFilterForm
     table = CertificateTable
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+        if plugin_settings.get("lazy_load_pem_content", True):
+            qs = qs.defer("pem_content", "issuer_chain", "chain_validation_message")
+        return qs
 
 
 class CertificateView(generic.ObjectView):

@@ -60,7 +60,7 @@ class TestDatabaseIndexes:
 
 
 class TestDeferredFields:
-    """Test that heavy fields are deferred in list views."""
+    """Test that heavy fields are deferred in list views based on setting."""
 
     def test_api_viewset_defers_on_list(self):
         """CertificateViewSet defers pem_content and issuer_chain on list action."""
@@ -71,12 +71,18 @@ class TestDeferredFields:
         assert "_DEFERRED_FIELDS" in source
         assert 'self.action == "list"' in source
 
-    def test_web_list_view_defers_heavy_fields(self):
-        """CertificateListView queryset defers heavy fields."""
+    def test_api_viewset_respects_lazy_load_setting(self):
+        """Defer is conditional on lazy_load_pem_content setting."""
+        source = _read_source("api/views.py")
+        assert "lazy_load_pem_content" in source
+        assert "PLUGINS_CONFIG" in source
+
+    def test_web_list_view_has_get_queryset(self):
+        """CertificateListView overrides get_queryset for conditional defer."""
         source = _read_source("views/certificates.py")
-        # Find CertificateListView section
-        assert '.defer(' in source
-        assert '"pem_content"' in source
+        assert "def get_queryset" in source
+        assert "lazy_load_pem_content" in source
+        assert ".defer(" in source
 
 
 class TestPluginSettings:
