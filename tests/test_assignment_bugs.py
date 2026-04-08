@@ -11,7 +11,21 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-_PLUGIN_DIR = pathlib.Path(__file__).resolve().parent.parent / "netbox_ssl"
+
+def _get_plugin_source_dir() -> pathlib.Path:
+    """Resolve plugin source directory for both local and Docker CI environments."""
+    # Local development: tests/ is next to netbox_ssl/
+    local = pathlib.Path(__file__).resolve().parent.parent / "netbox_ssl"
+    if local.is_dir():
+        return local
+    # Docker CI: tests at /tmp/plugin_tests/, plugin at /opt/netbox/netbox/netbox_ssl/
+    docker = pathlib.Path("/opt/netbox/netbox/netbox_ssl")
+    if docker.is_dir():
+        return docker
+    return local  # fallback
+
+
+_PLUGIN_DIR = _get_plugin_source_dir()
 
 
 def _read_source(relative_path: str) -> str:
