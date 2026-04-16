@@ -145,3 +145,4 @@ extra:
 
 exclude_docs: |
   superpowers/
+  images/README.md
