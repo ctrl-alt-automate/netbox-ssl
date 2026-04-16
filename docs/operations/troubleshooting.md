@@ -61,7 +61,7 @@ docker-compose restart netbox netbox-worker
 
 **Cause:** v0.9 introduced the `import_certificate` custom permission. While there's a backward-compatible fallback to `add_certificate`, some configurations may not trigger it.
 
-**Solution:** Assign the `import_certificate` permission to affected users/groups via Admin > Permissions. See [permissions documentation](permissions.md).
+**Solution:** Assign the `import_certificate` permission to affected users/groups via Admin > Permissions. See [permissions documentation](../reference/permissions.md).
 
 ### Assignment list shows "FieldError"
 

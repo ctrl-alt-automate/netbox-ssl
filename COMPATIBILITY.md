@@ -31,4 +31,4 @@ Each plugin release is tested against all supported NetBox versions via GitHub A
 
 ## Upgrade Path
 
-For upgrade instructions, see [docs/upgrading.md](docs/upgrading.md).
+For upgrade instructions, see [docs/operations/upgrading.md](docs/operations/upgrading.md).

@@ -1347,4 +1347,4 @@ nb.plugins.netbox_ssl.assignments.create(
 
 ---
 
-**Next:** [Data Models](data-models.md) — Database schema reference
+**Next:** [Data Models](./data-models.md) — Database schema reference
