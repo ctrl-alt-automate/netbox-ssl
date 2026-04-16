@@ -7,6 +7,8 @@ Run with: python manage.py check --tag netbox_ssl
 Or as part of all checks: python manage.py check
 """
 
+import contextlib
+
 from django.core.checks import Error, Info, Tags, Warning, register
 
 
@@ -395,11 +397,11 @@ def check_database_integrity(app_configs, **kwargs):
     """Check database integrity for certificate data."""
     issues = []
 
-    try:
+    with contextlib.suppress(Exception):  # models not available during migrations
         from netbox_ssl.models import Certificate, CertificateAssignment
 
         # Check for orphaned assignments (pointing to deleted objects)
-        try:
+        with contextlib.suppress(Exception):  # table may not exist yet
             orphaned = 0
             for assignment in CertificateAssignment.objects.select_related("assigned_object_type").iterator():
                 if assignment.assigned_object is None:
@@ -413,11 +415,9 @@ def check_database_integrity(app_configs, **kwargs):
                         id="netbox_ssl.W010",
                     )
                 )
-        except Exception:
-            pass  # Table may not exist yet
 
         # Check for duplicate serial_number + issuer combinations
-        try:
+        with contextlib.suppress(Exception):  # table may not exist yet
             from django.db.models import Count
 
             duplicates = (
@@ -432,10 +432,5 @@ def check_database_integrity(app_configs, **kwargs):
                         id="netbox_ssl.W011",
                     )
                 )
-        except Exception:
-            pass  # Table may not exist yet
-
-    except Exception:
-        pass  # Models not available
 
     return issues

@@ -4,6 +4,7 @@ Certificate Signing Request (CSR) parsing utilities.
 Handles PEM parsing and attribute extraction for CSRs.
 """
 
+import contextlib
 import re
 from dataclasses import dataclass
 
@@ -139,12 +140,10 @@ class CSRParser:
         }
 
         for oid, field_name in oid_mapping.items():
-            try:
+            with contextlib.suppress(Exception):
                 attrs = csr.subject.get_attributes_for_oid(oid)
                 if attrs:
                     fields[field_name] = attrs[0].value
-            except Exception:
-                pass
 
         return fields
 
@@ -152,7 +151,7 @@ class CSRParser:
     def _extract_sans(cls, csr: x509.CertificateSigningRequest) -> list[str]:
         """Extract Subject Alternative Names from CSR extensions."""
         sans = []
-        try:
+        with contextlib.suppress(Exception):
             # CSR extensions are in the attributes
             for attribute in csr.attributes:
                 if attribute.oid == x509.oid.AttributeOID.EXTENSION_REQUEST:
@@ -169,8 +168,6 @@ class CSRParser:
                                     sans.append(f"URI:{name.value}")
                                 else:
                                     sans.append(str(name.value))
-        except Exception:
-            pass
         return sans
 
     @classmethod

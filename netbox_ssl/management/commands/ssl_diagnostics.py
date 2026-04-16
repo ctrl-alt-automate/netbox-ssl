@@ -6,6 +6,8 @@ Provides a comprehensive overview of the plugin state for support and troublesho
 Usage: python manage.py ssl_diagnostics
 """
 
+import contextlib
+
 from django.core.management.base import BaseCommand
 
 
@@ -37,12 +39,10 @@ class Command(BaseCommand):
         except Exception:
             self.stdout.write("  NetBox version: unknown")
 
-        try:
+        with contextlib.suppress(Exception):
             import sys
 
             self.stdout.write(f"  Python version: {sys.version.split()[0]}")
-        except Exception:
-            pass
 
         self.stdout.write("")
 
