@@ -132,22 +132,32 @@ If your numbers are worse than these on equivalent hardware, investigate:
 - Indexes: ensure the v0.9 Certificate indexes are in place (run
   `manage.py check --tag netbox_ssl`)
 
-## Reference baseline
+## Recording your reference baseline
 
-The following results are from the v1.0.0 reference run — use as a starting
-point for comparison:
+The performance baseline is **environment-specific** — CPU model, disk IO,
+memory pressure, concurrent load, NetBox tuning, and PostgreSQL configuration
+all significantly influence results. Rather than publishing a single table
+that would mislead for most deployments, this runbook asks you to record
+your own baseline after running the scenarios above.
 
-| Scenario | Users | Requests/s | Success | p50 | p95 | p99 |
-|----------|-------|------------|---------|-----|-----|-----|
-| List | 50 | TBD | TBD | TBD | TBD | TBD |
-| Filter | 25 | TBD | TBD | TBD | TBD | TBD |
-| Import | 10 | TBD | TBD | TBD | TBD | TBD |
-| Diff | 5 | TBD | TBD | TBD | TBD | TBD |
+Template for your local `docs/operations/load-testing-baseline.md` (not
+checked in to the plugin repo — keep in your operations docs):
 
-!!! note "TBD values"
-    These are filled in when the maintainer cuts a release — they're captured
-    on the reference hardware defined above. Your results will vary based on
-    CPU, memory, disk IO, and concurrent load on the host.
+```markdown
+# Load testing baseline — <date>, commit <SHA>
+
+Hardware: <CPU, cores, RAM, disk>
+NetBox: <version>, gunicorn workers: <N>, PG connections: <N>
+
+| Scenario | Users | Req/s | Success | p50 | p95 | p99 |
+|----------|-------|-------|---------|-----|-----|-----|
+| List     | 50    | ...   | ...%    | ... | ... | ... |
+| Filter   | 25    | ...   | ...%    | ... | ... | ... |
+| Import   | 10    | ...   | ...%    | ... | ... | ... |
+| Diff     | 5     | ...   | ...%    | ... | ... | ... |
+```
+
+Re-run on upgrades and tuning changes to detect regressions.
 
 ## Capacity planning tips
 

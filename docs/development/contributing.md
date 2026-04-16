@@ -75,7 +75,10 @@ python scripts/run_tests.py --quick      # unit + parser only
 python scripts/run_tests.py --coverage   # with coverage report
 ```
 
-Coverage must stay at or above **80%** — CI enforces this.
+Unit-test coverage on `netbox_ssl/utils/` must stay at or above **70%** — CI
+enforces this via `.coveragerc`'s `fail_under = 70`. Higher layers (models,
+views, scripts) are covered by Docker-based integration tests that also run
+in CI.
 
 ## Code style
 

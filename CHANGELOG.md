@@ -64,9 +64,10 @@ https://ctrl-alt-automate.github.io/netbox-ssl/.
 - Bandit clean on release baseline (0 high, 0 medium findings — see
   [security review](https://ctrl-alt-automate.github.io/netbox-ssl/development/security-review/)).
 - `pip-audit` clean on declared dependencies at release time.
-- Unit test coverage for `netbox_ssl/utils/` at 72% with CI gate at 70% —
-  higher layers (models, views, scripts) are covered by Docker integration
-  tests in CI.
+- Unit test coverage for `netbox_ssl/utils/` at **72%** with CI gate at
+  **70%** — higher layers (models, views, scripts) are covered by Docker
+  integration tests in CI. The 70% gate is enforced via `.coveragerc`
+  `fail_under` on every PR.
 
 ### Migration from v0.9.x
 

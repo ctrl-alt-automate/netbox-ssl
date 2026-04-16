@@ -25,9 +25,10 @@ We bump MAJOR when **any** of these happen:
 
 Examples from history:
 
-- Removal of the `add_certificate` fallback (planned for 1.1) **is** a
-  breaking change — a MAJOR or at least a clearly-marked MINOR with migration
-  notes. We will announce this one minor release ahead of removal.
+- Removal of the `add_certificate` fallback **is** a breaking change under
+  SemVer. It was deprecated in v1.0.0 and will be removed in a future MAJOR
+  release (e.g., v2.0.0). We do not remove deprecated behaviour in MINOR
+  releases.
 
 ## What does **not** count as breaking
 
@@ -68,7 +69,9 @@ Example timeline:
 - v0.9.0: introduces `import_certificate` custom permission; `add_certificate`
   fallback works
 - v1.0.0: fallback is `Deprecated` (marked in CHANGELOG, noted in upgrade docs)
-- v1.1.0: fallback removed — callers must have `import_certificate`
+- v2.0.0 (future MAJOR): fallback removed — callers must have
+  `import_certificate`. Because this is backwards-incompatible, SemVer requires
+  a MAJOR bump.
 
 ## NetBox compatibility
 
