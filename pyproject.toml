@@ -35,11 +35,23 @@ dev = [
     "ruff>=0.4.0",
     "bandit>=1.7.0",
     "playwright>=1.40",
+    "locust>=2.20",
+    "pip-audit>=2.7",
+]
+docs = [
+    "mkdocs>=1.5",
+    "mkdocs-material>=9.5",
+    "mike>=2.0",
+    "mkdocs-awesome-pages-plugin>=2.9",
+    "mkdocs-git-revision-date-localized-plugin>=1.2",
+    "mkdocs-minify-plugin>=0.7",
+    "mkdocs-mermaid2-plugin>=1.1",
+    "pymdown-extensions>=10.7",
 ]
 
 [project.urls]
 Homepage = "https://github.com/ctrl-alt-automate/netbox-ssl"
-Documentation = "https://github.com/ctrl-alt-automate/netbox-ssl/tree/main/docs"
+Documentation = "https://ctrl-alt-automate.github.io/netbox-ssl/"
 Repository = "https://github.com/ctrl-alt-automate/netbox-ssl"
 Issues = "https://github.com/ctrl-alt-automate/netbox-ssl/issues"
 Changelog = "https://github.com/ctrl-alt-automate/netbox-ssl/blob/main/CHANGELOG.md"

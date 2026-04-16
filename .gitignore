@@ -132,3 +132,4 @@ docker-volumes/
 
 # Development database
 *.sqlite3
+.venv-docs/

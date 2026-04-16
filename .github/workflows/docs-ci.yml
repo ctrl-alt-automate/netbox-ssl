@@ -1,0 +1,25 @@
+name: Docs CI
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs-ci.yml"
+      - ".github/workflows/docs.yml"
+
+jobs:
+  build:
+    name: Strict MkDocs build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install docs deps
+        run: pip install -e ".[docs]"
+      - name: Run mkdocs build in strict mode
+        run: mkdocs build --strict
