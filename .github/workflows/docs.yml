@@ -1,0 +1,47 @@
+name: Docs Deploy
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version alias (e.g., 1.0, latest)"
+        required: true
+        default: "latest"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    name: Deploy versioned docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Install docs deps
+        run: pip install -e ".[docs]"
+      - name: Deploy via mike
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ "$REF_TYPE" == "tag" ]]; then
+            version="${REF_NAME#v}"
+            major_minor="${version%.*}"
+            mike deploy --push --update-aliases "${major_minor}" latest
+            mike set-default --push latest
+          else
+            mike deploy --push --update-aliases dev
+          fi

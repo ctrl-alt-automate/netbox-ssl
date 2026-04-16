@@ -9,7 +9,7 @@ import importlib.util
 import sys
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -27,14 +27,28 @@ if not _NETBOX_AVAILABLE and "netbox" not in sys.modules:
     _django_utils_timezone.now.return_value = datetime(2026, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
 
     for mod in [
-        "django", "django.conf", "django.db", "django.db.models",
-        "django.utils", "django.utils.timezone", "django.utils.translation",
-        "django.contrib", "django.contrib.contenttypes",
-        "django.contrib.contenttypes.fields", "django.contrib.contenttypes.models",
-        "django.contrib.postgres", "django.contrib.postgres.fields",
-        "django.contrib.postgres.indexes", "django.core", "django.core.exceptions",
-        "django.urls", "netbox", "netbox.models", "netbox.plugins",
-        "utilities", "utilities.choices",
+        "django",
+        "django.conf",
+        "django.db",
+        "django.db.models",
+        "django.utils",
+        "django.utils.timezone",
+        "django.utils.translation",
+        "django.contrib",
+        "django.contrib.contenttypes",
+        "django.contrib.contenttypes.fields",
+        "django.contrib.contenttypes.models",
+        "django.contrib.postgres",
+        "django.contrib.postgres.fields",
+        "django.contrib.postgres.indexes",
+        "django.core",
+        "django.core.exceptions",
+        "django.urls",
+        "netbox",
+        "netbox.models",
+        "netbox.plugins",
+        "utilities",
+        "utilities.choices",
     ]:
         sys.modules.setdefault(mod, MagicMock())
     sys.modules["django.utils.timezone"] = _django_utils_timezone
@@ -44,7 +58,6 @@ from netbox_ssl.utils.events import (
     EVENT_CERTIFICATE_EXPIRING_SOON,
     build_certificate_event_payload,
 )
-
 
 # ---------------------------------------------------------------------------
 # Tests: Threshold categorization logic
@@ -130,9 +143,7 @@ class TestScanEventPayloads:
 
     def test_expiring_soon_event_payload_with_threshold(self):
         cert = self._make_cert(10)
-        payload = build_certificate_event_payload(
-            cert, EVENT_CERTIFICATE_EXPIRING_SOON, threshold_days=14
-        )
+        payload = build_certificate_event_payload(cert, EVENT_CERTIFICATE_EXPIRING_SOON, threshold_days=14)
         assert payload["event_type"] == EVENT_CERTIFICATE_EXPIRING_SOON
         assert payload["threshold_days"] == 14
         assert payload["days_remaining"] == 10

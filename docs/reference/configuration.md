@@ -64,7 +64,7 @@ PLUGINS_CONFIG = {
 }
 ```
 
-The email notification is triggered by the **Certificate Expiry Notification** script (see [Scripts](scripts.md)). When `notification_email_enabled` is `True`, the script automatically sends an HTML + plain-text email report after each run.
+The email notification is triggered by the **Certificate Expiry Notification** script (see [Scripts](./scripts.md)). When `notification_email_enabled` is `True`, the script automatically sends an HTML + plain-text email report after each run.
 
 > **Prerequisites:** Django's email backend must be configured. At minimum, set `EMAIL_HOST`, `EMAIL_PORT`, and `DEFAULT_FROM_EMAIL` in your NetBox `configuration.py`.
 
@@ -210,4 +210,4 @@ class ExpiringCertificatesReport(Script):
 
 ---
 
-**Next:** [Usage](usage.md) — Learn the import and renewal workflows
+**Next:** [Tutorial — Your First Certificate Import](../tutorials/01-first-import.md) — Learn the import and renewal workflows

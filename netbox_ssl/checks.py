@@ -7,6 +7,8 @@ Run with: python manage.py check --tag netbox_ssl
 Or as part of all checks: python manage.py check
 """
 
+import contextlib
+
 from django.core.checks import Error, Info, Tags, Warning, register
 
 
@@ -388,3 +390,47 @@ def check_plugin_ready(app_configs, **kwargs):
             )
 
     return infos
+
+
+@register(Tags.database)
+def check_database_integrity(app_configs, **kwargs):
+    """Check database integrity for certificate data."""
+    issues = []
+
+    with contextlib.suppress(Exception):  # models not available during migrations
+        from netbox_ssl.models import Certificate, CertificateAssignment
+
+        # Check for orphaned assignments (pointing to deleted objects)
+        with contextlib.suppress(Exception):  # table may not exist yet
+            orphaned = 0
+            for assignment in CertificateAssignment.objects.select_related("assigned_object_type").iterator():
+                if assignment.assigned_object is None:
+                    orphaned += 1
+            if orphaned > 0:
+                issues.append(
+                    Warning(
+                        f"Found {orphaned} orphaned assignment(s) pointing to deleted objects.",
+                        hint="These assignments reference objects that no longer exist. "
+                        "Consider deleting them via the admin interface.",
+                        id="netbox_ssl.W010",
+                    )
+                )
+
+        # Check for duplicate serial_number + issuer combinations
+        with contextlib.suppress(Exception):  # table may not exist yet
+            from django.db.models import Count
+
+            duplicates = (
+                Certificate.objects.values("serial_number", "issuer").annotate(count=Count("id")).filter(count__gt=1)
+            )
+            dup_count = duplicates.count()
+            if dup_count > 0:
+                issues.append(
+                    Warning(
+                        f"Found {dup_count} duplicate serial_number + issuer combination(s).",
+                        hint="This may indicate duplicate certificate imports. Review and remove duplicates.",
+                        id="netbox_ssl.W011",
+                    )
+                )
+
+    return issues

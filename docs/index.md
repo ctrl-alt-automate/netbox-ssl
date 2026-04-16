@@ -1,135 +1,111 @@
-# NetBox SSL Plugin
+# NetBox SSL
 
-<p align="center">
-  <strong>Project Janus</strong> — Your Single Source of Truth for TLS/SSL certificate management
-</p>
+**Project Janus** — Your Single Source of Truth for TLS/SSL certificate management in NetBox.
 
-<p align="center">
-  <em>Named after Janus, the Roman god of doorways and transitions — because every certificate guards a doorway, and every renewal is a transition.</em>
-</p>
+[![PyPI](https://img.shields.io/pypi/v/netbox-ssl)](https://pypi.org/project/netbox-ssl/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![NetBox](https://img.shields.io/badge/NetBox-4.4%20%7C%204.5-blue.svg)](https://github.com/netbox-community/netbox)
+[![Status](https://img.shields.io/badge/Status-Stable-brightgreen.svg)](#)
 
 ---
 
-Welcome to the **NetBox SSL Plugin** documentation!
+## What is NetBox SSL?
 
-Track certificates, monitor expiration dates, and never lose sight of where your certificates are deployed.
+NetBox SSL is a plugin that brings **visibility** and **control** to your certificate
+lifecycle. Track every TLS certificate in your infrastructure, see where it's deployed,
+and never let one expire unnoticed.
 
-<p align="center">
-  <img src="images/certificate-list.png" alt="NetBox SSL Certificate List" width="800">
-</p>
+Named after Janus, the Roman god of doorways and transitions — because every certificate
+guards a doorway, and every renewal is a transition.
 
-## Quick Navigation
+## Pick your path
 
-| Getting Started | Daily Usage | Insights | Reference |
-|:---------------:|:-----------:|:--------:|:---------:|
-| [Installation](installation.md) | [Usage Guide](usage.md) | [Analytics Dashboard](usage.md#analytics-dashboard) | [API](api.md) |
-| [Configuration](configuration.md) | [Janus Renewal](usage.md#janus-renewal-workflow) | [Compliance Report](usage.md#compliance-report) | [Data Models](data-models.md) |
-| | [CSR Management](usage.md#certificate-signing-requests-csrs) | [Certificate Map](usage.md#certificate-map) | [Webhooks](webhooks.md) |
-| | [Compliance](usage.md#compliance-policies) | | |
-| | [Scripts](scripts.md) | | |
+<div class="grid cards" markdown>
 
-## What Can You Do?
+-   :material-rocket-launch:{ .lg .middle } __New to NetBox SSL?__
 
-### Track All Your Certificates
+    ---
 
-Import certificates with a simple paste — the plugin extracts all X.509 attributes automatically. No more spreadsheets or forgotten certificates.
+    Start with the **Tutorials** to learn step-by-step.
 
-<p align="center">
-  <img src="images/certificate-detail.png" alt="Certificate Detail View" width="700">
-</p>
+    [:octicons-arrow-right-24: First Import](tutorials/01-first-import.md)
 
-### Seamless Renewals with Janus Workflow
+-   :material-book-open-page-variant:{ .lg .middle } __Solving a specific problem?__
 
-When you renew a certificate, the Janus workflow automatically transfers all assignments from the old certificate to the new one and archives the old certificate. No manual updates needed.
+    ---
 
-### Know Where Every Certificate Lives
+    Jump to **How-To Guides** for task-oriented help.
 
-Assign certificates to Services, Devices, or Virtual Machines. See at a glance which infrastructure depends on which certificate.
+    [:octicons-arrow-right-24: How-To Guides](how-to/bulk-import.md)
 
-<p align="center">
-  <img src="images/assignments-list.png" alt="Certificate Assignments" width="700">
-</p>
+-   :material-code-braces:{ .lg .middle } __Building integrations?__
 
-### Never Miss an Expiration
+    ---
 
-The dashboard widget shows certificates that need attention:
-- **Critical** — Less than 14 days remaining
-- **Warning** — Less than 30 days remaining
-- **Orphan** — Not assigned to any infrastructure
+    Browse the **Reference** for API, data models, and configuration.
 
-<p align="center">
-  <img src="images/dashboard-widget.png" alt="Dashboard Widget" width="400">
-</p>
+    [:octicons-arrow-right-24: Reference](reference/api.md)
 
-### Track Certificate Requests
+-   :material-cog:{ .lg .middle } __Operating NetBox SSL in production?__
 
-Manage the full certificate lifecycle with CSR tracking:
-- Import and parse Certificate Signing Requests
-- Track approval status from request to issuance
-- Link issued certificates back to their CSRs
+    ---
 
-### Manage Certificate Authorities
+    See **Operations** for installation, upgrades, and load testing.
 
-Keep track of which CAs issue your certificates:
-- Register public, internal, and ACME CAs
-- Auto-detect CA from certificate issuer field
-- Track approved vs. non-approved CAs
+    [:octicons-arrow-right-24: Operations](operations/installation.md)
 
-### Enforce Compliance Policies
+-   :material-head-lightbulb:{ .lg .middle } __Understanding the design?__
 
-Define and enforce certificate standards:
-- Minimum key sizes and allowed algorithms
-- Maximum validity periods
-- Required SANs and forbidden wildcards
-- Approved issuer restrictions
+    ---
 
-### Validate Certificate Chains
+    Read the **Explanation** docs for architecture and rationale.
 
-Verify your certificate chains are complete:
-- Check chain completeness and signatures
-- Identify self-signed and missing intermediates
-- Bulk validate across your inventory
+    [:octicons-arrow-right-24: Explanation](explanation/architecture.md)
 
-### Export Your Data
+-   :material-source-commit:{ .lg .middle } __Contributing?__
 
-Export certificates for reporting and integration:
-- JSON for API integration
-- CSV for spreadsheets and reporting
-- PEM for deployment verification
+    ---
 
-### Insights & Analytics (v0.7)
+    See the **Development** section for contributor setup and policies.
 
-- **Analytics Dashboard** — Status distribution, key algorithms, expiry forecast, CA and ACME coverage
-- **Compliance Report** — Score overview, failure breakdowns, 90-day trend, CSV/JSON export
-- **Certificate Map** — Visual topology: Tenant → Device/VM → Service → Certificate with expiry colors
+    [:octicons-arrow-right-24: Contributing](development/contributing.md)
 
-## Security Philosophy
+</div>
 
-NetBox SSL is designed with **Passive Administration** in mind:
+## What can you do?
 
-- **Inventory, not deployment** — The plugin tracks certificates; it doesn't deploy them
-- **No private keys** — Private keys are never stored in the database
-- **Key location hints** — Document where keys are stored (Vault, HSM, etc.)
-- **Private key rejection** — PEM input containing private keys is automatically rejected
+### Track all your certificates
 
-## Compatibility
+Import certificates with a simple paste — the plugin extracts every X.509 attribute.
+Private keys are rejected by design; only public metadata is stored.
 
-| NetBox Version | Plugin Version | Status |
-|:--------------:|:--------------:|:------:|
-| 4.5.x          | 0.7.x          | Primary |
-| 4.4.x          | 0.7.x          | Supported |
-| 4.3.x and older| —              | Unsupported |
+### Seamless renewals with the Janus workflow
 
-## Documentation
+When you renew, all assignments transfer automatically from the old certificate to
+the new one, and the old one is archived. Full audit trail, atomic operation.
 
-- **[Installation](installation.md)** — Get the plugin installed and configured
-- **[Configuration](configuration.md)** — Customize thresholds, permissions, and widgets
-- **[Usage](usage.md)** — Learn the import and renewal workflows
-- **[Scripts](scripts.md)** — Expiry notifications and automation
-- **[API](api.md)** — REST API and GraphQL reference
-- **[Data Models](data-models.md)** — Database schema and relationships
+### Know where every certificate lives
 
-## Getting Help
+Assign certificates to Services, Devices, or Virtual Machines. See at a glance which
+infrastructure depends on which certificate.
 
-- **[GitHub Issues](https://github.com/ctrl-alt-automate/netbox-ssl/issues)** — Report bugs or request features
-- **[NetBox Slack](https://netdev.chat/)** — Community chat (#netbox channel)
+### Proactive expiry alerts
+
+Scheduled scans + NetBox Event Rules + webhooks → Slack, Teams, or PagerDuty
+notifications long before anything breaks.
+
+### Compliance and analytics
+
+Define compliance policies, monitor a score over time, visualise the expiry
+forecast, and export reports in CSV or JSON.
+
+## Community
+
+- :material-github: [GitHub](https://github.com/ctrl-alt-automate/netbox-ssl) — source, issues, PRs
+- :material-package: [PyPI](https://pypi.org/project/netbox-ssl/) — install with `pip install netbox-ssl`
+- :material-scale-balance: Apache 2.0 licensed — free for commercial use
+
+## Contributing
+
+We welcome contributions! See the [Contributing guide](development/contributing.md)
+to get started, or jump straight to [good first issues](https://github.com/ctrl-alt-automate/netbox-ssl/labels/good-first-issue).

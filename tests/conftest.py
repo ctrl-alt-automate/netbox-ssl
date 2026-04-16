@@ -4,6 +4,7 @@ Pytest configuration and fixtures for NetBox SSL plugin tests.
 
 from __future__ import annotations
 
+import contextlib
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -24,6 +25,8 @@ def get_plugin_source_dir() -> Path:
     if docker.is_dir():
         return docker
     return local  # fallback
+
+
 import requests
 
 # Try to import Django - not needed for browser tests
@@ -388,10 +391,8 @@ def renewal_test_data(netbox_api: NetBoxAPI):
     # Cleanup in reverse order — ignore errors from cascade deletes or
     # server-side issues (404 = already gone, 500 = cascade/event side-effect)
     def _safe_delete(fn, *args):
-        try:
+        with contextlib.suppress(requests.exceptions.RequestException):
             fn(*args)
-        except requests.exceptions.RequestException:
-            pass  # Teardown errors are acceptable
 
     _safe_delete(netbox_api.delete_assignment, assignment["id"])
     # Also clean up any new cert that renewal may have created

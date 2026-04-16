@@ -244,16 +244,39 @@ refactor: simplify certificate parser logic
 
 ---
 
+## Versioning Policy
+
+This project follows [Semantic Versioning](https://semver.org/):
+
+- **MAJOR** (e.g., 1.0 → 2.0): Breaking API or database changes that require manual intervention
+- **MINOR** (e.g., 1.0 → 1.1): New features, backward compatible. May include new migrations.
+- **PATCH** (e.g., 1.0.0 → 1.0.1): Bug fixes only. No new features, no migrations.
+
+### What constitutes a breaking change:
+
+- Removing or renaming a REST API endpoint
+- Removing or renaming a model field
+- Changing permission codenames
+- Removing a plugin setting
+
+### What is NOT a breaking change:
+
+- Adding new API endpoints or fields
+- Adding new migrations (additive)
+- Adding new plugin settings with defaults
+- Deprecating a feature (with a migration path)
+
 ## Release Process
 
 1. Merge `dev` into `main`
-2. Update version in `netbox_ssl/__init__.py`
-3. Create and push git tag:
+2. Update version in `netbox_ssl/__init__.py` and `pyproject.toml`
+3. Update CHANGELOG.md
+4. Create and push git tag:
    ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
+   git tag -a v1.0.0 -m "v1.0.0 — Release description"
+   git push origin v1.0.0
    ```
-4. CI will publish to PyPI automatically
+5. CI will publish to PyPI automatically via the `publish.yml` workflow
 
 ---
 
@@ -312,4 +335,4 @@ docker compose exec netbox python manage.py validate_templates
 
 ---
 
-**Next:** [Installation](installation.md) — Install the plugin
+**Next:** [Installation](../operations/installation.md) — Install the plugin

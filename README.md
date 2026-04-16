@@ -10,7 +10,7 @@
   <a href="https://github.com/ctrl-alt-automate/netbox-ssl/actions/workflows/ci.yml"><img src="https://github.com/ctrl-alt-automate/netbox-ssl/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://github.com/netbox-community/netbox"><img src="https://img.shields.io/badge/NetBox-4.4%20%7C%204.5-blue.svg" alt="NetBox"></a>
-  <img src="https://img.shields.io/badge/Status-Beta-yellow.svg" alt="Beta">
+  <img src="https://img.shields.io/badge/Status-Stable-brightgreen.svg" alt="Stable">
 </p>
 
 <p align="center">
@@ -62,7 +62,7 @@ sudo systemctl restart netbox netbox-rq
 
 **That's it!** Navigate to *Plugins > SSL Certificates* in your NetBox.
 
-📖 **Full documentation:** [docs/](docs/index.md)
+📖 **Full documentation:** https://ctrl-alt-automate.github.io/netbox-ssl/
 
 ## ⚙️ Configuration
 
@@ -87,7 +87,7 @@ PLUGINS_CONFIG = {
 | `expiry_scan_thresholds` | List | [14, 30, 60, 90] | Days-before-expiry thresholds for the expiry scan script |
 | `expiry_scan_cooldown_hours` | Integer | 24 | Minimum hours between duplicate event notifications |
 
-See [Configuration](docs/configuration.md) for more options including custom fields, permissions, and webhooks.
+See [Configuration](docs/reference/configuration.md) for more options including custom fields, permissions, and webhooks.
 
 ## 📸 Screenshots
 
@@ -198,15 +198,17 @@ Add the widget to your NetBox dashboard to see:
 
 ## 📚 Documentation
 
-Full documentation is available in the [docs/](docs/index.md) folder:
+Full documentation lives at **[ctrl-alt-automate.github.io/netbox-ssl](https://ctrl-alt-automate.github.io/netbox-ssl/)** — searchable, versioned, dark-mode enabled.
 
-- **[Installation](docs/installation.md)** — Get up and running
-- **[Configuration](docs/configuration.md)** — Customize expiry thresholds and more
-- **[Usage Guide](docs/usage.md)** — Learn the workflows
-- **[API Reference](docs/api.md)** — REST API and GraphQL
-- **[Custom Scripts](docs/scripts.md)** — Expiry notifications and scheduling
-- **[Webhooks](docs/webhooks.md)** — Event Rules with Slack, Teams, PagerDuty templates
-- **[Data Models](docs/data-models.md)** — Database schema details
+Offline copies of all pages also live in the [`docs/`](docs/index.md) folder:
+
+- **[Installation](docs/operations/installation.md)** — Get up and running
+- **[Configuration](docs/reference/configuration.md)** — Customize expiry thresholds and more
+- **[First Import Tutorial](docs/tutorials/01-first-import.md)** — Learn the workflows hands-on
+- **[API Reference](docs/reference/api.md)** — REST API and GraphQL
+- **[Custom Scripts](docs/reference/scripts.md)** — Expiry notifications and scheduling
+- **[Webhooks](docs/reference/webhooks.md)** — Event Rules with Slack, Teams, PagerDuty templates
+- **[Data Models](docs/reference/data-models.md)** — Database schema details
 - **[Contributing](CONTRIBUTING.md)** — Contribution guidelines
 
 ## 🛠️ Development

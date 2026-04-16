@@ -45,13 +45,13 @@ The `CertificateExpiryNotification` script checks for certificates that are expi
 
 The script can send an HTML + plain-text email report with the expiry results. There are two ways to enable this:
 
-**Option 1: Always send via plugin settings** — Set `notification_email_enabled: True` in your plugin configuration (see [Configuration](configuration.md)). The script will automatically send email after every run.
+**Option 1: Always send via plugin settings** — Set `notification_email_enabled: True` in your plugin configuration (see [Configuration](./configuration.md)). The script will automatically send email after every run.
 
 **Option 2: On-demand via script option** — Check the **Send Email** option when running the script manually, or pass `send_email: true` via the API. This overrides the plugin setting for a single run.
 
 You can override the default recipients by entering comma-separated email addresses in the **Email Recipients** field.
 
-> **Prerequisites:** Django's email backend must be configured on the NetBox server. See [Configuration — Email Notifications](configuration.md#email-notifications).
+> **Prerequisites:** Django's email backend must be configured on the NetBox server. See [Configuration — Email Notifications](./configuration.md#email-notifications).
 
 ---
 
@@ -307,4 +307,4 @@ def handle_ssl_alert(payload):
 
 ---
 
-**Next:** [API](api.md) — REST API reference
+**Next:** [API](./api.md) — REST API reference
