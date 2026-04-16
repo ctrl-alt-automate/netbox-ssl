@@ -421,17 +421,14 @@ def check_database_integrity(app_configs, **kwargs):
             from django.db.models import Count
 
             duplicates = (
-                Certificate.objects.values("serial_number", "issuer")
-                .annotate(count=Count("id"))
-                .filter(count__gt=1)
+                Certificate.objects.values("serial_number", "issuer").annotate(count=Count("id")).filter(count__gt=1)
             )
             dup_count = duplicates.count()
             if dup_count > 0:
                 issues.append(
                     Warning(
                         f"Found {dup_count} duplicate serial_number + issuer combination(s).",
-                        hint="This may indicate duplicate certificate imports. "
-                        "Review and remove duplicates.",
+                        hint="This may indicate duplicate certificate imports. Review and remove duplicates.",
                         id="netbox_ssl.W011",
                     )
                 )

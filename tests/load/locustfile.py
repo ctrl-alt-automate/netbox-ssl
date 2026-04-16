@@ -34,9 +34,7 @@ from tests.load.seed_data import generate_sample_pem  # noqa: E402
 
 _TOKEN = os.environ.get("NETBOX_TOKEN")
 if not _TOKEN:
-    raise RuntimeError(
-        "NETBOX_TOKEN env var is required. See docs/operations/load-testing.md"
-    )
+    raise RuntimeError("NETBOX_TOKEN env var is required. See docs/operations/load-testing.md")
 
 
 class CertificateBrowseUser(HttpUser):
