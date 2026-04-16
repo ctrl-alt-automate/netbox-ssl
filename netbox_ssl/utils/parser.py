@@ -5,6 +5,7 @@ Handles PEM, DER, and PKCS#7 parsing, validation, and X.509 attribute extraction
 IMPORTANT: Private keys are rejected for security reasons.
 """
 
+import contextlib
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -172,17 +173,13 @@ class CertificateParser:
         # Binary format detection: DER SEQUENCE tag
         if raw_data[:1] == b"\x30":
             # Try PKCS#7 DER first
-            try:
+            with contextlib.suppress(Exception):
                 x509_pkcs7.load_der_pkcs7_certificates(raw_data)
                 return "pkcs7_der"
-            except Exception:
-                pass
             # Try plain DER certificate
-            try:
+            with contextlib.suppress(Exception):
                 x509.load_der_x509_certificate(raw_data)
                 return "der"
-            except Exception:
-                pass
 
         return "unknown"
 

@@ -57,7 +57,7 @@ class ComplianceSeverityChoices(ChoiceSet):
 class ComplianceResultChoices(ChoiceSet):
     """Result status for compliance checks."""
 
-    RESULT_PASS = "pass"
+    RESULT_PASS = "pass"  # nosec B105
     RESULT_FAIL = "fail"
     RESULT_ERROR = "error"
     RESULT_SKIPPED = "skipped"

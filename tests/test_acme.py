@@ -93,7 +93,7 @@ class TestACMESyncWithModel:
         """Local _ACME_PATTERNS must match netbox_ssl.models.certificates."""
         from netbox_ssl.models.certificates import _ACME_PATTERNS as real_patterns
 
-        assert _ACME_PATTERNS == real_patterns
+        assert real_patterns == _ACME_PATTERNS
 
     @requires_netbox
     def test_acme_provider_values_match_model(self):

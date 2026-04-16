@@ -335,4 +335,4 @@ docker compose exec netbox python manage.py validate_templates
 
 ---
 
-**Next:** [Installation](installation.md) — Install the plugin
+**Next:** [Installation](../operations/installation.md) — Install the plugin

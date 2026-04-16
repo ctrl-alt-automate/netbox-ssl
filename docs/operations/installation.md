@@ -47,7 +47,7 @@ PLUGINS_CONFIG = {
 }
 ```
 
-See [Configuration](configuration.md) for all available options.
+See [Configuration](../reference/configuration.md) for all available options.
 
 ---
 
@@ -167,4 +167,4 @@ If you need to remove the plugin:
 
 ---
 
-**Next:** [Configuration](configuration.md) — Customize plugin settings
+**Next:** [Configuration](../reference/configuration.md) — Customize plugin settings

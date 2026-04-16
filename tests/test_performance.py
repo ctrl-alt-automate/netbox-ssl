@@ -12,6 +12,7 @@ import pytest
 # Mark all tests in this module as unit tests
 pytestmark = pytest.mark.unit
 
+
 def _get_plugin_source_dir() -> pathlib.Path:
     """Resolve plugin source directory for both local and Docker CI environments."""
     local = pathlib.Path(__file__).resolve().parent.parent / "netbox_ssl"

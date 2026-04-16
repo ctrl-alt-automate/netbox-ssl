@@ -1,0 +1,148 @@
+site_name: NetBox SSL
+site_description: TLS/SSL certificate management for NetBox — Project Janus
+site_url: https://ctrl-alt-automate.github.io/netbox-ssl/
+repo_url: https://github.com/ctrl-alt-automate/netbox-ssl
+repo_name: ctrl-alt-automate/netbox-ssl
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; Ctrl-Alt-Automate — Apache License 2.0
+
+theme:
+  name: material
+  language: en
+  features:
+    - content.action.edit
+    - content.code.copy
+    - content.tabs.link
+    - content.tooltips
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+
+plugins:
+  - search:
+      separator: '[\s\u200b\-_,:!=\[\]()"/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: iso_date
+      exclude:
+        - superpowers/**
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+      htmlmin_opts:
+        remove_comments: true
+  - mermaid2
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid_custom
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+nav:
+  - Home: index.md
+  - Tutorials:
+      - tutorials/01-first-import.md
+      - tutorials/02-renewal-workflow.md
+      - tutorials/03-expiry-monitoring.md
+  - How-To Guides:
+      - how-to/bulk-import.md
+      - how-to/acme-auto-renewal.md
+      - how-to/compliance-policies.md
+      - how-to/external-sources.md
+      - how-to/ari-monitoring.md
+  - Reference:
+      - reference/api.md
+      - reference/data-models.md
+      - reference/configuration.md
+      - reference/scripts.md
+      - reference/permissions.md
+      - reference/webhooks.md
+  - Operations:
+      - operations/installation.md
+      - operations/upgrading.md
+      - operations/troubleshooting.md
+      - operations/load-testing.md
+  - Development:
+      - development/contributing.md
+      - development/development.md
+      - development/versioning.md
+      - development/security-review.md
+  - Explanation:
+      - explanation/architecture.md
+      - explanation/janus-workflow.md
+      - explanation/security-model.md
+
+extra:
+  version:
+    provider: mike
+    default: latest
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ctrl-alt-automate/netbox-ssl
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/netbox-ssl/
+
+exclude_docs: |
+  superpowers/
+  images/README.md

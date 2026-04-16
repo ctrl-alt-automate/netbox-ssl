@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-04-16
+
+**GA Release** — NetBox SSL is now Generally Available. Full documentation at
+https://ctrl-alt-automate.github.io/netbox-ssl/.
+
+### Added
+
+- **MkDocs Material documentation site** ([#57](https://github.com/ctrl-alt-automate/netbox-ssl/issues/57)):
+  versioned via [mike](https://github.com/jimporter/mike), searchable, hosted on
+  GitHub Pages. Diátaxis-hybrid layout with tutorials, how-to guides, reference,
+  operations, development, and explanation sections.
+- **Tutorials** ([#57](https://github.com/ctrl-alt-automate/netbox-ssl/issues/57)):
+  Your First Certificate Import, The Janus Renewal Workflow, Expiry Monitoring
+  with Events and Webhooks.
+- **How-to guides** ([#57](https://github.com/ctrl-alt-automate/netbox-ssl/issues/57)):
+  Bulk Import, ACME-Managed Certificate Tracking, Compliance Policies, External
+  Source Ingestion, ARI Monitoring (RFC 9773).
+- **Explanation docs** ([#57](https://github.com/ctrl-alt-automate/netbox-ssl/issues/57)):
+  Architecture with Mermaid diagrams, Janus workflow design rationale,
+  Security model explained.
+- **Versioning policy** (`docs/development/versioning.md`) ([#59](https://github.com/ctrl-alt-automate/netbox-ssl/issues/59)):
+  semver commitment, deprecation windows, NetBox compatibility policy.
+- **Detailed contributing guide** (`docs/development/contributing.md`) ([#57](https://github.com/ctrl-alt-automate/netbox-ssl/issues/57)):
+  dev setup, testing pyramid, code style, commit conventions, PR process,
+  release process for maintainers.
+- **Load testing suite** (`tests/load/locustfile.py`, `tests/load/seed_data.py`,
+  `docs/operations/load-testing.md`) ([#60](https://github.com/ctrl-alt-automate/netbox-ssl/issues/60)):
+  Locust scenarios for list/filter/import/diff endpoints with documented SLOs
+  and capacity-planning tips.
+- **`docs-ci.yml`** GitHub Actions workflow: `mkdocs build --strict` on every
+  PR that touches `docs/`, `mkdocs.yml`, or the workflow itself.
+- **`docs.yml`** GitHub Actions workflow: versioned docs deploy to GitHub Pages
+  on tagged releases (via mike). Uses GitHub ref env vars — no injection risk.
+
+### Changed
+
+- Documentation restructured using the Diátaxis framework. Existing bookmarks
+  to `docs/<name>.md` should move to the canonical site URLs (e.g.,
+  `docs/installation.md` → `operations/installation.md`,
+  `docs/api.md` → `reference/api.md`). `docs/usage.md` split into
+  `how-to/bulk-import.md` and `how-to/acme-auto-renewal.md`.
+- `docs/security-review.md` moved to `docs/development/security-review.md`.
+- `[project.urls].Documentation` now points at the GH Pages site.
+- README links to the documentation site; offline copies remain in `docs/`.
+
+### Deprecated
+
+- The `add_certificate` permission fallback for import endpoints (introduced
+  in v0.9.0 for backward compatibility) will be **removed in v1.1**. Assign
+  the `import_certificate` custom permission explicitly before upgrading.
+  See [permissions reference](https://ctrl-alt-automate.github.io/netbox-ssl/reference/permissions/).
+
+### Security
+
+- Bandit clean on release baseline (0 high, 0 medium findings — see
+  [security review](https://ctrl-alt-automate.github.io/netbox-ssl/development/security-review/)).
+- `pip-audit` clean on declared dependencies at release time.
+- Unit test coverage for `netbox_ssl/utils/` at **72%** with CI gate at
+  **70%** — higher layers (models, views, scripts) are covered by Docker
+  integration tests in CI. The 70% gate is enforced via `.coveragerc`
+  `fail_under` on every PR.
+
+### Migration from v0.9.x
+
+**No breaking changes. No new database migrations.** Rollback is a simple
+`pip install netbox-ssl==0.9.0`. Documentation URLs have moved — see the
+[upgrading guide](https://ctrl-alt-automate.github.io/netbox-ssl/operations/upgrading/).
+
 ## [0.9.0] - 2026-04-08
 
 ### Added

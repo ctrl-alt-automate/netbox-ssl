@@ -7,7 +7,7 @@ Provides a "Single Source of Truth" for certificate inventory and lifecycle mana
 
 from netbox.plugins import PluginConfig
 
-__version__ = "0.9.0"
+__version__ = "1.0.0"
 
 
 class NetBoxSSLConfig(PluginConfig):
@@ -77,8 +77,7 @@ class NetBoxSSLConfig(PluginConfig):
                 if major < 4 or (major == 4 and minor < 4):
                     logger = logging.getLogger("netbox_ssl")
                     logger.warning(
-                        "NetBox SSL v%s requires NetBox >= 4.4.0 (detected %s). "
-                        "Some features may not work correctly.",
+                        "NetBox SSL v%s requires NetBox >= 4.4.0 (detected %s). Some features may not work correctly.",
                         __version__,
                         ".".join(str(v) for v in version),
                     )
