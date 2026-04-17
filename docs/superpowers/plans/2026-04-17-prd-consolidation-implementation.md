@@ -1090,7 +1090,9 @@ git pull
 ### Task 11: Update MEMORY.md
 
 **Files:**
-- Modify: `/Users/elvis/.claude/projects/-Users-elvis-Developer-Netbox-SSL-project/memory/MEMORY.md`
+- Modify: `~/.claude/projects/<encoded-project-path>/memory/MEMORY.md`
+  (the Claude Code auto-memory file for this project; its exact path is
+  environment-dependent)
 
 - [ ] **Step 1: Append PRD consolidation entry under Release History (or
     add a new "Documentation Milestones" section if the user prefers)**

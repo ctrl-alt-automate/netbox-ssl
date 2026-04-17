@@ -55,8 +55,10 @@ https://ctrl-alt-automate.github.io/netbox-ssl/.
 ### Deprecated
 
 - The `add_certificate` permission fallback for import endpoints (introduced
-  in v0.9.0 for backward compatibility) will be **removed in v1.1**. Assign
-  the `import_certificate` custom permission explicitly before upgrading.
+  in v0.9.0 for backward compatibility) will be **removed in v2.0.0**.
+  Removal is a breaking change, so per SemVer it lands in a major release.
+  Assign the `import_certificate` custom permission explicitly before
+  upgrading to v2.0.
   See [permissions reference](https://ctrl-alt-automate.github.io/netbox-ssl/reference/permissions/).
 
 ### Security

@@ -35,7 +35,6 @@ accessibility.
 ## Where were these files before?
 
 These documents originally lived in a sibling folder outside the git
-repository (`/Users/<user>/Developer/Netbox-SSL-project/project-requirement-document/`).
-They were imported into the git-tracked repo on 2026-04-17 as part of
-the PRD consolidation work. The external folder is stale after this
-date; feel free to delete it from your workspace.
+repository. They were imported into the git-tracked repo on 2026-04-17
+as part of the PRD consolidation work. Any remaining copy outside the
+repository is stale after this date and can be removed.
