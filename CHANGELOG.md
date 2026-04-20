@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-04-20
+
+**Patch release** — two post-GA bugfixes surfaced while producing fresh
+documentation screenshots against a fully seeded NetBox 4.5 environment.
+
+### Fixed
+
+- **`ComplianceTrendSnapshot` schema drift**: migration `0009` originally created
+  the model without the `custom_field_data` and `tags` fields that `NetBoxModel`
+  requires. Any access to `ComplianceTrendSnapshot.objects` raised
+  `ProgrammingError: column ... custom_field_data does not exist`, which broke
+  the compliance report view (`get_trend()`) and `ComplianceReporter.create_snapshot()`
+  (used by the scheduled compliance script). New migration
+  `0020_compliancetrendsnapshot_netboxmodel_fields` backfills both columns.
+- **External Sources list view 500**: the list view annotated the queryset with
+  `certificate_count=Count("certificates")`, shadowing the model's
+  `certificate_count` `@property`. When Django hydrated the annotated objects
+  it attempted `setattr(instance, "certificate_count", value)` and raised
+  `AttributeError: property 'certificate_count' of 'ExternalSource' object has no setter`.
+  The annotation is now exposed as `_annotated_cert_count` and
+  `ExternalSourceTable.render_certificate_count()` prefers it, falling back to
+  the property for contexts that don't annotate.
+
+### Migration notes
+
+Run `python manage.py migrate netbox_ssl` after upgrading — one new migration
+(`0020`) adds two columns to `netbox_ssl_compliancetrendsnapshot`. Downgrade
+is safe; the columns are additive.
+
 ## [1.0.0] - 2026-04-16
 
 **GA Release** — NetBox SSL is now Generally Available. Full documentation at
