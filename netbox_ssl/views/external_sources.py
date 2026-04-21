@@ -18,8 +18,10 @@ from ..tables import ExternalSourceTable
 class ExternalSourceListView(generic.ObjectListView):
     """List all External Sources."""
 
-    queryset = ExternalSource.objects.prefetch_related("tenant", "tags").annotate(
-        certificate_count=Count("certificates")
+    queryset = (
+        ExternalSource.objects.select_related("tenant")
+        .prefetch_related("tags")
+        .annotate(_annotated_cert_count=Count("certificates"))
     )
     filterset = ExternalSourceFilterSet
     filterset_form = ExternalSourceFilterForm

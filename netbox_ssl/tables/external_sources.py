@@ -87,5 +87,5 @@ class ExternalSourceTable(NetBoxTable):
         )
 
     def render_certificate_count(self, value, record):
-        """Render certificate count."""
-        return record.certificate_count
+        """Render certificate count, preferring the list-view annotation."""
+        return getattr(record, "_annotated_cert_count", record.certificate_count)
