@@ -14,12 +14,19 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-MIGRATION_PATH = (
-    Path(__file__).resolve().parent.parent
-    / "netbox_ssl"
-    / "migrations"
-    / "0021_external_source_auth_credentials_and_region.py"
-)
+
+def _get_plugin_source_dir():
+    """Find the netbox_ssl source directory (local or Docker CI)."""
+    local = Path(__file__).resolve().parent.parent / "netbox_ssl"
+    if local.is_dir():
+        return local
+    docker = Path("/opt/netbox/netbox/netbox_ssl")
+    if docker.is_dir():
+        return docker
+    return local
+
+
+MIGRATION_PATH = _get_plugin_source_dir() / "migrations" / "0021_external_source_auth_credentials_and_region.py"
 
 try:
     _spec = importlib.util.find_spec("netbox")

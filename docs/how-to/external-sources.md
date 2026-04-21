@@ -73,7 +73,7 @@ Supported role-based `auth_method` values:
 
 The legacy single-string `auth_credentials_reference` field (v0.8 – v1.0) remains functional through v1.1.x for backward compatibility. Migration 0021 auto-wraps existing values as `{"token": "..."}` in `auth_credentials`; operators need take no action.
 
-**`auth_credentials_reference` is removed in v2.0.0.** See [ROADMAP §8.2](../../project-requirement-document/ROADMAP.md#82-removal-of-auth_credentials_reference-field-on-externalsource).
+**`auth_credentials_reference` is removed in v2.0.0.** See [ROADMAP §8.2](https://github.com/ctrl-alt-automate/netbox-ssl/blob/main/project-requirement-document/ROADMAP.md#82-removal-of-auth_credentials_reference-field-on-externalsource).
 
 ## Step 1 — Create an ExternalSource record
 
