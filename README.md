@@ -91,38 +91,98 @@ See [Configuration](docs/reference/configuration.md) for more options including 
 
 ## 📸 Screenshots
 
+### Certificate Operations
+
 <table>
   <tr>
     <td align="center">
-      <img src="docs/images/analytics-dashboard-dark.png" alt="Analytics Dashboard" width="400"><br>
-      <em>Analytics dashboard with expiry forecast</em>
+      <img src="docs/images/certificate-list-dark.png" alt="Certificate list" width="420"><br>
+      <em>Unified certificate list with status, expiry, issuer and tenant</em>
     </td>
     <td align="center">
-      <img src="docs/images/certificate-detail-dark.png" alt="Certificate Detail" width="400"><br>
-      <em>Certificate detail with tabbed layout</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/images/compliance-report-dark.png" alt="Compliance Report" width="400"><br>
-      <em>Compliance report with score and trend</em>
-    </td>
-    <td align="center">
-      <img src="docs/images/certificate-map-dark.png" alt="Certificate Map" width="400"><br>
-      <em>Certificate map topology per tenant</em>
+      <img src="docs/images/certificate-detail-dark.png" alt="Certificate detail" width="420"><br>
+      <em>Tabbed detail view with per-certificate renewal notes</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/images/certificate-import-dark.png" alt="Smart Import" width="400"><br>
-      <em>Smart Paste import with X.509 parsing</em>
+      <img src="docs/images/certificate-import-dark.png" alt="Smart Paste import" width="420"><br>
+      <em>Smart Paste import with private-key rejection and chain parsing</em>
     </td>
     <td align="center">
-      <img src="docs/images/assignments-list-dark.png" alt="Assignments" width="400"><br>
-      <em>Track which certificates are assigned where</em>
+      <img src="docs/images/bulk-import-dark.png" alt="Bulk CSV/JSON import" width="420"><br>
+      <em>Bulk CSV/JSON import with preview workflow (v0.5+)</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/images/assignments-list-dark.png" alt="Assignments" width="420"><br>
+      <em>Track which certificates are assigned to which services</em>
+    </td>
+    <td align="center">
+      <img src="docs/images/csr-list-dark.png" alt="CSRs" width="420"><br>
+      <em>Certificate Signing Requests through their lifecycle</em>
     </td>
   </tr>
 </table>
+
+### Insights & Compliance
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/images/analytics-dashboard-dark.png" alt="Analytics dashboard" width="420"><br>
+      <em>Analytics: status, algorithms, expiry forecast, CA and ACME distribution</em>
+    </td>
+    <td align="center">
+      <img src="docs/images/compliance-report-dark.png" alt="Compliance report" width="420"><br>
+      <em>Compliance score card, failure breakdown and 90-day trend</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <img src="docs/images/certificate-map-dark.png" alt="Certificate map" width="780"><br>
+      <em>Certificate map topology — Tenant → Device/VM → Service → Certificate (HTMX-lazy)</em>
+    </td>
+  </tr>
+</table>
+
+### Governance
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/images/ca-list-dark.png" alt="Certificate Authorities" width="420"><br>
+      <em>Known Certificate Authorities with auto-detection and scoping</em>
+    </td>
+    <td align="center">
+      <img src="docs/images/ca-detail-dark.png" alt="CA detail" width="420"><br>
+      <em>CA detail with markdown renewal instructions (v0.8+)</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/images/external-sources-list-dark.png" alt="External Sources" width="420"><br>
+      <em>External Sources framework — Lemur / Generic REST adapters (v0.8+)</em>
+    </td>
+    <td align="center">
+      <img src="docs/images/external-source-detail-dark.png" alt="External Source detail" width="420"><br>
+      <em>Source configuration, sync status and one-click Dry Run</em>
+    </td>
+  </tr>
+</table>
+
+> Screenshots come from a seeded demo environment. To regenerate them:
+>
+> ```bash
+> docker compose up -d
+> docker exec -i netbox-ssl-netbox-1 /opt/netbox/venv/bin/python \
+>     /opt/netbox/netbox/manage.py shell < scripts/create_test_data.py
+> docker exec -i netbox-ssl-netbox-1 /opt/netbox/venv/bin/python \
+>     /opt/netbox/netbox/manage.py shell < scripts/seed_certificates.py
+> pip install playwright requests && playwright install chromium
+> python scripts/take_screenshots.py
+> ```
 
 ## Features
 
