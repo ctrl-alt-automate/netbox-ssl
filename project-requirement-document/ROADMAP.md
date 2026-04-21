@@ -240,7 +240,7 @@ models are built for it.
 
 Running outbound scans to discover certificates conflicts with passive
 administration and introduces false-positive risk. Passive ingestion
-from an existing scanner's output (see §5.6) is the correct pattern.
+from an existing scanner's output (see §5.4) is the correct pattern.
 
 ### 7.5 TLS Traffic Inspection or Interception
 
