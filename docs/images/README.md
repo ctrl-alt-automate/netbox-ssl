@@ -1,54 +1,70 @@
 # Documentation Screenshots
 
-This folder contains screenshots for the NetBox SSL Plugin documentation.
+This folder holds every screenshot rendered in the root README and in the
+published documentation site (MkDocs).
 
-## Required Screenshots
+## Naming convention
 
-The following screenshots are referenced in the documentation:
+All captures come in two themes:
 
-| Filename | Description | URL |
-|----------|-------------|-----|
-| `certificate-list.png` | Certificate list view with status badges | `/plugins/ssl/certificates/` |
-| `certificate-detail.png` | Certificate detail page with assignments | `/plugins/ssl/certificates/{id}/` |
-| `certificate-import.png` | Smart Paste import form | `/plugins/ssl/certificates/import/` |
-| `assignments-list.png` | Certificate assignments list | `/plugins/ssl/assignments/` |
-| `dashboard-widget.png` | SSL Certificate Status dashboard widget | `/` (scroll down) |
+| Pattern | Theme | Used by |
+|---------|-------|---------|
+| `<name>-dark.png` | NetBox dark mode (default) | Root README, docs site dark palette |
+| `<name>-light.png` | NetBox light mode | docs site light palette, hi-contrast needs |
 
-## Generating Screenshots
+The base `<name>.png` (no suffix) form is **no longer used**. A handful of
+legacy captures from the pre-playwright era are kept only when they still
+appear in user-facing documentation and lack a refreshed replacement
+(notably `dashboard-widget.png`).
 
-### Option 1: Automated Script
+## Catalog
 
-Run the provided screenshot capture script:
+| Filename (-dark and -light) | URL | Notes |
+|-----------------------------|-----|-------|
+| `certificate-list` | `/plugins/ssl/certificates/` | Mixed statuses, expiry badges |
+| `certificate-detail` | `/plugins/ssl/certificates/{id}/` | Tabbed layout with renewal note |
+| `certificate-import` | `/plugins/ssl/certificates/import/` | Smart Paste import form |
+| `bulk-import` | `/plugins/ssl/certificates/bulk-import/` | CSV/JSON preview workflow |
+| `assignments-list` | `/plugins/ssl/assignments/` | Service-level certificate links |
+| `csr-list` / `csr-detail` | `/plugins/ssl/csrs/` | Pending / Approved / Rejected / Issued |
+| `ca-list` / `ca-detail` | `/plugins/ssl/certificate-authorities/` | CA detail shows renewal instructions markdown |
+| `analytics-dashboard` | `/plugins/ssl/analytics/` | Status, algorithm, expiry forecast, CA distribution |
+| `compliance-report` | `/plugins/ssl/compliance-report/` | Score, severity, 90-day trend |
+| `certificate-map` | `/plugins/ssl/certificate-map/` | Tenant → Device/VM → Service → Cert tree |
+| `external-sources-list` / `external-source-detail` | `/plugins/ssl/external-sources/` | Lemur / Generic REST adapters |
+| `dashboard-widget.png` (legacy) | NetBox home dashboard | SSL Certificate Status widget |
+
+## Regenerating
 
 ```bash
-cd /path/to/netbox-ssl
-pip install selenium
-python scripts/capture_screenshots.py
+# 1. Boot a local NetBox with the plugin mounted
+docker compose up -d
+
+# 2. Seed demo infrastructure (tenants, devices, VMs, services)
+docker exec -i netbox-ssl-netbox-1 /opt/netbox/venv/bin/python \
+    /opt/netbox/netbox/manage.py shell < scripts/create_test_data.py
+
+# 3. Seed certificates, CAs, CSRs, assignments, policies
+docker exec -i netbox-ssl-netbox-1 /opt/netbox/venv/bin/python \
+    /opt/netbox/netbox/manage.py shell < scripts/seed_certificates.py
+
+# 4. Backfill compliance checks and 90-day trend
+docker exec -i netbox-ssl-netbox-1 /opt/netbox/venv/bin/python \
+    /opt/netbox/netbox/manage.py shell < scripts/seed_compliance_runs.py
+
+# 5. Install Playwright + requests and capture every page in both themes
+pip install playwright requests && playwright install chromium
+python scripts/take_screenshots.py
 ```
 
-### Option 2: Manual Capture
+The final step writes ~28 PNGs under `docs/images/` (14 pages × 2 themes).
+Override the default viewport or output dir with `--width`, `--height`,
+or `--output`. See `python scripts/take_screenshots.py --help`.
 
-1. Start your NetBox development environment:
-   ```bash
-   docker compose up -d
-   ```
+## Capture guidelines
 
-2. Navigate to `http://localhost:8000` and log in (admin/admin)
-
-3. Capture each screenshot at the URLs listed above
-
-4. Save screenshots to:
-   - `docs/images/` (for README)
-   - `../netbox-ssl.wiki/images/` (for Wiki)
-
-### Recommended Settings
-
-- **Browser width:** 1200-1400px
-- **Format:** PNG
-- **Theme:** Dark mode (NetBox default)
-
-## Notes
-
-- Screenshots should show realistic data (certificates with various statuses)
-- Include the sidebar navigation for context
-- Crop to focus on the relevant UI elements if needed
+- **Viewport:** 1440×900 keeps sidebars + toolbars visible without oversized rasters.
+- **Theme:** Capture dark and light in the same run so the pair stays in sync.
+- **Data:** Run `seed_certificates.py` first — empty tables look broken in docs.
+- **HTMX pages:** The screenshot script expands every certificate-map accordion
+  before capturing, so tenants don't appear as "Loading..." placeholders.
