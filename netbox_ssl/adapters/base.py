@@ -34,6 +34,35 @@ _STREAM_CHUNK_SIZE: int = 8192
 
 
 @dataclass(frozen=True)
+class CredentialField:
+    """Metadata for one credential component declared by an adapter.
+
+    Adapters use a mapping of name -> CredentialField to describe the
+    credentials required for a given auth_method. The form and serializer
+    consume this mapping to validate user-submitted auth_credentials.
+
+    Attributes:
+        required: Must be present in auth_credentials at form-save time.
+        label:    User-facing label used by the form / UI.
+        secret:   If True, component is high-sensitivity — drives UI
+                  masking and may restrict allowed reference schemes.
+        help_text: Short description shown by the form.
+
+    Note:
+        ``required=True`` is the default because required components are the
+        common case. There is intentionally no ``default`` attribute:
+        credential values must always be explicit; a silent default would
+        mask misconfiguration at form-save time and is incompatible with
+        the validator's missing-required = error assumption.
+    """
+
+    required: bool = True
+    label: str = ""
+    secret: bool = False
+    help_text: str = ""
+
+
+@dataclass(frozen=True)
 class FetchedCertificate:
     """Normalized certificate data from an external source."""
 
