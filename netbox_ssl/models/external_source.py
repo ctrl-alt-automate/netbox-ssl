@@ -87,10 +87,18 @@ class AuthMethodChoices(ChoiceSet):
 
     AUTH_BEARER = "bearer"
     AUTH_API_KEY = "api_key"
+    AUTH_AWS_EXPLICIT = "aws_explicit"
+    AUTH_AWS_INSTANCE_ROLE = "aws_instance_role"
+    AUTH_AZURE_EXPLICIT = "azure_explicit"
+    AUTH_AZURE_MANAGED_IDENTITY = "azure_managed_identity"
 
     CHOICES = [
         (AUTH_BEARER, "Bearer Token", "blue"),
         (AUTH_API_KEY, "API Key (Header)", "yellow"),
+        (AUTH_AWS_EXPLICIT, "AWS Explicit Credentials", "orange"),
+        (AUTH_AWS_INSTANCE_ROLE, "AWS Instance Role", "green"),
+        (AUTH_AZURE_EXPLICIT, "Azure Service Principal", "blue"),
+        (AUTH_AZURE_MANAGED_IDENTITY, "Azure Managed Identity", "green"),
     ]
 
 
@@ -125,18 +133,42 @@ class ExternalSource(NetBoxModel):
     )
     base_url = models.URLField(
         max_length=500,
+        blank=True,
         validators=[validate_external_source_url],
-        help_text="HTTPS API endpoint of the external source",
+        help_text=("HTTPS API endpoint of the external source. Not required for region-scoped adapters (AWS ACM)."),
     )
     auth_method = models.CharField(
         max_length=20,
         choices=AuthMethodChoices,
         help_text="Authentication method for the external source",
     )
+    auth_credentials = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Mapping of credential component name to a reference string "
+            "(e.g. {'access_key_id': 'env:AWS_KEY'}). "
+            "Leave empty for role-based auth methods "
+            "(aws_instance_role, azure_managed_identity)."
+        ),
+    )
+
+    region = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text=(
+            "Cloud region identifier (e.g., 'us-east-1'). "
+            "Required for region-scoped adapters such as AWS ACM; "
+            "ignored by others."
+        ),
+    )
+
     auth_credentials_reference = models.CharField(
         max_length=512,
         blank=True,
-        help_text='Credential reference (e.g., "env:LEMUR_API_TOKEN"). Never store actual secrets.',
+        help_text=(
+            "DEPRECATED in v1.1, removed in v2.0. Use auth_credentials instead — existing rows auto-migrate via 0021."
+        ),
     )
     field_mapping = models.JSONField(
         blank=True,
