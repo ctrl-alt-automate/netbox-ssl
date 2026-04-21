@@ -58,11 +58,17 @@ def resolve_ids(base_url: str, token: str | None) -> dict[str, int | None]:
         2. NetBox REST API lookup by name (needs NETBOX_TOKEN)
         3. fallback to PK=1
     """
+    def _pk_from_env(key: str) -> int | None:
+        """Parse a positive integer PK from an env var, tolerating empty or
+        non-numeric values (which fall through to the API/default resolution)."""
+        val = os.environ.get(key, "").strip()
+        return int(val) if val.isdigit() else None
+
     ids: dict[str, int | None] = {
-        "cert": int(os.environ["CERT_PK"]) if os.environ.get("CERT_PK") else None,
-        "ca": int(os.environ["CA_PK"]) if os.environ.get("CA_PK") else None,
-        "csr": int(os.environ["CSR_PK"]) if os.environ.get("CSR_PK") else None,
-        "source": int(os.environ["SOURCE_PK"]) if os.environ.get("SOURCE_PK") else None,
+        "cert": _pk_from_env("CERT_PK"),
+        "ca": _pk_from_env("CA_PK"),
+        "csr": _pk_from_env("CSR_PK"),
+        "source": _pk_from_env("SOURCE_PK"),
     }
 
     # Attempt API lookup for any still-unresolved IDs

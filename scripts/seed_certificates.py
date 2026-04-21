@@ -79,8 +79,12 @@ print("=" * 70)
 print("Seeding NetBox SSL certificate data")
 print("=" * 70)
 
-tenant_prod = Tenant.objects.get(slug="production")
-tenant_dev = Tenant.objects.get(slug="development")
+tenant_prod, _ = Tenant.objects.get_or_create(
+    slug="production", defaults={"name": "Production"}
+)
+tenant_dev, _ = Tenant.objects.get_or_create(
+    slug="development", defaults={"name": "Development"}
+)
 
 # ======================================================================
 # CERTIFICATE AUTHORITIES
