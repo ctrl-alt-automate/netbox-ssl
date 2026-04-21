@@ -21,46 +21,102 @@ MIGRATION_PATH = (
     / "0021_external_source_auth_credentials_and_region.py"
 )
 
-# ---------------------------------------------------------------------------
-# Guard: when running outside a NetBox container, stub out
-# netbox_ssl.models.external_source in sys.modules before the migration
-# module is imported. The migration does:
-#
-#   import netbox_ssl.models.external_source  # for validate_external_source_url
-#
-# Without the stub, importing the package triggers netbox_ssl/__init__.py
-# and the full Django model metaclass machinery, which requires a configured
-# Django settings environment.
-# ---------------------------------------------------------------------------
 try:
     _spec = importlib.util.find_spec("netbox")
     _NETBOX_AVAILABLE = _spec is not None and _spec.origin is not None
 except (ValueError, ModuleNotFoundError):
     _NETBOX_AVAILABLE = False
 
-if not _NETBOX_AVAILABLE:
-    # Stub the external_source module with only what the migration references:
-    # the validate_external_source_url callable (used as a field validator).
-    def _stub_validate_external_source_url(value: str) -> None:  # noqa: D401
-        """Stub validator — no-op in unit test environment."""
 
-    _es_stub = MagicMock()
-    _es_stub.validate_external_source_url = _stub_validate_external_source_url
-
-    sys.modules.setdefault("netbox_ssl.models.external_source", _es_stub)
-
-    # Also ensure the package namespace resolves so attribute access
-    # `netbox_ssl.models.external_source` on the module object works.
-    _netbox_ssl_stub = sys.modules.get("netbox_ssl", MagicMock())
-    if not hasattr(_netbox_ssl_stub, "models"):
-        _netbox_ssl_stub.models = MagicMock()
-    _netbox_ssl_stub.models.external_source = _es_stub
-    sys.modules.setdefault("netbox_ssl", _netbox_ssl_stub)
-    sys.modules.setdefault("netbox_ssl.models", _netbox_ssl_stub.models)
+def _stub_validate_external_source_url(value: str) -> None:
+    """Stub validator — no-op in unit test environment."""
 
 
-def _load_migration():
-    """Load the migration module via importlib, bypassing Django's app registry."""
+@pytest.fixture
+def migration_module(monkeypatch):
+    """Load the migration module with fresh stubs (isolated per test).
+
+    This fixture ensures that sys.modules is clean for the migration exec
+    by force-replacing all relevant entries using monkeypatch.setitem().
+    Monkeypatch automatically restores values after the test, preventing
+    cross-file sys.modules contamination from earlier test runs.
+
+    Important: When other test modules (e.g. test_external_source) use
+    sys.modules.setdefault() to install MagicMocks for parent packages
+    like "django.db", those MagicMocks can interfere with attribute access
+    on submodules like "django.db.migrations". We must recreate the entire
+    parent hierarchy with real objects to avoid this pollution.
+    """
+    if not _NETBOX_AVAILABLE:
+        # Create real operation classes so migration operations have proper names
+        # Note: class names must be AlterField (not _AlterField) so type(op).__name__ works
+        class AlterField:
+            """Stub for migrations.AlterField."""
+
+            def __init__(self, **kwargs):
+                self.name = kwargs.get("name")
+
+        class AddField:
+            """Stub for migrations.AddField."""
+
+            def __init__(self, **kwargs):
+                self.name = kwargs.get("name")
+
+        class RunPython:
+            """Stub for migrations.RunPython."""
+
+            def __init__(self, func, *args, **kwargs):
+                self.code = func
+
+            @staticmethod
+            def noop(*args, **kwargs):
+                """Stub noop method."""
+                pass
+
+        class Migration:
+            """Stub Django Migration class."""
+
+            operations = []
+            dependencies = []
+
+        # Rebuild the django.db hierarchy to avoid MagicMock attribute pollution
+        _django_db = MagicMock()
+        _django_db_migrations = MagicMock()
+        _django_db_migrations.Migration = Migration
+        _django_db_migrations.AlterField = AlterField
+        _django_db_migrations.AddField = AddField
+        _django_db_migrations.RunPython = RunPython
+        _django_db.migrations = _django_db_migrations
+
+        monkeypatch.setitem(sys.modules, "django.db.migrations", _django_db_migrations)
+        monkeypatch.setitem(sys.modules, "django.db", _django_db)
+
+        # Create a fresh netbox.plugins.PluginConfig stub (required by netbox_ssl/__init__.py)
+        _netbox_plugins = MagicMock()
+
+        class _StubPluginConfig:
+            pass
+
+        _netbox_plugins.PluginConfig = _StubPluginConfig
+
+        # Force-install Django + NetBox stubs so netbox_ssl/__init__.py can import
+        monkeypatch.setitem(sys.modules, "netbox.plugins", _netbox_plugins)
+
+        # Create fresh external_source stub (required by the migration)
+        es_stub = MagicMock()
+        es_stub.validate_external_source_url = _stub_validate_external_source_url
+
+        monkeypatch.setitem(sys.modules, "netbox_ssl.models.external_source", es_stub)
+
+        # Ensure the package namespace resolves correctly for attribute access
+        netbox_ssl_stub = MagicMock()
+        models_stub = MagicMock()
+        models_stub.external_source = es_stub
+        netbox_ssl_stub.models = models_stub
+
+        monkeypatch.setitem(sys.modules, "netbox_ssl", netbox_ssl_stub)
+        monkeypatch.setitem(sys.modules, "netbox_ssl.models", models_stub)
+
     spec = importlib.util.spec_from_file_location("mig0021", MIGRATION_PATH)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -72,27 +128,21 @@ def test_migration_file_exists():
     assert MIGRATION_PATH.is_file(), f"Migration not found at {MIGRATION_PATH}"
 
 
-def test_migration_defines_expected_operations():
-    module = _load_migration()
-
-    operation_types = [type(op).__name__ for op in module.Migration.operations]
+def test_migration_defines_expected_operations(migration_module):
+    operation_types = [type(op).__name__ for op in migration_module.Migration.operations]
     # Two AddFields (auth_credentials, region), two AlterFields (auth_method, base_url), one RunPython (backfill).
     assert operation_types.count("AddField") == 2
     assert operation_types.count("AlterField") == 2
     assert operation_types.count("RunPython") == 1
 
 
-def test_migration_adds_auth_credentials_and_region():
-    module = _load_migration()
-
-    addfield_names = [op.name for op in module.Migration.operations if type(op).__name__ == "AddField"]
+def test_migration_adds_auth_credentials_and_region(migration_module):
+    addfield_names = [op.name for op in migration_module.Migration.operations if type(op).__name__ == "AddField"]
     assert set(addfield_names) == {"auth_credentials", "region"}
 
 
-def test_migration_depends_on_0020():
-    module = _load_migration()
-
+def test_migration_depends_on_0020(migration_module):
     assert (
         "netbox_ssl",
         "0020_compliancetrendsnapshot_netboxmodel_fields",
-    ) in module.Migration.dependencies
+    ) in migration_module.Migration.dependencies
