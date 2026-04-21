@@ -60,6 +60,7 @@ class CertificateAuthorityType(NetBoxObjectType):
         "name",
         "source_type",
         "base_url",
+        "region",
         "auth_method",
         "sync_interval_minutes",
         "enabled",
@@ -75,12 +76,16 @@ class CertificateAuthorityType(NetBoxObjectType):
 class ExternalSourceType(NetBoxObjectType):
     """GraphQL type for ExternalSource model.
 
-    Note: auth_credentials_reference is intentionally excluded for security.
+    Note: auth_credentials and auth_credentials_reference are intentionally
+    excluded for security — both hold env-var references that would be a
+    reconnaissance leak if exposed. Use has_credentials to check
+    configuration presence.
     """
 
     name: str
     source_type: str
     base_url: str
+    region: str
     auth_method: str
     sync_interval_minutes: int
     enabled: bool
@@ -90,6 +95,17 @@ class ExternalSourceType(NetBoxObjectType):
     @strawberry_django.field
     def certificate_count(self) -> int:
         return self.certificates.count()
+
+    @strawberry_django.field
+    def has_credentials(self) -> bool:
+        """Are credentials configured for this source?
+
+        True for role-based auth (AWS instance role, Azure MI) even when
+        auth_credentials is empty — those methods authorize via host identity.
+        """
+        if self.auth_method in ("aws_instance_role", "azure_managed_identity"):
+            return True
+        return bool(self.auth_credentials) or bool(self.auth_credentials_reference)
 
 
 @strawberry_django.type(
