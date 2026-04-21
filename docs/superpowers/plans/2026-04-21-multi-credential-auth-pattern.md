@@ -194,9 +194,9 @@ git commit -m "feat(adapters): add CredentialField dataclass for per-adapter cre
 
 ---
 
-## Task 2: `CredentialResolver.resolve_many()`
+## Task 2: `CredentialResolver.resolve_many()` + promote `ENV_VAR_PATTERN`
 
-Extend the existing single-value resolver with a dict-shaped helper that resolves all components of a credentials dict in one call, failing fast if any component is missing.
+Extend the single-value resolver with a dict-shaped helper that resolves all components of a credentials dict in one call, failing fast on the first error. Also promote the module-private `_ENV_VAR_PATTERN` to a public `ENV_VAR_PATTERN` so the new `ExternalSourceSchemaValidator` can reuse the exact same regex.
 
 **Files:**
 - Modify: `netbox_ssl/utils/credential_resolver.py`
@@ -273,9 +273,42 @@ python -m pytest tests/test_credential_resolver_many.py -v -p no:django
 
 Expected: FAIL with `AttributeError: type object 'CredentialResolver' has no attribute 'resolve_many'`.
 
-- [ ] **Step 3: Add `resolve_many` method**
+- [ ] **Step 3: Promote `_ENV_VAR_PATTERN` to public `ENV_VAR_PATTERN`**
 
-Open `netbox_ssl/utils/credential_resolver.py`. After the existing `resolve` classmethod (ends around line 58) and before `_resolve_env` (starts around line 60), insert:
+Open `netbox_ssl/utils/credential_resolver.py`. At the top of the module, replace:
+
+```python
+_ENV_VAR_PATTERN = re.compile(r"^[A-Z_][A-Z0-9_]{0,254}$")
+```
+
+With:
+
+```python
+# Public: re-used by ExternalSourceSchemaValidator for early form-time
+# validation. Must match the resolver's own accepted format so runtime
+# resolution cannot fail on names the form silently accepted.
+ENV_VAR_PATTERN = re.compile(r"^[A-Z_][A-Z0-9_]{0,254}$")
+
+# Backward-compatible alias — keep until v2.0.0 in case any custom
+# subclass reads the private name.
+_ENV_VAR_PATTERN = ENV_VAR_PATTERN
+```
+
+Then find the single internal usage inside `_resolve_env` (around line 74):
+
+```python
+    if not _ENV_VAR_PATTERN.match(var_name):
+```
+
+Replace with:
+
+```python
+    if not ENV_VAR_PATTERN.match(var_name):
+```
+
+- [ ] **Step 4: Add `resolve_many` method**
+
+Still in `netbox_ssl/utils/credential_resolver.py`. After the existing `resolve` classmethod (ends around line 58) and before `_resolve_env` (starts around line 60), insert:
 
 ```python
     @classmethod
@@ -297,7 +330,7 @@ Open `netbox_ssl/utils/credential_resolver.py`. After the existing `resolve` cla
         return {name: cls.resolve(ref) for name, ref in references.items()}
 ```
 
-- [ ] **Step 4: Run tests to verify they all pass**
+- [ ] **Step 5: Run tests to verify they all pass**
 
 ```bash
 python -m pytest tests/test_credential_resolver_many.py -v -p no:django
@@ -305,18 +338,105 @@ python -m pytest tests/test_credential_resolver_many.py -v -p no:django
 
 Expected: 5 passed.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Run the existing credential_resolver tests to confirm the rename didn't break anything**
+
+```bash
+python -m pytest tests/ -v -p no:django -k "credential_resolver" --no-header 2>&1 | tail -10
+```
+
+Expected: all existing tests still pass.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add netbox_ssl/utils/credential_resolver.py tests/test_credential_resolver_many.py
-git commit -m "feat(resolver): add CredentialResolver.resolve_many() for dict-shaped refs"
+git commit -m "feat(resolver): add resolve_many() + promote ENV_VAR_PATTERN to public"
 ```
 
 ---
 
-## Task 3: `BaseAdapter.SUPPORTED_AUTH_METHODS` + `credential_schema()` classmethod
+## Task 2b: Extend `PROHIBITED_SYNC_FIELDS` safe-list
 
-Extend the abstract base with the schema-declaration contract. Concrete adapters override `credential_schema()`; the default raises for unsupported `auth_method`.
+Per the spec §11 and the Gemini review on PR #103, the safe-list of field names that external-source adapters must never accept from upstream payloads is expanded in Phase 1 so downstream adapters (AWS ACM #100, Azure Key Vault #101) inherit the protection without each having to re-declare it. The *enforcement* (code that asserts adapter responses contain none of these keys) lives in the adapter PRs.
+
+**Files:**
+- Modify: `netbox_ssl/adapters/base.py`
+- Test: `tests/test_credential_schema.py` (extend)
+
+- [ ] **Step 1: Write the failing test**
+
+Add to `tests/test_credential_schema.py` (end of file):
+
+```python
+def test_prohibited_sync_fields_includes_cloud_aliases():
+    """v1.1 extends the safe-list with AWS/Azure key-material aliases."""
+    from netbox_ssl.adapters.base import PROHIBITED_SYNC_FIELDS
+
+    # Pre-existing entries — must stay.
+    assert "private_key" in PROHIBITED_SYNC_FIELDS
+    assert "key_material" in PROHIBITED_SYNC_FIELDS
+    assert "p12" in PROHIBITED_SYNC_FIELDS
+    assert "pfx" in PROHIBITED_SYNC_FIELDS
+    assert "pkcs12" in PROHIBITED_SYNC_FIELDS
+
+    # v1.1 additions — Azure Key Vault + AWS ACM aliases.
+    assert "pem_bundle" in PROHIBITED_SYNC_FIELDS
+    assert "secret_value" in PROHIBITED_SYNC_FIELDS
+    assert "key" in PROHIBITED_SYNC_FIELDS
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+python -m pytest tests/test_credential_schema.py::test_prohibited_sync_fields_includes_cloud_aliases -v -p no:django
+```
+
+Expected: FAIL — `"pem_bundle" not in PROHIBITED_SYNC_FIELDS`.
+
+- [ ] **Step 3: Extend the safe-list**
+
+Open `netbox_ssl/adapters/base.py`. Locate the existing `PROHIBITED_SYNC_FIELDS` constant (around line 15). Replace it with:
+
+```python
+# Fields that must never be accepted from external sources.
+# Enforcement lives in each adapter's response-parsing code; this list
+# is the single source of truth consulted by those assertions.
+PROHIBITED_SYNC_FIELDS: frozenset[str] = frozenset(
+    {
+        # Pre-v1.1 entries
+        "private_key",
+        "key_material",
+        "p12",
+        "pfx",
+        "pkcs12",
+        # v1.1 additions for AWS ACM and Azure Key Vault parity
+        "pem_bundle",     # AWS ACM export-certificate bundle form
+        "secret_value",   # Azure Key Vault secret attribute
+        "key",            # Azure Key Vault certificate.key shortcut
+    }
+)
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+```bash
+python -m pytest tests/test_credential_schema.py::test_prohibited_sync_fields_includes_cloud_aliases -v -p no:django
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add netbox_ssl/adapters/base.py tests/test_credential_schema.py
+git commit -m "feat(adapters): extend PROHIBITED_SYNC_FIELDS with AWS/Azure key-material aliases"
+```
+
+---
+
+## Task 3: `BaseAdapter` adapter-requirements + `credential_schema()` classmethod
+
+Extend the abstract base with the schema-declaration contract and the two new class attributes — `REQUIRES_BASE_URL` (default `True`, consumer: Lemur / Generic REST / Azure KV) and `REQUIRES_REGION` (default `False`, consumer: AWS ACM). Concrete adapters override `credential_schema()`; the default raises for unsupported `auth_method`.
 
 **Files:**
 - Modify: `netbox_ssl/adapters/base.py`
@@ -331,6 +451,13 @@ def test_base_adapter_has_empty_supported_auth_methods():
     from netbox_ssl.adapters.base import BaseAdapter
 
     assert BaseAdapter.SUPPORTED_AUTH_METHODS == ()
+
+
+def test_base_adapter_default_requires_base_url():
+    from netbox_ssl.adapters.base import BaseAdapter
+
+    assert BaseAdapter.REQUIRES_BASE_URL is True
+    assert BaseAdapter.REQUIRES_REGION is False
 
 
 def test_base_adapter_credential_schema_rejects_unknown_auth_method():
@@ -357,6 +484,13 @@ Open `netbox_ssl/adapters/base.py`. Inside the `class BaseAdapter(ABC):` body, r
     # meaningful — the first entry is used as the default in the
     # ExternalSource form dropdown for this adapter.
     SUPPORTED_AUTH_METHODS: tuple[str, ...] = ()
+
+    # Adapter endpoint requirements consumed by ExternalSourceSchemaValidator.
+    # Lemur / Generic REST / Azure KV set REQUIRES_BASE_URL (inherited default).
+    # AWS ACM overrides to REQUIRES_BASE_URL = False, REQUIRES_REGION = True
+    # because boto3 derives endpoints from the region + service.
+    REQUIRES_BASE_URL: bool = True
+    REQUIRES_REGION: bool = False
 
     @classmethod
     def credential_schema(cls, auth_method: str) -> dict[str, "CredentialField"]:
@@ -390,13 +524,13 @@ Note: the return type string `"CredentialField"` uses a forward reference becaus
 python -m pytest tests/test_credential_schema.py -v -p no:django
 ```
 
-Expected: 5 passed.
+Expected: 6 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add netbox_ssl/adapters/base.py tests/test_credential_schema.py
-git commit -m "feat(adapters): add SUPPORTED_AUTH_METHODS + credential_schema() to BaseAdapter"
+git commit -m "feat(adapters): add SUPPORTED_AUTH_METHODS + REQUIRES_* + credential_schema() to BaseAdapter"
 ```
 
 ---
@@ -884,7 +1018,7 @@ git commit -m "feat(adapters): add registry helpers get_adapter_class/get_suppor
 
 ---
 
-## Task 8: Extend `AuthMethodChoices` + add `auth_credentials` field to `ExternalSource`
+## Task 8: Extend `AuthMethodChoices` + add `auth_credentials` + `region` + relax `base_url`
 
 **Files:**
 - Modify: `netbox_ssl/models/external_source.py`
@@ -918,6 +1052,24 @@ def test_external_source_has_auth_credentials_field():
                    if not f.many_to_many and not f.one_to_many]
     assert "auth_credentials" in field_names
     assert "auth_credentials_reference" in field_names  # still present, deprecated
+
+
+@pytest.mark.unit
+def test_external_source_has_region_field():
+    from netbox_ssl.models.external_source import ExternalSource
+
+    field_names = [f.name for f in ExternalSource._meta.get_fields()
+                   if not f.many_to_many and not f.one_to_many]
+    assert "region" in field_names
+
+
+@pytest.mark.unit
+def test_external_source_base_url_is_optional():
+    """base_url becomes optional in v1.1 so AWS ACM sources can omit it."""
+    from netbox_ssl.models.external_source import ExternalSource
+
+    base_url_field = ExternalSource._meta.get_field("base_url")
+    assert base_url_field.blank is True
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -953,7 +1105,7 @@ class AuthMethodChoices(ChoiceSet):
     ]
 ```
 
-- [ ] **Step 4: Add `auth_credentials` field + deprecate help_text**
+- [ ] **Step 4: Add `auth_credentials` field + `region` field + deprecate help_text**
 
 In the same file, find the `auth_credentials_reference` field definition (around line 136). Immediately before it, add:
 
@@ -966,6 +1118,16 @@ In the same file, find the `auth_credentials_reference` field definition (around
             "(e.g. {'access_key_id': 'env:AWS_KEY'}). "
             "Leave empty for role-based auth methods "
             "(aws_instance_role, azure_managed_identity)."
+        ),
+    )
+
+    region = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text=(
+            "Cloud region identifier (e.g., 'us-east-1'). "
+            "Required for region-scoped adapters such as AWS ACM; "
+            "ignored by others."
         ),
     )
 ```
@@ -993,27 +1155,55 @@ With:
     )
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [ ] **Step 5: Relax `base_url` to `blank=True`**
 
-```bash
-python -m pytest tests/test_external_source.py::test_auth_method_choices_include_cloud_methods tests/test_external_source.py::test_external_source_has_auth_credentials_field -v -p no:django
+Still in `netbox_ssl/models/external_source.py`. Find the `base_url` field definition (should be near the top of the `ExternalSource` model, around line 125). Replace:
+
+```python
+    base_url = models.URLField(
+        max_length=500,
+        validators=[validate_external_source_url],
+        help_text="HTTPS API endpoint of the external source",
+    )
 ```
 
-Expected: 2 passed.
+With:
 
-- [ ] **Step 6: Commit**
+```python
+    base_url = models.URLField(
+        max_length=500,
+        blank=True,
+        validators=[validate_external_source_url],
+        help_text=(
+            "HTTPS API endpoint of the external source. "
+            "Not required for region-scoped adapters (AWS ACM)."
+        ),
+    )
+```
+
+- [ ] **Step 6: Run tests to verify they pass**
+
+```bash
+python -m pytest tests/test_external_source.py -v -p no:django -k "auth_method_choices or auth_credentials_field or region_field or base_url_is_optional"
+```
+
+Expected: 4 passed.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add netbox_ssl/models/external_source.py tests/test_external_source.py
-git commit -m "feat(models): add auth_credentials JSONField + 4 new auth_method values"
+git commit -m "feat(models): add auth_credentials, region; relax base_url; 4 new auth_methods"
 ```
 
 ---
 
-## Task 9: Migration 0021 — add field + backfill from `auth_credentials_reference`
+## Task 9: Migration 0021 — add `auth_credentials` + `region`, relax `base_url`, backfill
+
+One migration applies all three v1.1 infrastructure schema changes so Phase 2/3 adapters need no further model migrations.
 
 **Files:**
-- Create: `netbox_ssl/migrations/0021_external_source_auth_credentials.py`
+- Create: `netbox_ssl/migrations/0021_external_source_auth_credentials_and_region.py`
 - Test: `tests/test_migration_0021.py` (inline integration-style test)
 
 - [ ] **Step 1: Write the failing test**
@@ -1038,7 +1228,7 @@ MIGRATION_PATH = (
     Path(__file__).resolve().parent.parent
     / "netbox_ssl"
     / "migrations"
-    / "0021_external_source_auth_credentials.py"
+    / "0021_external_source_auth_credentials_and_region.py"
 )
 
 
@@ -1046,15 +1236,29 @@ def test_migration_file_exists():
     assert MIGRATION_PATH.is_file(), f"Migration not found at {MIGRATION_PATH}"
 
 
-def test_migration_defines_addfield_and_runpython():
+def test_migration_defines_expected_operations():
     spec = importlib.util.spec_from_file_location("mig0021", MIGRATION_PATH)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
 
     operation_types = [type(op).__name__ for op in module.Migration.operations]
-    assert "AddField" in operation_types
-    assert "RunPython" in operation_types
+    # Two AddFields (auth_credentials, region), one AlterField (base_url), one RunPython (backfill).
+    assert operation_types.count("AddField") == 2
+    assert operation_types.count("AlterField") == 1
+    assert operation_types.count("RunPython") == 1
+
+
+def test_migration_adds_auth_credentials_and_region():
+    spec = importlib.util.spec_from_file_location("mig0021", MIGRATION_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    addfield_names = [
+        op.name for op in module.Migration.operations
+        if type(op).__name__ == "AddField"
+    ]
+    assert set(addfield_names) == {"auth_credentials", "region"}
 
 
 def test_migration_depends_on_0020():
@@ -1075,12 +1279,13 @@ Expected: FAIL — file does not exist.
 
 - [ ] **Step 3: Create the migration file**
 
-Create `netbox_ssl/migrations/0021_external_source_auth_credentials.py`:
+Create `netbox_ssl/migrations/0021_external_source_auth_credentials_and_region.py`:
 
 ```python
-"""Add auth_credentials JSONField to ExternalSource.
+"""Add auth_credentials JSONField + region CharField to ExternalSource;
+relax base_url to blank=True for region-scoped adapters (AWS ACM).
 
-Backfills the new field from the deprecated auth_credentials_reference
+Backfills auth_credentials from the deprecated auth_credentials_reference
 CharField so existing Lemur / Generic REST configurations continue to
 work without operator action.
 
@@ -1089,6 +1294,8 @@ auth_credentials_reference is kept for one minor cycle and removed in v2.0.0.
 """
 
 from django.db import migrations, models
+
+import netbox_ssl.models.external_source  # for validate_external_source_url
 
 
 def _migrate_auth_credentials(apps, schema_editor):
@@ -1117,6 +1324,20 @@ class Migration(migrations.Migration):
             name="auth_credentials",
             field=models.JSONField(blank=True, default=dict),
         ),
+        migrations.AddField(
+            model_name="externalsource",
+            name="region",
+            field=models.CharField(blank=True, max_length=32),
+        ),
+        migrations.AlterField(
+            model_name="externalsource",
+            name="base_url",
+            field=models.URLField(
+                blank=True,
+                max_length=500,
+                validators=[netbox_ssl.models.external_source.validate_external_source_url],
+            ),
+        ),
         migrations.RunPython(
             _migrate_auth_credentials,
             reverse_code=migrations.RunPython.noop,
@@ -1130,7 +1351,7 @@ class Migration(migrations.Migration):
 python -m pytest tests/test_migration_0021.py -v -p no:django
 ```
 
-Expected: 3 passed.
+Expected: 4 passed.
 
 - [ ] **Step 5: Apply migration locally to catch any Django-level syntax errors**
 
@@ -1157,8 +1378,8 @@ Expected: the Lemur (demo) source should show `auth_credentials={'token': 'env:L
 - [ ] **Step 7: Commit**
 
 ```bash
-git add netbox_ssl/migrations/0021_external_source_auth_credentials.py tests/test_migration_0021.py
-git commit -m "feat(migrations): 0021 add auth_credentials JSONField with data backfill"
+git add netbox_ssl/migrations/0021_external_source_auth_credentials_and_region.py tests/test_migration_0021.py
+git commit -m "feat(migrations): 0021 add auth_credentials + region; relax base_url; backfill refs"
 ```
 
 ---
@@ -1432,7 +1653,94 @@ def test_validator_accepts_bare_varname_as_env_ref():
         source_type="lemur",
         auth_method="bearer",
         auth_credentials={"token": "LEGACY_BARE_VAR_NAME"},
+        base_url="https://example.com",
     )  # should not raise
+
+
+def test_validator_rejects_empty_path_after_scheme():
+    """env: with nothing after must be rejected at form time."""
+    from django.core.exceptions import ValidationError
+    from netbox_ssl.utils.external_source_validator import (
+        ExternalSourceSchemaValidator,
+    )
+
+    with pytest.raises(ValidationError) as exc:
+        ExternalSourceSchemaValidator.validate(
+            source_type="lemur",
+            auth_method="bearer",
+            auth_credentials={"token": "env:"},
+            base_url="https://example.com",
+        )
+    assert "empty path" in str(exc.value).lower()
+
+
+def test_validator_rejects_invalid_env_var_name():
+    """Env var names must match ENV_VAR_PATTERN (uppercase, digits, underscore)."""
+    from django.core.exceptions import ValidationError
+    from netbox_ssl.utils.external_source_validator import (
+        ExternalSourceSchemaValidator,
+    )
+
+    # lowercase letters not allowed
+    with pytest.raises(ValidationError) as exc:
+        ExternalSourceSchemaValidator.validate(
+            source_type="lemur",
+            auth_method="bearer",
+            auth_credentials={"token": "env:lowercase_var"},
+            base_url="https://example.com",
+        )
+    assert "valid environment variable name" in str(exc.value).lower()
+
+    # Hyphens not allowed
+    with pytest.raises(ValidationError):
+        ExternalSourceSchemaValidator.validate(
+            source_type="lemur",
+            auth_method="bearer",
+            auth_credentials={"token": "env:HAS-HYPHENS"},
+            base_url="https://example.com",
+        )
+
+
+def test_validator_rejects_missing_base_url_when_required():
+    """Lemur requires base_url — empty string must be rejected."""
+    from django.core.exceptions import ValidationError
+    from netbox_ssl.utils.external_source_validator import (
+        ExternalSourceSchemaValidator,
+    )
+
+    with pytest.raises(ValidationError) as exc:
+        ExternalSourceSchemaValidator.validate(
+            source_type="lemur",
+            auth_method="bearer",
+            auth_credentials={"token": "env:TOKEN"},
+            base_url="",   # missing
+        )
+    assert "base_url" in exc.value.message_dict
+
+
+def test_validator_accepts_base_url_omitted_when_not_required():
+    """AWS ACM (hypothetical) would have REQUIRES_BASE_URL=False. Since Task 3
+    set the default to True, this test uses LemurAdapter; intended behavior is
+    covered by Phase 2 once AWS adapter ships. Skeleton for coverage."""
+    # Phase 1 adapters (Lemur, Generic REST) all require base_url.
+    # This test is a placeholder for the AWS path; full assertion
+    # lives in #100's implementation PR.
+    pass
+
+
+def test_validator_does_not_require_region_for_lemur():
+    """region check only fires for adapters with REQUIRES_REGION = True."""
+    from netbox_ssl.utils.external_source_validator import (
+        ExternalSourceSchemaValidator,
+    )
+    # Should not raise — Lemur.REQUIRES_REGION is False (default).
+    ExternalSourceSchemaValidator.validate(
+        source_type="lemur",
+        auth_method="bearer",
+        auth_credentials={"token": "env:TOKEN"},
+        base_url="https://example.com",
+        region="",
+    )
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -1460,11 +1768,11 @@ from __future__ import annotations
 from django.core.exceptions import ValidationError
 
 from ..adapters import get_adapter_class
-from .credential_resolver import CredentialResolver
+from .credential_resolver import ENV_VAR_PATTERN, CredentialResolver
 
 
 class ExternalSourceSchemaValidator:
-    """Validate an ExternalSource credential payload.
+    """Validate an ExternalSource payload against adapter requirements.
 
     All validation methods raise Django ValidationError with a dict of
     field-specific errors so callers (form, serializer) can surface them
@@ -1476,13 +1784,17 @@ class ExternalSourceSchemaValidator:
         source_type: str,
         auth_method: str,
         auth_credentials: dict,
+        base_url: str = "",
+        region: str = "",
     ) -> None:
-        """Validate credential payload against the adapter's schema.
+        """Validate credential payload + adapter requirements.
 
         Args:
-            source_type: The ExternalSource.source_type value.
-            auth_method: The auth_method identifier.
+            source_type:      The ExternalSource.source_type value.
+            auth_method:      The auth_method identifier.
             auth_credentials: The credential references dict to validate.
+            base_url:         The ExternalSource.base_url value (may be empty).
+            region:           The ExternalSource.region value (may be empty).
 
         Raises:
             ValidationError: With a field-specific error dict.
@@ -1505,7 +1817,20 @@ class ExternalSourceSchemaValidator:
                 )}
             )
 
-        # 3. Schema compliance
+        # 3. Adapter endpoint requirements (base_url, region)
+        if adapter_cls.REQUIRES_BASE_URL and not base_url:
+            raise ValidationError(
+                {"base_url": f"{adapter_cls.__name__} requires a base URL."}
+            )
+        if adapter_cls.REQUIRES_REGION and not region:
+            raise ValidationError(
+                {"region": (
+                    f"{adapter_cls.__name__} requires a region "
+                    "(e.g., 'us-east-1')."
+                )}
+            )
+
+        # 4. Schema compliance for auth_credentials
         schema = adapter_cls.credential_schema(auth_method)
 
         extra_keys = set(auth_credentials.keys()) - set(schema.keys())
@@ -1526,7 +1851,7 @@ class ExternalSourceSchemaValidator:
                     )}
                 )
 
-        # 4. Reference format — does NOT resolve (see spec §9.1)
+        # 5. Reference format — strict match against ENV_VAR_PATTERN
         for key, ref in auth_credentials.items():
             if not isinstance(ref, str) or not ref.strip():
                 raise ValidationError(
@@ -1534,8 +1859,11 @@ class ExternalSourceSchemaValidator:
                         f"Credential '{key}' must be a non-empty string reference"
                     )}
                 )
+
             if ":" in ref:
-                scheme = ref.split(":", 1)[0].strip().lower()
+                scheme, _, path = ref.partition(":")
+                scheme = scheme.strip().lower()
+                path = path.strip()
                 if scheme not in CredentialResolver.SUPPORTED_SCHEMES:
                     raise ValidationError(
                         {"auth_credentials": (
@@ -1544,6 +1872,27 @@ class ExternalSourceSchemaValidator:
                             f"Supported: {sorted(CredentialResolver.SUPPORTED_SCHEMES)}"
                         )}
                     )
+                if not path:
+                    raise ValidationError(
+                        {"auth_credentials": (
+                            f"Credential '{key}' has an empty path after "
+                            f"'{scheme}:'. Provide an env-var name, e.g. 'env:MY_TOKEN'."
+                        )}
+                    )
+                var_name = path
+            else:
+                var_name = ref.strip()
+
+            # 6. Env-var name must match the resolver's allowed pattern
+            if not ENV_VAR_PATTERN.match(var_name):
+                raise ValidationError(
+                    {"auth_credentials": (
+                        f"Credential '{key}' references '{var_name}', which is "
+                        "not a valid environment variable name. "
+                        "Names must start with an uppercase letter or underscore "
+                        "and contain only uppercase letters, digits, and underscores."
+                    )}
+                )
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -1552,13 +1901,13 @@ class ExternalSourceSchemaValidator:
 python -m pytest tests/test_external_source_validator.py -v -p no:django
 ```
 
-Expected: 9 passed.
+Expected: 14 passed (9 original + 1 empty-path + 2 ENV_VAR_PATTERN + 1 base_url required + 1 region check placeholder).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add netbox_ssl/utils/external_source_validator.py tests/test_external_source_validator.py
-git commit -m "feat(utils): add ExternalSourceSchemaValidator as single source of truth"
+git commit -m "feat(utils): ExternalSourceSchemaValidator with ENV_VAR_PATTERN + base_url/region checks"
 ```
 
 ---
@@ -1701,6 +2050,7 @@ class ExternalSourceForm(NetBoxModelForm):
             "name",
             "source_type",
             "base_url",
+            "region",
             "auth_method",
             "auth_credentials",
             "field_mapping",
@@ -1716,6 +2066,8 @@ class ExternalSourceForm(NetBoxModelForm):
             source_type=cleaned.get("source_type"),
             auth_method=cleaned.get("auth_method"),
             auth_credentials=cleaned.get("auth_credentials") or {},
+            base_url=cleaned.get("base_url") or "",
+            region=cleaned.get("region") or "",
         )
         return cleaned
 ```
@@ -1769,28 +2121,36 @@ Open `netbox_ssl/api/serializers/external_sources.py`. In the `ExternalSourceSer
     )
 ```
 
-2. In the `Meta.fields` list, add `"auth_credentials"` next to `"auth_credentials_reference"`.
+2. In the `Meta.fields` list, add `"auth_credentials"` next to `"auth_credentials_reference"`, and add `"region"` next to `"base_url"`.
 
 3. At the end of the class (after `get_has_credentials`), add:
 
 ```python
     def validate(self, attrs):
-        """Validate credential payload against adapter schema."""
+        """Validate credential payload against adapter schema + requirements."""
         from ...utils.external_source_validator import ExternalSourceSchemaValidator
 
         source_type = attrs.get("source_type")
         auth_method = attrs.get("auth_method")
         auth_credentials = attrs.get("auth_credentials") or {}
+        base_url = attrs.get("base_url")
+        region = attrs.get("region")
 
         # On PATCH, instance fields fill in missing attrs
         if self.instance is not None:
             source_type = source_type or self.instance.source_type
             auth_method = auth_method or self.instance.auth_method
+            if base_url is None:
+                base_url = self.instance.base_url
+            if region is None:
+                region = self.instance.region
 
         ExternalSourceSchemaValidator.validate(
             source_type=source_type,
             auth_method=auth_method,
             auth_credentials=auth_credentials,
+            base_url=base_url or "",
+            region=region or "",
         )
         return attrs
 ```
@@ -1876,9 +2236,15 @@ python -m pytest tests/test_external_source_graphql.py -v -p no:django
 
 Expected: FAIL on `has_credentials` check (already passes on exclusion check).
 
-- [ ] **Step 3: Add `has_credentials` computed field**
+- [ ] **Step 3: Add `region` to the ExternalSourceType field list + `has_credentials` computed field**
 
-Open `netbox_ssl/graphql/types.py`. Locate the `ExternalSourceType` class (around line 75). Inside the class, after the existing `certificate_count` method, add:
+Open `netbox_ssl/graphql/types.py`. Locate the `ExternalSourceType` class (around line 75). Find the existing explicit annotations list (starts with `name: str`). Add `region: str` between `base_url` and `auth_method`:
+
+```python
+    region: str
+```
+
+Then inside the class, after the existing `certificate_count` method, add:
 
 ```python
     @strawberry_django.field
@@ -2323,19 +2689,20 @@ Expected: browser opens the PR. Close the browser when done.
 
 Run through the spec §11 Phase 1 items one more time. Each should map to at least one task above:
 
-1. ✓ `CredentialField` + `resolve_many()` — Tasks 1, 2
+1. ✓ `CredentialField` + `resolve_many()` + `ENV_VAR_PATTERN` promotion — Tasks 1, 2
 2. ✓ `AuthMethodChoices` with 4 new values — Task 8
-3. ✓ `auth_credentials` field + migration 0021 — Tasks 8, 9
-4. ✓ `BaseAdapter` `SUPPORTED_AUTH_METHODS` + `credential_schema()` — Task 3
+3. ✓ `auth_credentials` + `region` fields + relax `base_url` + migration 0021 — Tasks 8, 9
+4. ✓ `BaseAdapter` `SUPPORTED_AUTH_METHODS` + `REQUIRES_BASE_URL` + `REQUIRES_REGION` + `credential_schema()` — Task 3
 5. ✓ `LemurAdapter` + `GenericRESTAdapter` schemas — Tasks 4, 5
-6. ✓ `ExternalSourceSchemaValidator` — Task 11
-7. ✓ `ExternalSourceForm` — Task 12
-8. ✓ Serializer `auth_credentials` + `has_credentials` + `validate()` — Task 13
-9. ✓ GraphQL exclusion — Task 14
-10. ✓ `snapshot()` scrub — Task 10
-11. ✓ ROADMAP §8.2 entry — Task 15
-12. ✓ `docs/how-to/external-sources.md` — Task 16
-13. ✓ CHANGELOG — Task 17
+6. ✓ `PROHIBITED_SYNC_FIELDS` extension — Task 2b
+7. ✓ `ExternalSourceSchemaValidator` (schema + ENV_VAR_PATTERN + base_url/region) — Task 11
+8. ✓ `ExternalSourceForm` — Task 12
+9. ✓ Serializer `auth_credentials` + `region` + `has_credentials` + `validate()` — Task 13
+10. ✓ GraphQL exclusion + `region` + `has_credentials` — Task 14
+11. ✓ `snapshot()` scrub — Task 10
+12. ✓ ROADMAP §8.2 entry — Task 15
+13. ✓ `docs/how-to/external-sources.md` — Task 16
+14. ✓ CHANGELOG — Task 17
 
 Plus `BaseAdapter.resolve_credentials()` returns dict + `_get_headers()` reads `creds["token"]` — Task 6.
 

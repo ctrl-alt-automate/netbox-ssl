@@ -165,6 +165,36 @@ class ExternalSource(NetBoxModel):
         ),
     )
 
+    # NEW — cloud-region discriminator (v1.1)
+    # Used by region-scoped adapters (AWS ACM). Ignored by others.
+    # Free-text on purpose: AWS region naming evolves (us-east-1,
+    # eu-west-2, ap-southeast-3, ...) and we don't want a hard-coded
+    # enum the plugin must track.
+    region = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text=(
+            "Cloud region identifier (e.g., 'us-east-1'). "
+            "Required for region-scoped adapters such as AWS ACM; "
+            "ignored by others."
+        ),
+    )
+
+    # CHANGED — base_url becomes optional (v1.1)
+    # Some adapters (AWS ACM) derive endpoints from region + service
+    # and do not use base_url at all. Adapters that DO require a base
+    # URL (Lemur, Generic REST, Azure Key Vault) enforce it via
+    # REQUIRES_BASE_URL class attribute + form-level validation.
+    base_url = models.URLField(
+        max_length=500,
+        blank=True,  # was: not set (implicit False)
+        validators=[validate_external_source_url],
+        help_text=(
+            "HTTPS API endpoint of the external source. "
+            "Not required for region-scoped adapters (AWS ACM)."
+        ),
+    )
+
     # DEPRECATED — preserved one minor cycle, removed in v2.0.0
     auth_credentials_reference = models.CharField(
         max_length=512,
@@ -176,15 +206,40 @@ class ExternalSource(NetBoxModel):
     )
 ```
 
-Neither field has `null=True` — `auth_credentials` defaults to `{}`, `auth_credentials_reference` defaults to `""`. Empty is a valid state for role-based auth.
+Fields have `null=True` only if the existing schema already set it; `blank=True` covers the "empty acceptable" state at form-level. Empty `auth_credentials` is valid for role-based auth, empty `base_url` is valid for region-scoped adapters, empty `region` is valid for everyone else.
 
-### 5.3 Validation is **form-level, not DB-level**
+### 5.3 Adapter class-attribute declarations
+
+To keep cloud-vs-classic endpoint differences out of the model-level validation, adapters declare their requirements via class attributes:
+
+```python
+class BaseAdapter(ABC):
+    SUPPORTED_AUTH_METHODS: tuple[str, ...] = ()
+    REQUIRES_BASE_URL: bool = True   # Lemur / Generic REST / Azure KV
+    REQUIRES_REGION: bool = False    # only AWS ACM overrides to True
+
+
+class AwsAcmAdapter(BaseAdapter):
+    REQUIRES_BASE_URL = False
+    REQUIRES_REGION = True
+
+
+class AzureKvAdapter(BaseAdapter):
+    REQUIRES_BASE_URL = True   # vault URL lives in base_url
+    REQUIRES_REGION = False
+```
+
+Form-level validation consults these attributes; see §9 for the validator logic.
+
+### 5.4 Validation is **form-level, not DB-level**
 
 Because the same model must accept both explicit-credentials rows and role-based rows (which have empty `auth_credentials`), DB-level constraints cannot enforce schema compliance. Form validation (and equivalent serializer validation) is the single gate. See §8.
 
 ## 6. Migration path
 
-### 6.1 Migration `0021_external_source_auth_credentials`
+### 6.1 Migration `0021_external_source_auth_credentials_and_region`
+
+The single migration adds both the `auth_credentials` JSONField and the new `region` CharField, and relaxes `base_url` to `blank=True`. One migration keeps the v1.1 infrastructure atomic — Phase 2/3 adapters don't need further schema migrations.
 
 ```python
 def _migrate_auth_credentials(apps, schema_editor):
@@ -205,6 +260,16 @@ class Migration(migrations.Migration):
             model_name="externalsource",
             name="auth_credentials",
             field=models.JSONField(blank=True, default=dict),
+        ),
+        migrations.AddField(
+            model_name="externalsource",
+            name="region",
+            field=models.CharField(blank=True, max_length=32),
+        ),
+        migrations.AlterField(
+            model_name="externalsource",
+            name="base_url",
+            field=models.URLField(blank=True, max_length=500),
         ),
         migrations.RunPython(_migrate_auth_credentials, migrations.RunPython.noop),
     ]
@@ -478,22 +543,41 @@ Documentation must make this clear:
 
 A utility class used by the form, serializer, and any future management command. Prevents validation drift between API and UI.
 
+**Scope of this validator:** credential schema compliance, reference-format correctness (env-var name regex, non-empty path), and adapter-level `REQUIRES_BASE_URL` / `REQUIRES_REGION` requirements. It does NOT resolve env-refs (that would leak whether a specific env-var is set on the NetBox host).
+
 ```python
 # netbox_ssl/utils/external_source_validator.py
 
 class ExternalSourceSchemaValidator:
-    """Validate ExternalSource credential payload against the adapter schema."""
+    """Validate ExternalSource payload against the adapter schema + requirements."""
 
     @staticmethod
-    def validate(source_type: str, auth_method: str, auth_credentials: dict) -> None:
-        """Raise ValidationError with field-specific errors, or return cleanly."""
-        from ..adapters import get_adapter_class
+    def validate(
+        source_type: str,
+        auth_method: str,
+        auth_credentials: dict,
+        base_url: str = "",
+        region: str = "",
+    ) -> None:
+        """Raise ValidationError with field-specific errors, or return cleanly.
 
+        Args:
+            source_type:       The ExternalSource.source_type value.
+            auth_method:       The auth_method identifier.
+            auth_credentials:  The credential references dict.
+            base_url:          The ExternalSource.base_url value (may be empty).
+            region:            The ExternalSource.region value (may be empty).
+        """
+        from ..adapters import get_adapter_class
+        from .credential_resolver import CredentialResolver, ENV_VAR_PATTERN
+
+        # 1. source_type must be known
         try:
             adapter_cls = get_adapter_class(source_type)
         except KeyError:
             raise ValidationError({"source_type": f"Unknown source_type '{source_type}'"})
 
+        # 2. auth_method must be supported by this adapter
         if auth_method not in adapter_cls.SUPPORTED_AUTH_METHODS:
             raise ValidationError({
                 "auth_method": (
@@ -502,6 +586,20 @@ class ExternalSourceSchemaValidator:
                 )
             })
 
+        # 3. base_url and region requirements per adapter
+        if adapter_cls.REQUIRES_BASE_URL and not base_url:
+            raise ValidationError({
+                "base_url": f"{adapter_cls.__name__} requires a base URL."
+            })
+        if adapter_cls.REQUIRES_REGION and not region:
+            raise ValidationError({
+                "region": (
+                    f"{adapter_cls.__name__} requires a region "
+                    "(e.g., 'us-east-1')."
+                )
+            })
+
+        # 4. Schema compliance for auth_credentials
         schema = adapter_cls.credential_schema(auth_method)
 
         extra_keys = set(auth_credentials.keys()) - set(schema.keys())
@@ -517,10 +615,12 @@ class ExternalSourceSchemaValidator:
             if field_spec.required and key not in auth_credentials:
                 raise ValidationError({
                     "auth_credentials": (
-                        f"Missing required credential '{key}' ({field_spec.label})"
+                        f"Missing required credential '{key}' "
+                        f"({field_spec.label or key})"
                     )
                 })
 
+        # 5. Reference format — strict match against ENV_VAR_PATTERN
         for key, ref in auth_credentials.items():
             if not isinstance(ref, str) or not ref.strip():
                 raise ValidationError({
@@ -528,8 +628,14 @@ class ExternalSourceSchemaValidator:
                         f"Credential '{key}' must be a non-empty string reference"
                     )
                 })
+
+            # Split scheme and path. If no colon, the whole string is the
+            # env-var name (legacy bare form the CredentialResolver still
+            # accepts).
             if ":" in ref:
-                scheme = ref.split(":", 1)[0].strip().lower()
+                scheme, _, path = ref.partition(":")
+                scheme = scheme.strip().lower()
+                path = path.strip()
                 if scheme not in CredentialResolver.SUPPORTED_SCHEMES:
                     raise ValidationError({
                         "auth_credentials": (
@@ -537,9 +643,34 @@ class ExternalSourceSchemaValidator:
                             f"Supported: {sorted(CredentialResolver.SUPPORTED_SCHEMES)}"
                         )
                     })
+                if not path:
+                    raise ValidationError({
+                        "auth_credentials": (
+                            f"Credential '{key}' has an empty path after '{scheme}:'. "
+                            "Provide an env-var name, e.g. 'env:MY_TOKEN'."
+                        )
+                    })
+                var_name = path
+            else:
+                var_name = ref.strip()
+
+            # 6. Env-var name must match the resolver's allowed pattern
+            # so runtime resolution cannot fail on a format the form
+            # silently accepted.
+            if not ENV_VAR_PATTERN.match(var_name):
+                raise ValidationError({
+                    "auth_credentials": (
+                        f"Credential '{key}' references '{var_name}', which is not "
+                        "a valid environment variable name. "
+                        "Names must start with an uppercase letter or underscore "
+                        "and contain only uppercase letters, digits, and underscores."
+                    )
+                })
 ```
 
-**Validator does not resolve env-refs** — that would implicitly leak whether a specific env-var is set on the NetBox host. First real resolve happens at `test_connection()` or first sync.
+**`ENV_VAR_PATTERN` promotion.** `CredentialResolver` currently keeps the regex as a module-private `_ENV_VAR_PATTERN`. Phase 1 promotes it to a public `ENV_VAR_PATTERN` so the validator can reuse the single source of truth without a leading underscore.
+
+**Validator still does not resolve env-refs.** Early-validating the *name* format is a property of the reference string, not of the NetBox host's environment. First real resolve happens at `test_connection()` or first sync.
 
 ### 9.2 Form
 
@@ -750,19 +881,20 @@ This spec ships as a single PR that lands the auth-pattern infrastructure. Downs
 
 **Phase 1 — RFC infrastructure (this spec's implementation):**
 
-1. Add `CredentialField` dataclass + `resolve_many()` to `CredentialResolver`.
+1. Add `CredentialField` dataclass + `resolve_many()` to `CredentialResolver`; promote `_ENV_VAR_PATTERN` to public `ENV_VAR_PATTERN` so the validator can reuse it.
 2. Extend `AuthMethodChoices` with the four new enum values.
-3. Add `auth_credentials` field + migration 0021 (with data backfill).
-4. Extend `BaseAdapter` with `SUPPORTED_AUTH_METHODS` + `credential_schema()` classmethod.
-5. Add schemas to `LemurAdapter` + `GenericRESTAdapter` (backward-compat trivial case).
-6. Add `ExternalSourceSchemaValidator` utility.
-7. Add `ExternalSourceForm` with schema-driven `clean()`.
-8. Extend `ExternalSourceSerializer` with `auth_credentials` (write_only), `has_credentials` (read-only), `validate()` via the validator.
-9. Exclude `auth_credentials` from GraphQL types.
-10. Scrub `auth_credentials` in `ExternalSource.snapshot()`.
-11. Update ROADMAP §8 with deprecation entry for `auth_credentials_reference`.
-12. Update docs: `docs/how-to/external-source-ingestion.md` with the new JSON shape + deprecation note.
-13. Tests across all layers per §10.
+3. Add `auth_credentials` JSONField, `region` CharField, relax `base_url` to `blank=True`; migration 0021 applies all three changes + data backfill.
+4. Extend `BaseAdapter` with `SUPPORTED_AUTH_METHODS`, `credential_schema()` classmethod, and the `REQUIRES_BASE_URL` / `REQUIRES_REGION` class attributes.
+5. Add schemas to `LemurAdapter` + `GenericRESTAdapter` (backward-compat trivial case). Both inherit `REQUIRES_BASE_URL = True`, `REQUIRES_REGION = False`.
+6. Extend `PROHIBITED_SYNC_FIELDS` in `adapters/base.py` with AWS/Azure key-material aliases — `pem_bundle`, `pfx`, `pkcs12`, `secret_value`, `key`. The list itself ships in Phase 1 as a **safe-list** so it is in place when the Phase 2/3 adapters land; the *code that enforces* the list against adapter responses is adapter-specific and lives in the adapter PRs.
+7. Add `ExternalSourceSchemaValidator` utility — schema compliance, reference-format (env-var name regex), `REQUIRES_BASE_URL` / `REQUIRES_REGION` enforcement.
+8. Add `ExternalSourceForm` with schema-driven `clean()`.
+9. Extend `ExternalSourceSerializer` with `auth_credentials` (write_only), `region` (read/write), `has_credentials` (read-only), `validate()` via the validator.
+10. Exclude `auth_credentials` from GraphQL types; expose `has_credentials` and `region` as read-only fields on `ExternalSourceType`.
+11. Scrub `auth_credentials` in `ExternalSource.snapshot()`.
+12. Update ROADMAP §8 with deprecation entry for `auth_credentials_reference`.
+13. Update docs: `docs/how-to/external-sources.md` with the new JSON shape, `region` field, deprecation note, and role-based auth section.
+14. Tests across all layers per §10.
 
 **Phase 2 — AWS ACM adapter** (separate PR, tracked in #100):
 
@@ -805,6 +937,7 @@ None blocking. Items that may arise but can be deferred:
 - **Per-adapter connection-test UX**: form-preview button that runs `test_connection()` before save. Not in scope; current flow is save → open detail page → click "Test Connection".
 - **Adapter auto-registration vs explicit list**: if the plugin grows to 10+ adapters, move from manual registry to entry-point-based discovery. Keep as-is for v1.1.
 - **Migration for downstream forks**: anyone maintaining a fork with custom adapters must implement `credential_schema()` on their adapter classes. Documented in the v1.1 CHANGELOG as a breaking change for custom adapter authors (who are a small, advanced audience).
+- **Adapter-side enforcement of `PROHIBITED_SYNC_FIELDS`**: Phase 1 ships the expanded safe-list; the code that asserts on parsed adapter responses lives in the Phase 2 (AWS ACM) and Phase 3 (Azure KV) PRs where those field names actually appear in upstream payloads.
 
 ## 14. Relationship to existing decisions
 
