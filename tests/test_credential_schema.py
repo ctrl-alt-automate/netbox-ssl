@@ -78,3 +78,23 @@ def test_prohibited_sync_fields_includes_cloud_aliases():
     assert "pem_bundle" in PROHIBITED_SYNC_FIELDS
     assert "secret_value" in PROHIBITED_SYNC_FIELDS
     assert "key" in PROHIBITED_SYNC_FIELDS
+
+
+def test_base_adapter_has_empty_supported_auth_methods():
+    from netbox_ssl.adapters.base import BaseAdapter
+
+    assert BaseAdapter.SUPPORTED_AUTH_METHODS == ()
+
+
+def test_base_adapter_default_requires_base_url():
+    from netbox_ssl.adapters.base import BaseAdapter
+
+    assert BaseAdapter.REQUIRES_BASE_URL is True
+    assert BaseAdapter.REQUIRES_REGION is False
+
+
+def test_base_adapter_credential_schema_rejects_unknown_auth_method():
+    from netbox_ssl.adapters.base import BaseAdapter
+
+    with pytest.raises(ValueError, match="does not support"):
+        BaseAdapter.credential_schema("anything")

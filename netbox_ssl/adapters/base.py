@@ -90,6 +90,41 @@ class FetchedCertificate:
 class BaseAdapter(ABC):
     """Abstract base class for external source adapters."""
 
+    # Tuple of auth_method identifiers this adapter supports. Order is
+    # meaningful — the first entry is used as the default in the
+    # ExternalSource form dropdown for this adapter.
+    SUPPORTED_AUTH_METHODS: tuple[str, ...] = ()
+
+    # Adapter endpoint requirements consumed by ExternalSourceSchemaValidator.
+    # Lemur / Generic REST / Azure KV set REQUIRES_BASE_URL (inherited default).
+    # AWS ACM overrides to REQUIRES_BASE_URL = False, REQUIRES_REGION = True
+    # because boto3 derives endpoints from the region + service.
+    REQUIRES_BASE_URL: bool = True
+    REQUIRES_REGION: bool = False
+
+    @classmethod
+    def credential_schema(cls, auth_method: str) -> dict[str, CredentialField]:
+        """Return the credential component schema for a given auth_method.
+
+        Concrete adapters override this; the default implementation
+        raises for any auth_method not in SUPPORTED_AUTH_METHODS.
+
+        Args:
+            auth_method: The auth method identifier (e.g. "bearer", "aws_explicit").
+
+        Returns:
+            Mapping of component name -> CredentialField.
+
+        Raises:
+            ValueError: If auth_method is not in SUPPORTED_AUTH_METHODS.
+        """
+        if auth_method not in cls.SUPPORTED_AUTH_METHODS:
+            raise ValueError(
+                f"{cls.__name__} does not support auth_method '{auth_method}'. "
+                f"Supported: {list(cls.SUPPORTED_AUTH_METHODS)}"
+            )
+        return {}
+
     def __init__(self, source) -> None:
         self.source = source
         self._credentials: str | None = None
