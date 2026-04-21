@@ -1,8 +1,8 @@
 # NetBox SSL — Roadmap
 
 **Status:** Living document
-**Last reviewed:** 2026-04-17
-**Plugin version at publication:** v1.0.0
+**Last reviewed:** 2026-04-21
+**Plugin version at publication:** v1.0.1
 **Owner:** NetBox SSL team (see `CONTRIBUTING.md`)
 
 > This roadmap sketches what *may* come after v1.0.0. It is deliberately
@@ -24,6 +24,7 @@
 | Date | Change |
 |------|--------|
 | 2026-04-17 | Initial roadmap post-v1.0 GA. |
+| 2026-04-21 | Post-v1.0.1 review. Promoted **AWS ACM** and **Azure Key Vault** read-only adapters from Later (§5.4, §5.5) to Next (now §4.1, §4.2). Demoted **DigiCert CertCentral Adapter** from Next (§4.2) to Later (§5.5), narrowed scope to a GenericRESTAdapter preset + how-to guide because a reliable first-party adapter requires a live DigiCert account the maintainer does not hold. Renumbered §4.1 Vault → §4.3 (scope unchanged), §4.3 Performance Scaling Pass → §4.4 (scope unchanged). |
 
 ---
 
@@ -57,7 +58,41 @@ milestone and work has started.*
 
 ## 4. Next — Committed, Scoped, Not Yet Started
 
-### 4.1 Vault Read-Only Integration
+### 4.1 AWS ACM Read-Only Adapter
+
+**Goal.** Add a first-party External Source adapter for AWS Certificate
+Manager. Reads certificate metadata only, never private keys (ACM does
+not expose them).
+
+**Scope boundary.** Same as the existing Lemur adapter: read-only,
+HTTPS-only outbound calls, credentials by reference (env vars or an
+IAM role attached to the NetBox host). The adapter joins the registry
+alongside `LemurAdapter` and `GenericRESTAdapter`.
+
+**Reference issue.** [#100](https://github.com/ctrl-alt-automate/netbox-ssl/issues/100).
+**Blocking dependency.** [#99](https://github.com/ctrl-alt-automate/netbox-ssl/issues/99)
+(RFC: Multi-credential auth pattern) — AWS needs `access_key_id` +
+`secret_access_key` at minimum, which the single-string credential
+reference cannot currently express.
+
+### 4.2 Azure Key Vault Read-Only Adapter
+
+**Goal.** Add a first-party External Source adapter for Azure Key
+Vault. Reads certificate metadata (`cer` bytes only), never private
+key material.
+
+**Scope boundary.** Read-only. Uses the Azure SDK to call only the
+`certificates` API — explicitly never `get_key`, `get_secret`,
+`backup_certificate`, or any export path that would touch private-key
+material. The adapter duplicates the plugin-level `_PROHIBITED_MAPPING_KEYS`
+guard with an adapter-level assertion.
+
+**Reference issue.** [#101](https://github.com/ctrl-alt-automate/netbox-ssl/issues/101).
+**Blocking dependency.** [#99](https://github.com/ctrl-alt-automate/netbox-ssl/issues/99)
+(RFC: Multi-credential auth pattern) — Azure needs `tenant_id` +
+`client_id` + `client_secret` at minimum, or a Managed Identity path.
+
+### 4.3 Vault Read-Only Integration
 
 **Goal.** Resolve `private_key_location` breadcrumbs against a HashiCorp
 Vault instance to confirm the key is where the operator says it is,
@@ -70,18 +105,7 @@ the PEM parser's private-key rejection.
 
 **Reference issue.** To be filed.
 
-### 4.2 DigiCert CertCentral Adapter
-
-**Goal.** Add a first-party External Source adapter for DigiCert
-CertCentral. Reads certificate metadata only, never private keys.
-
-**Scope boundary.** Same as the existing Lemur adapter: read-only,
-HTTPS-only, `env:VAR_NAME` credentials, no redirect following. The
-adapter joins the existing `GenericRESTAdapter` in the registry.
-
-**Reference issue.** To be filed.
-
-### 4.3 Performance Scaling Pass (> 10 000 Certificates)
+### 4.4 Performance Scaling Pass (> 10 000 Certificates)
 
 **Goal.** Validate and tune plugin behaviour at 10 000 and 50 000
 certificates. Profile slow queries, tune index usage, add benchmark
@@ -115,30 +139,40 @@ Define SLAs per tenant or CA ("renewal must land within X days of
 warning"). Purely administrative — tracks the human workflow, does not
 automate it.
 
-### 5.4 AWS ACM Read-Only Adapter
-
-External Source adapter for AWS Certificate Manager. Read-only via
-`list-certificates` / `describe-certificate`. Private keys never
-fetched, even when IAM permissions would allow.
-
-### 5.5 Azure Key Vault Read-Only Adapter
-
-External Source adapter for Azure Key Vault certificates. Public
-metadata only.
-
-### 5.6 Scan-Result Ingestion
+### 5.4 Scan-Result Ingestion
 
 Import output from `nmap`, `sslyze`, or similar passive scanners. Dedupes
 against the existing inventory and flags discrepancies. The scanner
 remains the active component; the plugin ingests the results.
 
-### 5.7 Multi-Language Documentation
+### 5.5 DigiCert CertCentral via GenericREST Preset
+
+Originally scoped as a first-party adapter (ex-§4.2 in the 2026-04-17
+roadmap). Demoted on 2026-04-21 because reliable development without a
+live DigiCert account is not feasible — the adapter could be written
+against published schemas, but real-world auth quirks, undocumented
+fields, pagination edge cases, and error-response formats cannot be
+verified without live access.
+
+**Revised scope.** Ship a documented `GenericRESTAdapter` **preset** for
+DigiCert CertCentral instead of a dedicated adapter class: a YAML/JSON
+configuration fragment in `docs/how-to/` that operators with an account
+can drop into their `ExternalSource.field_mapping`. Community members
+with accounts validate and refine the preset; fewer lines of code,
+same operational outcome.
+
+**Promotion path back to Next.** If a maintainer gains a live DigiCert
+account, or a community contributor commits to long-term adapter
+maintenance with their account, promote to Next with an ADR-worthy
+discussion of adapter-class vs. preset trade-off.
+
+### 5.6 Multi-Language Documentation
 
 Dutch translation of the docs site (currently English only). Possibly
 other languages if contributors step up. The PRD itself stays English
 as the canonical reference.
 
-### 5.8 Per-Tenant Alerting Policies
+### 5.7 Per-Tenant Alerting Policies
 
 Different expiry thresholds and notification channels for different
 parts of the organisation. Currently thresholds are global.
@@ -206,7 +240,7 @@ models are built for it.
 
 Running outbound scans to discover certificates conflicts with passive
 administration and introduces false-positive risk. Passive ingestion
-from an existing scanner's output (see §5.6) is the correct pattern.
+from an existing scanner's output (see §5.4) is the correct pattern.
 
 ### 7.5 TLS Traffic Inspection or Interception
 
