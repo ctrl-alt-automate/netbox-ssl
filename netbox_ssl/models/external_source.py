@@ -247,6 +247,20 @@ class ExternalSource(NetBoxModel):
             )
         super().save(*args, **kwargs)
 
+    def snapshot(self) -> dict | None:
+        """Override changelog snapshot to redact credential values.
+
+        Key-level audit trail is preserved (adds/removes of credential
+        components show in diffs) but reference strings are redacted to
+        prevent historical env-var-name leakage.
+        """
+        data = super().snapshot() or {}
+        if isinstance(data.get("auth_credentials"), dict):
+            data["auth_credentials"] = dict.fromkeys(data["auth_credentials"], "<redacted>")
+        if data.get("auth_credentials_reference"):
+            data["auth_credentials_reference"] = "<redacted>"
+        return data
+
     @property
     def certificate_count(self) -> int:
         """Return the number of certificates synced from this source.
