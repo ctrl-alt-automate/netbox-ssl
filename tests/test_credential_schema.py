@@ -200,3 +200,34 @@ def test_get_headers_api_key_reads_token_from_dict():
         headers = adapter._get_headers()
 
     assert headers["X-API-Key"] == "apikey_value"
+
+
+def test_get_adapter_class_returns_correct_class():
+    from netbox_ssl.adapters import get_adapter_class
+    from netbox_ssl.adapters.lemur import LemurAdapter
+    from netbox_ssl.adapters.generic_rest import GenericRESTAdapter
+
+    assert get_adapter_class("lemur") is LemurAdapter
+    assert get_adapter_class("generic_rest") is GenericRESTAdapter
+
+
+def test_get_adapter_class_raises_for_unknown():
+    from netbox_ssl.adapters import get_adapter_class
+
+    with pytest.raises(KeyError, match="No adapter registered"):
+        get_adapter_class("nonexistent")
+
+
+def test_get_supported_auth_methods():
+    from netbox_ssl.adapters import get_supported_auth_methods
+
+    assert get_supported_auth_methods("lemur") == ("bearer",)
+    assert get_supported_auth_methods("generic_rest") == ("bearer", "api_key")
+
+
+def test_get_credential_schema_for_lemur():
+    from netbox_ssl.adapters import get_credential_schema
+
+    schema = get_credential_schema("lemur", "bearer")
+    assert "token" in schema
+    assert schema["token"].required is True
