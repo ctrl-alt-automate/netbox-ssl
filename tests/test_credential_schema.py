@@ -121,3 +121,27 @@ def test_lemur_credential_schema_rejects_non_bearer():
 
     with pytest.raises(ValueError, match="does not support"):
         LemurAdapter.credential_schema("api_key")
+
+
+def test_generic_rest_supports_bearer_and_api_key():
+    from netbox_ssl.adapters.generic_rest import GenericRESTAdapter
+
+    assert GenericRESTAdapter.SUPPORTED_AUTH_METHODS == ("bearer", "api_key")
+
+
+def test_generic_rest_schema_is_single_token_for_both_methods():
+    from netbox_ssl.adapters.generic_rest import GenericRESTAdapter
+
+    for method in ("bearer", "api_key"):
+        schema = GenericRESTAdapter.credential_schema(method)
+        assert set(schema.keys()) == {"token"}
+        assert schema["token"].required is True
+        assert schema["token"].secret is True
+
+
+def test_generic_rest_schema_rejects_cloud_methods():
+    from netbox_ssl.adapters.generic_rest import GenericRESTAdapter
+
+    for method in ("aws_explicit", "azure_managed_identity"):
+        with pytest.raises(ValueError, match="does not support"):
+            GenericRESTAdapter.credential_schema(method)
