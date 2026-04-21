@@ -98,3 +98,26 @@ def test_base_adapter_credential_schema_rejects_unknown_auth_method():
 
     with pytest.raises(ValueError, match="does not support"):
         BaseAdapter.credential_schema("anything")
+
+
+def test_lemur_supports_bearer_only():
+    from netbox_ssl.adapters.lemur import LemurAdapter
+
+    assert LemurAdapter.SUPPORTED_AUTH_METHODS == ("bearer",)
+
+
+def test_lemur_credential_schema_has_single_token_field():
+    from netbox_ssl.adapters.lemur import LemurAdapter
+
+    schema = LemurAdapter.credential_schema("bearer")
+    assert set(schema.keys()) == {"token"}
+    assert schema["token"].required is True
+    assert schema["token"].secret is True
+    assert schema["token"].label == "API Token"
+
+
+def test_lemur_credential_schema_rejects_non_bearer():
+    from netbox_ssl.adapters.lemur import LemurAdapter
+
+    with pytest.raises(ValueError, match="does not support"):
+        LemurAdapter.credential_schema("api_key")
