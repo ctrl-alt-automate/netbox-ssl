@@ -24,7 +24,7 @@
 | Date | Change |
 |------|--------|
 | 2026-04-17 | Initial roadmap post-v1.0 GA. |
-| 2026-04-21 | Post-v1.0.1 review. Promoted **AWS ACM** and **Azure Key Vault** read-only adapters from Later (§5.4, §5.5) to Next (now §4.1, §4.2). Demoted **DigiCert CertCentral Adapter** from Next (§4.2) to Later (§5.5), narrowed scope to a GenericRESTAdapter preset + how-to guide because a reliable first-party adapter requires a live DigiCert account the maintainer does not hold. Renumbered §4.3 Vault → §4.3 (unchanged), Performance Scaling Pass → §4.4. |
+| 2026-04-21 | Post-v1.0.1 review. Promoted **AWS ACM** and **Azure Key Vault** read-only adapters from Later (§5.4, §5.5) to Next (now §4.1, §4.2). Demoted **DigiCert CertCentral Adapter** from Next (§4.2) to Later (§5.5), narrowed scope to a GenericRESTAdapter preset + how-to guide because a reliable first-party adapter requires a live DigiCert account the maintainer does not hold. Renumbered §4.1 Vault → §4.3 (scope unchanged), §4.3 Performance Scaling Pass → §4.4 (scope unchanged). |
 
 ---
 
