@@ -19,13 +19,19 @@ from utilities.choices import ChoiceSet
 logger = logging.getLogger("netbox_ssl.models")
 
 # Fields that must never appear in field_mapping (mirrors adapters.base.PROHIBITED_SYNC_FIELDS).
+# Keep in sync with adapters/base.py — a mismatch allows sensitive keys in field_mapping.
 _PROHIBITED_MAPPING_KEYS: frozenset[str] = frozenset(
     {
+        # Pre-v1.1 entries
         "private_key",
         "key_material",
         "p12",
         "pfx",
         "pkcs12",
+        # v1.1 additions for AWS ACM and Azure Key Vault parity
+        "pem_bundle",
+        "secret_value",
+        "key",
     }
 )
 

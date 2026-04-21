@@ -81,11 +81,17 @@ class ExternalSourceSerializer(NetBoxModelSerializer):
     def get_has_credentials(self, obj) -> bool:
         """Indicate whether the source is authorized to run.
 
-        Role-based auth (AWS instance role, Azure Managed Identity)
-        needs no stored credentials but still has valid auth.
+        Role-based auth (e.g., AWS instance role, Azure Managed Identity)
+        needs no stored credentials but still has valid auth. The set of
+        role-based methods is declared per-adapter via IMPLICIT_AUTH_METHODS.
         """
-        if obj.auth_method in {"aws_instance_role", "azure_managed_identity"}:
-            return True
+        from ...adapters import get_adapter_class
+
+        try:
+            if obj.auth_method in get_adapter_class(obj.source_type).IMPLICIT_AUTH_METHODS:
+                return True
+        except KeyError:
+            pass
         return bool(obj.auth_credentials or obj.auth_credentials_reference)
 
     def validate(self, attrs):

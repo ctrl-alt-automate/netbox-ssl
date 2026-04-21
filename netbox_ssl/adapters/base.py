@@ -102,6 +102,14 @@ class BaseAdapter(ABC):
     REQUIRES_BASE_URL: bool = True
     REQUIRES_REGION: bool = False
 
+    # Auth methods that authorize via host identity (cloud instance role,
+    # managed identity) and therefore do NOT require auth_credentials to be
+    # populated. Used by serializers/GraphQL to derive `has_credentials`
+    # without hardcoding specific auth-method names.
+    # Phase 1 adapters (Lemur, GenericREST) have none. AWS ACM (#100) will
+    # override to ("aws_instance_role",); Azure KV (#101) to ("azure_managed_identity",).
+    IMPLICIT_AUTH_METHODS: tuple[str, ...] = ()
+
     @classmethod
     def credential_schema(cls, auth_method: str) -> dict[str, CredentialField]:
         """Return the credential component schema for a given auth_method.

@@ -204,8 +204,8 @@ def test_get_headers_api_key_reads_token_from_dict():
 
 def test_get_adapter_class_returns_correct_class():
     from netbox_ssl.adapters import get_adapter_class
-    from netbox_ssl.adapters.lemur import LemurAdapter
     from netbox_ssl.adapters.generic_rest import GenericRESTAdapter
+    from netbox_ssl.adapters.lemur import LemurAdapter
 
     assert get_adapter_class("lemur") is LemurAdapter
     assert get_adapter_class("generic_rest") is GenericRESTAdapter
@@ -231,3 +231,21 @@ def test_get_credential_schema_for_lemur():
     schema = get_credential_schema("lemur", "bearer")
     assert "token" in schema
     assert schema["token"].required is True
+
+
+def test_base_adapter_default_implicit_auth_methods_is_empty():
+    from netbox_ssl.adapters.base import BaseAdapter
+
+    assert BaseAdapter.IMPLICIT_AUTH_METHODS == ()
+
+
+def test_lemur_does_not_declare_implicit_auth():
+    from netbox_ssl.adapters.lemur import LemurAdapter
+
+    assert LemurAdapter.IMPLICIT_AUTH_METHODS == ()
+
+
+def test_generic_rest_does_not_declare_implicit_auth():
+    from netbox_ssl.adapters.generic_rest import GenericRESTAdapter
+
+    assert GenericRESTAdapter.IMPLICIT_AUTH_METHODS == ()

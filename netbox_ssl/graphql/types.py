@@ -100,11 +100,18 @@ class ExternalSourceType(NetBoxObjectType):
     def has_credentials(self) -> bool:
         """Are credentials configured for this source?
 
-        True for role-based auth (AWS instance role, Azure MI) even when
-        auth_credentials is empty — those methods authorize via host identity.
+        True for role-based auth (e.g., AWS instance role, Azure Managed Identity)
+        even when auth_credentials is empty — those methods authorize via host
+        identity. The set of role-based methods is declared per-adapter via
+        IMPLICIT_AUTH_METHODS.
         """
-        if self.auth_method in ("aws_instance_role", "azure_managed_identity"):
-            return True
+        from ..adapters import get_adapter_class
+
+        try:
+            if self.auth_method in get_adapter_class(self.source_type).IMPLICIT_AUTH_METHODS:
+                return True
+        except KeyError:
+            pass
         return bool(self.auth_credentials) or bool(self.auth_credentials_reference)
 
 
