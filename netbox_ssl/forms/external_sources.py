@@ -84,7 +84,8 @@ class ExternalSourceForm(NetBoxModelForm):
         }
 
     def clean(self) -> dict:
-        cleaned = super().clean() or {}
+        super().clean()
+        cleaned = self.cleaned_data
         ExternalSourceSchemaValidator.validate(
             source_type=cleaned.get("source_type"),
             auth_method=cleaned.get("auth_method"),
