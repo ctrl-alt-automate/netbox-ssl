@@ -21,7 +21,9 @@ if not _NETBOX_AVAILABLE:
         "django.conf",
         "django.db",
         "django.db.models",
+        "django.db.models.functions",
         "django.utils",
+        "django.utils.timezone",
         "django.utils.translation",
         "netbox",
         "netbox.plugins",
@@ -145,3 +147,56 @@ def test_generic_rest_schema_rejects_cloud_methods():
     for method in ("aws_explicit", "azure_managed_identity"):
         with pytest.raises(ValueError, match="does not support"):
             GenericRESTAdapter.credential_schema(method)
+
+
+def test_base_adapter_resolve_credentials_returns_dict():
+    """resolve_credentials must return dict[str, str] for multi-cred support."""
+    import os
+    from unittest.mock import MagicMock, patch
+
+    from netbox_ssl.adapters.lemur import LemurAdapter
+
+    source = MagicMock()
+    source.auth_credentials = {"token": "env:LEMUR_TEST_TOKEN"}
+    adapter = LemurAdapter(source)
+
+    with patch.dict(os.environ, {"LEMUR_TEST_TOKEN": "t0ken"}):
+        result = adapter.resolve_credentials()
+
+    assert isinstance(result, dict)
+    assert result == {"token": "t0ken"}
+
+
+def test_get_headers_bearer_reads_token_from_dict():
+    import os
+    from unittest.mock import MagicMock, patch
+
+    from netbox_ssl.adapters.lemur import LemurAdapter
+
+    source = MagicMock()
+    source.auth_credentials = {"token": "env:MY_TOKEN"}
+    source.auth_method = "bearer"
+    adapter = LemurAdapter(source)
+
+    with patch.dict(os.environ, {"MY_TOKEN": "bearer_value"}):
+        headers = adapter._get_headers()
+
+    assert headers["Authorization"] == "Bearer bearer_value"
+    assert headers["Accept"] == "application/json"
+
+
+def test_get_headers_api_key_reads_token_from_dict():
+    import os
+    from unittest.mock import MagicMock, patch
+
+    from netbox_ssl.adapters.generic_rest import GenericRESTAdapter
+
+    source = MagicMock()
+    source.auth_credentials = {"token": "env:MY_KEY"}
+    source.auth_method = "api_key"
+    adapter = GenericRESTAdapter(source)
+
+    with patch.dict(os.environ, {"MY_KEY": "apikey_value"}):
+        headers = adapter._get_headers()
+
+    assert headers["X-API-Key"] == "apikey_value"

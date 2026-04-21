@@ -127,31 +127,37 @@ class BaseAdapter(ABC):
 
     def __init__(self, source) -> None:
         self.source = source
-        self._credentials: str | None = None
+        self._credentials: dict[str, str] | None = None
 
-    def resolve_credentials(self) -> str:
-        """Resolve the credential reference to an actual value.
+    def resolve_credentials(self) -> dict[str, str]:
+        """Resolve all credential components from auth_credentials.
 
         Returns:
-            The resolved credential string.
+            Mapping of component name -> resolved value. Cached per
+            adapter instance for the duration of one sync run.
         """
         if self._credentials is None:
             from ..utils.credential_resolver import CredentialResolver
 
-            self._credentials = CredentialResolver.resolve(self.source.auth_credentials_reference)
+            self._credentials = CredentialResolver.resolve_many(self.source.auth_credentials or {})
         return self._credentials
 
     def _get_headers(self) -> dict[str, str]:
         """Build HTTP headers with authentication.
 
+        For bearer and api_key auth methods, reads the "token" credential.
+        Subclasses override for adapter-specific auth (AWS SigV4, Azure
+        OAuth2) that does not use HTTP headers.
+
         Returns:
             Dictionary of HTTP headers including auth and accept headers.
         """
-        cred = self.resolve_credentials()
+        creds = self.resolve_credentials()
+        token = creds.get("token", "")
         if self.source.auth_method == "bearer":
-            return {"Authorization": f"Bearer {cred}", "Accept": "application/json"}
-        elif self.source.auth_method == "api_key":
-            return {"X-API-Key": cred, "Accept": "application/json"}
+            return {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+        if self.source.auth_method == "api_key":
+            return {"X-API-Key": token, "Accept": "application/json"}
         return {"Accept": "application/json"}
 
     def _make_request(self, url: str, params: dict | None = None) -> requests.Response:
