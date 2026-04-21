@@ -13,12 +13,23 @@ from ..models import (
     ExternalSourceTypeChoices,
     SyncStatusChoices,
 )
+from ..utils.external_source_validator import ExternalSourceSchemaValidator
 
 
 class ExternalSourceForm(NetBoxModelForm):
     """Form for creating/editing External Sources."""
 
     comments = CommentField()
+
+    auth_credentials = forms.JSONField(
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 5, "class": "font-monospace"}),
+        help_text=(
+            "JSON mapping of credential component name to an env-var reference. "
+            'Example: {"access_key_id": "env:AWS_KEY"}. '
+            "Leave empty for role-based auth methods."
+        ),
+    )
 
     fieldsets = (
         FieldSet(
@@ -31,6 +42,8 @@ class ExternalSourceForm(NetBoxModelForm):
         ),
         FieldSet(
             "auth_method",
+            "auth_credentials",
+            "region",
             "auth_credentials_reference",
             name=_("Authentication"),
         ),
@@ -52,7 +65,9 @@ class ExternalSourceForm(NetBoxModelForm):
             "name",
             "source_type",
             "base_url",
+            "region",
             "auth_method",
+            "auth_credentials",
             "auth_credentials_reference",
             "field_mapping",
             "sync_interval_minutes",
@@ -67,6 +82,17 @@ class ExternalSourceForm(NetBoxModelForm):
                 attrs={"placeholder": "env:MY_API_TOKEN"},
             ),
         }
+
+    def clean(self) -> dict:
+        cleaned = super().clean()
+        ExternalSourceSchemaValidator.validate(
+            source_type=cleaned.get("source_type"),
+            auth_method=cleaned.get("auth_method"),
+            auth_credentials=cleaned.get("auth_credentials") or {},
+            base_url=cleaned.get("base_url") or "",
+            region=cleaned.get("region") or "",
+        )
+        return cleaned
 
 
 class ExternalSourceFilterForm(NetBoxModelFilterSetForm):
