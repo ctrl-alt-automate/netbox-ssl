@@ -138,7 +138,7 @@ class ExternalSource(NetBoxModel):
         help_text=("HTTPS API endpoint of the external source. Not required for region-scoped adapters (AWS ACM)."),
     )
     auth_method = models.CharField(
-        max_length=20,
+        max_length=30,
         choices=AuthMethodChoices,
         help_text="Authentication method for the external source",
     )

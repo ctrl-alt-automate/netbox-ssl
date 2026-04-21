@@ -35,6 +35,22 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.AlterField(
+            model_name="externalsource",
+            name="auth_method",
+            field=models.CharField(
+                choices=[
+                    ("bearer", "Bearer Token"),
+                    ("api_key", "API Key (Header)"),
+                    ("aws_explicit", "AWS Explicit Credentials"),
+                    ("aws_instance_role", "AWS Instance Role"),
+                    ("azure_explicit", "Azure Service Principal"),
+                    ("azure_managed_identity", "Azure Managed Identity"),
+                ],
+                help_text="Authentication method for the external source",
+                max_length=30,
+            ),
+        ),
         migrations.AddField(
             model_name="externalsource",
             name="auth_credentials",

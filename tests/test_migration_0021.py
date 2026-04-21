@@ -76,9 +76,9 @@ def test_migration_defines_expected_operations():
     module = _load_migration()
 
     operation_types = [type(op).__name__ for op in module.Migration.operations]
-    # Two AddFields (auth_credentials, region), one AlterField (base_url), one RunPython (backfill).
+    # Two AddFields (auth_credentials, region), two AlterFields (auth_method, base_url), one RunPython (backfill).
     assert operation_types.count("AddField") == 2
-    assert operation_types.count("AlterField") == 1
+    assert operation_types.count("AlterField") == 2
     assert operation_types.count("RunPython") == 1
 
 
