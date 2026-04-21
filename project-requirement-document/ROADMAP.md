@@ -24,7 +24,7 @@
 | Date | Change |
 |------|--------|
 | 2026-04-17 | Initial roadmap post-v1.0 GA. |
-| 2026-04-21 | Post-v1.0.1 review. Promoted **AWS ACM** and **Azure Key Vault** read-only adapters from Later (§5.4, §5.5) to Next (now §4.1, §4.2). Demoted **DigiCert CertCentral Adapter** from Next (§4.2) to Later (§5.5), narrowed scope to a GenericRESTAdapter preset + how-to guide because a reliable first-party adapter requires a live DigiCert account the maintainer does not hold. Renumbered §4.1 Vault → §4.3 (scope unchanged), §4.3 Performance Scaling Pass → §4.4 (scope unchanged). |
+| 2026-04-21 | Post-v1.0.1 review. Promoted **AWS ACM** and **Azure Key Vault** read-only adapters from Later (§5.4, §5.5) to Next (now §4.1, §4.2). Demoted **DigiCert CertCentral Adapter** from Next (§4.2) to Later (§5.5), narrowed scope to a GenericRESTAdapter preset + how-to guide because a reliable first-party adapter requires a live DigiCert account the maintainer does not hold. Renumbered §4.1 Vault → §4.3 (scope unchanged), §4.3 Performance Scaling Pass → §4.4 (scope unchanged). Added §8.2 for `auth_credentials_reference` deprecation (landing with multi-credential auth pattern in v1.1.0). |
 
 ---
 
@@ -273,6 +273,15 @@ permission. The legacy fallback will be removed in v2.0.
 **Operator action.** Assign `import_certificate` to the appropriate
 roles before upgrading to v2.0. See
 [permissions reference](https://ctrl-alt-automate.github.io/netbox-ssl/reference/permissions/).
+
+### 8.2 Removal of auth_credentials_reference field on ExternalSource
+
+- **Deprecated in:** v1.1.0
+- **Removal target:** v2.0.0
+
+The `ExternalSource.auth_credentials_reference` CharField stored single-string credential references. v1.1 adds a structured `auth_credentials` JSONField that supersedes it; migration 0021 wraps existing single strings as `{"token": "env:..."}`.
+
+**Operator action.** No code change needed IF you've run `manage.py migrate` on v1.1 (the field content is already copied to `auth_credentials["token"]`). If you still rely on `auth_credentials_reference` in custom code (e.g. reading it from the database directly in a script), switch to `auth_credentials` before upgrading to v2.0.
 
 ---
 
