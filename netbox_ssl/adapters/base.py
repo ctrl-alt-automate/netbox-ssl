@@ -11,14 +11,21 @@ import requests
 
 logger = logging.getLogger("netbox_ssl.adapters")
 
-# Fields that must never be accepted from external sources
+# Fields that must never be accepted from external sources.
+# Enforcement lives in each adapter's response-parsing code; this list
+# is the single source of truth consulted by those assertions.
 PROHIBITED_SYNC_FIELDS: frozenset[str] = frozenset(
     {
+        # Pre-v1.1 entries
         "private_key",
         "key_material",
         "p12",
         "pfx",
         "pkcs12",
+        # v1.1 additions for AWS ACM and Azure Key Vault parity
+        "pem_bundle",  # AWS ACM export-certificate bundle form
+        "secret_value",  # Azure Key Vault secret attribute
+        "key",  # Azure Key Vault certificate.key shortcut
     }
 )
 
@@ -31,6 +38,35 @@ READ_TIMEOUT: int = 30
 
 # Chunk size for streaming response reads
 _STREAM_CHUNK_SIZE: int = 8192
+
+
+@dataclass(frozen=True)
+class CredentialField:
+    """Metadata for one credential component declared by an adapter.
+
+    Adapters use a mapping of name -> CredentialField to describe the
+    credentials required for a given auth_method. The form and serializer
+    consume this mapping to validate user-submitted auth_credentials.
+
+    Attributes:
+        required: Must be present in auth_credentials at form-save time.
+        label:    User-facing label used by the form / UI.
+        secret:   If True, component is high-sensitivity — drives UI
+                  masking and may restrict allowed reference schemes.
+        help_text: Short description shown by the form.
+
+    Note:
+        ``required=True`` is the default because required components are the
+        common case. There is intentionally no ``default`` attribute:
+        credential values must always be explicit; a silent default would
+        mask misconfiguration at form-save time and is incompatible with
+        the validator's missing-required = error assumption.
+    """
+
+    required: bool = True
+    label: str = ""
+    secret: bool = False
+    help_text: str = ""
 
 
 @dataclass(frozen=True)
@@ -54,33 +90,82 @@ class FetchedCertificate:
 class BaseAdapter(ABC):
     """Abstract base class for external source adapters."""
 
-    def __init__(self, source) -> None:
-        self.source = source
-        self._credentials: str | None = None
+    # Tuple of auth_method identifiers this adapter supports. Order is
+    # meaningful — the first entry is used as the default in the
+    # ExternalSource form dropdown for this adapter.
+    SUPPORTED_AUTH_METHODS: tuple[str, ...] = ()
 
-    def resolve_credentials(self) -> str:
-        """Resolve the credential reference to an actual value.
+    # Adapter endpoint requirements consumed by ExternalSourceSchemaValidator.
+    # Lemur / Generic REST / Azure KV set REQUIRES_BASE_URL (inherited default).
+    # AWS ACM overrides to REQUIRES_BASE_URL = False, REQUIRES_REGION = True
+    # because boto3 derives endpoints from the region + service.
+    REQUIRES_BASE_URL: bool = True
+    REQUIRES_REGION: bool = False
+
+    # Auth methods that authorize via host identity (cloud instance role,
+    # managed identity) and therefore do NOT require auth_credentials to be
+    # populated. Used by serializers/GraphQL to derive `has_credentials`
+    # without hardcoding specific auth-method names.
+    # Phase 1 adapters (Lemur, GenericREST) have none. AWS ACM (#100) will
+    # override to ("aws_instance_role",); Azure KV (#101) to ("azure_managed_identity",).
+    IMPLICIT_AUTH_METHODS: tuple[str, ...] = ()
+
+    @classmethod
+    def credential_schema(cls, auth_method: str) -> dict[str, CredentialField]:
+        """Return the credential component schema for a given auth_method.
+
+        Concrete adapters override this; the default implementation
+        raises for any auth_method not in SUPPORTED_AUTH_METHODS.
+
+        Args:
+            auth_method: The auth method identifier (e.g. "bearer", "aws_explicit").
 
         Returns:
-            The resolved credential string.
+            Mapping of component name -> CredentialField.
+
+        Raises:
+            ValueError: If auth_method is not in SUPPORTED_AUTH_METHODS.
+        """
+        if auth_method not in cls.SUPPORTED_AUTH_METHODS:
+            raise ValueError(
+                f"{cls.__name__} does not support auth_method '{auth_method}'. "
+                f"Supported: {list(cls.SUPPORTED_AUTH_METHODS)}"
+            )
+        return {}
+
+    def __init__(self, source) -> None:
+        self.source = source
+        self._credentials: dict[str, str] | None = None
+
+    def resolve_credentials(self) -> dict[str, str]:
+        """Resolve all credential components from auth_credentials.
+
+        Returns:
+            Mapping of component name -> resolved value. Cached per
+            adapter instance for the duration of one sync run.
         """
         if self._credentials is None:
             from ..utils.credential_resolver import CredentialResolver
 
-            self._credentials = CredentialResolver.resolve(self.source.auth_credentials_reference)
+            self._credentials = CredentialResolver.resolve_many(self.source.auth_credentials or {})
         return self._credentials
 
     def _get_headers(self) -> dict[str, str]:
         """Build HTTP headers with authentication.
 
+        For bearer and api_key auth methods, reads the "token" credential.
+        Subclasses override for adapter-specific auth (AWS SigV4, Azure
+        OAuth2) that does not use HTTP headers.
+
         Returns:
             Dictionary of HTTP headers including auth and accept headers.
         """
-        cred = self.resolve_credentials()
+        creds = self.resolve_credentials()
+        token = creds.get("token", "")
         if self.source.auth_method == "bearer":
-            return {"Authorization": f"Bearer {cred}", "Accept": "application/json"}
-        elif self.source.auth_method == "api_key":
-            return {"X-API-Key": cred, "Accept": "application/json"}
+            return {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+        if self.source.auth_method == "api_key":
+            return {"X-API-Key": token, "Accept": "application/json"}
         return {"Accept": "application/json"}
 
     def _make_request(self, url: str, params: dict | None = None) -> requests.Response:

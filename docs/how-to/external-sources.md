@@ -22,6 +22,59 @@ endpoint — without manual CSV exports.
 Adapters live under `netbox_ssl/adapters/`. New adapters can be added by
 subclassing `BaseAdapter`.
 
+## Credentials reference format (v1.1+)
+
+As of v1.1.0, credentials are stored in the `auth_credentials` JSONField, which maps credential component names to environment-variable references. This supports both simple single-token adapters (Lemur, Generic REST) and multi-component cloud adapters (AWS ACM, Azure Key Vault).
+
+### Single-token adapters (Lemur, Generic REST)
+
+```json
+{"token": "env:LEMUR_API_TOKEN"}
+```
+
+The operator sets `LEMUR_API_TOKEN=<value>` in the NetBox process environment; the plugin reads the env var at sync time, never stores the value.
+
+### Multi-component adapters (AWS ACM, Azure Key Vault)
+
+AWS ACM with explicit credentials:
+
+```json
+{
+  "access_key_id": "env:AWS_ACCESS_KEY_ID",
+  "secret_access_key": "env:AWS_SECRET_ACCESS_KEY",
+  "session_token": "env:AWS_SESSION_TOKEN"
+}
+```
+
+Azure Key Vault with explicit service-principal credentials:
+
+```json
+{
+  "tenant_id": "env:AZURE_TENANT_ID",
+  "client_id": "env:AZURE_CLIENT_ID",
+  "client_secret": "env:AZURE_CLIENT_SECRET"
+}
+```
+
+### Role-based auth (cloud-native)
+
+When NetBox runs on an AWS EC2 instance with an IAM role or on Azure with a Managed Identity, `auth_credentials` is left **empty** and the adapter uses the host identity. This is the recommended production pattern.
+
+```json
+{}
+```
+
+Supported role-based `auth_method` values:
+
+- `aws_instance_role` — AWS IAM role attached to the NetBox host (EC2, ECS, Lambda). Requires IMDSv2 enabled.
+- `azure_managed_identity` — Azure Managed Identity (system- or user-assigned). For user-assigned, include `client_id` pointing at the identity's client-ID.
+
+### Deprecated — `auth_credentials_reference`
+
+The legacy single-string `auth_credentials_reference` field (v0.8 – v1.0) remains functional through v1.1.x for backward compatibility. Migration 0021 auto-wraps existing values as `{"token": "..."}` in `auth_credentials`; operators need take no action.
+
+**`auth_credentials_reference` is removed in v2.0.0.** See [ROADMAP §8.2](https://github.com/ctrl-alt-automate/netbox-ssl/blob/main/project-requirement-document/ROADMAP.md#82-removal-of-auth_credentials_reference-field-on-externalsource).
+
 ## Step 1 — Create an ExternalSource record
 
 Navigate to **Admin → NetBox SSL → External Sources → + Add**.

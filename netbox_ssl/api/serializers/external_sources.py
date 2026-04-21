@@ -27,6 +27,14 @@ class ExternalSourceSerializer(NetBoxModelSerializer):
         allow_blank=True,
         max_length=512,
     )
+    auth_credentials = serializers.JSONField(
+        write_only=True,
+        required=False,
+        default=dict,
+        help_text=(
+            "Mapping of credential component name to env-var reference. See ExternalSource model help for format."
+        ),
+    )
 
     class Meta:
         model = ExternalSource
@@ -37,7 +45,9 @@ class ExternalSourceSerializer(NetBoxModelSerializer):
             "name",
             "source_type",
             "base_url",
+            "region",
             "auth_method",
+            "auth_credentials",
             "auth_credentials_reference",
             "has_credentials",
             "field_mapping",
@@ -69,8 +79,48 @@ class ExternalSourceSerializer(NetBoxModelSerializer):
         return obj.certificates.count()
 
     def get_has_credentials(self, obj) -> bool:
-        """Check if the source has credential references configured."""
-        return bool(obj.auth_credentials_reference)
+        """Indicate whether the source is authorized to run.
+
+        Role-based auth (e.g., AWS instance role, Azure Managed Identity)
+        needs no stored credentials but still has valid auth. The set of
+        role-based methods is declared per-adapter via IMPLICIT_AUTH_METHODS.
+        """
+        from ...adapters import get_adapter_class
+
+        try:
+            if obj.auth_method in get_adapter_class(obj.source_type).IMPLICIT_AUTH_METHODS:
+                return True
+        except KeyError:
+            pass
+        return bool(obj.auth_credentials or obj.auth_credentials_reference)
+
+    def validate(self, attrs):
+        """Validate credential payload against adapter schema + requirements."""
+        from ...utils.external_source_validator import ExternalSourceSchemaValidator
+
+        source_type = attrs.get("source_type")
+        auth_method = attrs.get("auth_method")
+        auth_credentials = attrs.get("auth_credentials") or {}
+        base_url = attrs.get("base_url")
+        region = attrs.get("region")
+
+        # On PATCH, instance fields fill in missing attrs
+        if self.instance is not None:
+            source_type = source_type or self.instance.source_type
+            auth_method = auth_method or self.instance.auth_method
+            if base_url is None:
+                base_url = self.instance.base_url
+            if region is None:
+                region = self.instance.region
+
+        ExternalSourceSchemaValidator.validate(
+            source_type=source_type,
+            auth_method=auth_method,
+            auth_credentials=auth_credentials,
+            base_url=base_url or "",
+            region=region or "",
+        )
+        return attrs
 
 
 class ExternalSourceSyncLogSerializer(serializers.ModelSerializer):

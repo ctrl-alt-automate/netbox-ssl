@@ -15,6 +15,7 @@ import requests
 
 from .base import (
     BaseAdapter,
+    CredentialField,
     FetchedCertificate,
 )
 
@@ -83,6 +84,25 @@ class GenericRESTAdapter(BaseAdapter):
     If the external API paginates its results, only the first page is
     consumed.  Pagination support is planned for v0.9.
     """
+
+    SUPPORTED_AUTH_METHODS: tuple[str, ...] = ("bearer", "api_key")
+
+    @classmethod
+    def credential_schema(cls, auth_method: str) -> dict[str, CredentialField]:
+        """Generic REST uses one token for either bearer or api-key headers."""
+        if auth_method not in cls.SUPPORTED_AUTH_METHODS:
+            raise ValueError(
+                f"GenericRESTAdapter does not support auth_method '{auth_method}'. "
+                f"Supported: {list(cls.SUPPORTED_AUTH_METHODS)}"
+            )
+        return {
+            "token": CredentialField(
+                required=True,
+                label="API Token / Key",
+                secret=True,
+                help_text="Bearer token or API key value (same component, different header)",
+            ),
+        }
 
     def __init__(self, source) -> None:
         super().__init__(source)
