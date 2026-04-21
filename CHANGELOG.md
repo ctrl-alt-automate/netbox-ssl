@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Multi-credential auth pattern for External Sources** ([#99](https://github.com/ctrl-alt-automate/netbox-ssl/issues/99)):
+  new `ExternalSource.auth_credentials` JSONField stores credential-component
+  references (e.g., `{"access_key_id": "env:AWS_KEY", "secret_access_key": "env:AWS_SECRET"}`)
+  instead of a single-string token. Enables first-class role-based auth
+  (`aws_instance_role`, `azure_managed_identity`) where the cloud SDK resolves
+  credentials via the host identity and `auth_credentials` stays empty.
+- **Per-adapter credential schemas** — each adapter class declares a
+  `credential_schema(auth_method)` classmethod; the ExternalSource form
+  and API serializer validate submitted credentials against the schema
+  at save time, surfacing field-specific errors (missing required key,
+  unknown key, unsupported reference scheme).
+- **Four new `auth_method` values**: `aws_explicit`, `aws_instance_role`,
+  `azure_explicit`, `azure_managed_identity`. Form dropdowns filter
+  per-source-type automatically via the adapter's `SUPPORTED_AUTH_METHODS`.
+- **`has_credentials` computed field** on the GraphQL type + API serializer —
+  returns `True` for role-based auth methods even when `auth_credentials`
+  is empty, so UI consumers can show "configured" state without seeing
+  reference values.
+- **`ExternalSource.snapshot()` credential redaction** — changelog entries
+  redact reference values to `<redacted>` while preserving key-level audit
+  trail (adds/removes of credential components stay visible).
+
+### Deprecated
+
+- **`ExternalSource.auth_credentials_reference`** (single-string CharField
+  from v0.8) deprecated in favor of the new JSONField. Migration 0021
+  auto-wraps existing values as `{"token": "..."}`. Field stays functional
+  through v1.1.x; removed in v2.0.0 — see [ROADMAP §8.2](project-requirement-document/ROADMAP.md#82-removal-of-auth_credentials_reference-field-on-externalsource).
+
+### Migration notes
+
+One new migration (`0021_external_source_auth_credentials`) adds the field
+and backfills it from the legacy CharField. Run:
+
+```bash
+python manage.py migrate netbox_ssl
+```
+
+The migration is idempotent (safe to re-run) and additive (safe to downgrade to v1.0.x — the old field remains).
+
 ## [1.0.1] - 2026-04-20
 
 **Patch release** — two post-GA bugfixes surfaced while producing fresh
