@@ -61,3 +61,20 @@ def test_credential_field_all_attributes():
     assert field.label == "Session Token"
     assert field.secret is True
     assert field.help_text == "Only for temporary credentials"
+
+
+def test_prohibited_sync_fields_includes_cloud_aliases():
+    """v1.1 extends the safe-list with AWS/Azure key-material aliases."""
+    from netbox_ssl.adapters.base import PROHIBITED_SYNC_FIELDS
+
+    # Pre-existing entries — must stay.
+    assert "private_key" in PROHIBITED_SYNC_FIELDS
+    assert "key_material" in PROHIBITED_SYNC_FIELDS
+    assert "p12" in PROHIBITED_SYNC_FIELDS
+    assert "pfx" in PROHIBITED_SYNC_FIELDS
+    assert "pkcs12" in PROHIBITED_SYNC_FIELDS
+
+    # v1.1 additions — Azure Key Vault + AWS ACM aliases.
+    assert "pem_bundle" in PROHIBITED_SYNC_FIELDS
+    assert "secret_value" in PROHIBITED_SYNC_FIELDS
+    assert "key" in PROHIBITED_SYNC_FIELDS

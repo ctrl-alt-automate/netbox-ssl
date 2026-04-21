@@ -11,14 +11,21 @@ import requests
 
 logger = logging.getLogger("netbox_ssl.adapters")
 
-# Fields that must never be accepted from external sources
+# Fields that must never be accepted from external sources.
+# Enforcement lives in each adapter's response-parsing code; this list
+# is the single source of truth consulted by those assertions.
 PROHIBITED_SYNC_FIELDS: frozenset[str] = frozenset(
     {
+        # Pre-v1.1 entries
         "private_key",
         "key_material",
         "p12",
         "pfx",
         "pkcs12",
+        # v1.1 additions for AWS ACM and Azure Key Vault parity
+        "pem_bundle",  # AWS ACM export-certificate bundle form
+        "secret_value",  # Azure Key Vault secret attribute
+        "key",  # Azure Key Vault certificate.key shortcut
     }
 )
 
