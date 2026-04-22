@@ -220,7 +220,7 @@ class AwsAcmAdapter(BaseAdapter):
 
             try:
                 x509_cert = x509.load_pem_x509_certificate(pem.encode("utf-8"))
-                fingerprint = x509_cert.fingerprint(hashes.SHA256()).hex()
+                fingerprint = ":".join(f"{b:02X}" for b in x509_cert.fingerprint(hashes.SHA256()))
             except (ValueError, TypeError) as e:
                 logger.warning(
                     "ACM cert %s has invalid PEM: %s — skipping",

@@ -155,6 +155,7 @@ def test_build_client_kwargs_aws_explicit_minimal():
     """Explicit creds with only required fields (no session_token)."""
     import os
     from unittest.mock import MagicMock, patch
+
     from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     source = MagicMock()
@@ -180,6 +181,7 @@ def test_build_client_kwargs_aws_explicit_with_session_token():
     """Explicit creds with optional session_token."""
     import os
     from unittest.mock import MagicMock, patch
+
     from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     source = MagicMock()
@@ -192,11 +194,14 @@ def test_build_client_kwargs_aws_explicit_with_session_token():
     }
     adapter = AwsAcmAdapter(source)
 
-    with patch.dict(os.environ, {
-        "TEST_AKID": "AKIATEST",
-        "TEST_SECRET": "secretval",
-        "TEST_SESSION": "sessionval",
-    }):
+    with patch.dict(
+        os.environ,
+        {
+            "TEST_AKID": "AKIATEST",
+            "TEST_SECRET": "secretval",
+            "TEST_SESSION": "sessionval",
+        },
+    ):
         kwargs = adapter._build_client_kwargs()
 
     assert kwargs == {
@@ -210,6 +215,7 @@ def test_build_client_kwargs_aws_explicit_with_session_token():
 def test_build_client_kwargs_aws_instance_role_omits_credentials():
     """Instance-role auth: only region, no credential kwargs."""
     from unittest.mock import MagicMock
+
     from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     source = MagicMock()
@@ -226,6 +232,7 @@ def test_build_client_kwargs_aws_instance_role_omits_credentials():
 def test_get_client_builds_lazily():
     """First call builds the client; second call returns the cached one."""
     from unittest.mock import MagicMock, patch
+
     from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     source = MagicMock()
@@ -250,6 +257,7 @@ def test_get_client_passes_explicit_credentials():
     """boto3.client called with credential kwargs when aws_explicit."""
     import os
     from unittest.mock import MagicMock, patch
+
     from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     source = MagicMock()
@@ -261,9 +269,10 @@ def test_get_client_passes_explicit_credentials():
     }
     adapter = AwsAcmAdapter(source)
 
-    with patch.dict(os.environ, {"T_AKID": "AKIA", "T_SECRET": "shh"}):
-        with patch("netbox_ssl.adapters.aws_acm.boto3.client") as mock_factory:
-            adapter._get_client()
+    with patch.dict(os.environ, {"T_AKID": "AKIA", "T_SECRET": "shh"}), patch(
+        "netbox_ssl.adapters.aws_acm.boto3.client"
+    ) as mock_factory:
+        adapter._get_client()
 
     mock_factory.assert_called_once_with(
         "acm",
@@ -338,8 +347,9 @@ def _make_get_response(pem: str, chain: str = "") -> dict:
 
 
 def test_parse_acm_certificate_happy_path_amazon_issued():
-    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
     from cert_factory import CertFactory
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     pem = CertFactory.create(cn="example.com", sans=["www.example.com"])
     chain_pem = CertFactory.create(cn="Test CA", issuer_cn="Test Root")
@@ -358,13 +368,17 @@ def test_parse_acm_certificate_happy_path_amazon_issued():
     assert cert.pem_content == pem
     assert cert.issuer_chain == chain_pem
     assert cert.sans == ("example.com", "www.example.com")
-    assert len(cert.fingerprint_sha256) == 64  # SHA256 hex
+    # SHA256 fingerprint in uppercase colon-separated form to match CertificateParser._calculate_fingerprint
+    assert len(cert.fingerprint_sha256) == 95  # 32 bytes × 2 hex + 31 colons
+    assert cert.fingerprint_sha256.count(":") == 31
+    assert cert.fingerprint_sha256.upper() == cert.fingerprint_sha256  # uppercase
 
 
 def test_parse_acm_certificate_imported_no_chain():
     """IMPORTED certs may have empty CertificateChain — handle gracefully."""
-    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
     from cert_factory import CertFactory
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     pem = CertFactory.create(cn="imported.example.com")
     describe = _make_describe_response(Type="IMPORTED")
@@ -377,8 +391,9 @@ def test_parse_acm_certificate_imported_no_chain():
 
 
 def test_parse_acm_certificate_skips_failed_status():
-    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
     from cert_factory import CertFactory
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     pem = CertFactory.create(cn="failed.example.com")
     describe = _make_describe_response(Status="FAILED")
@@ -388,8 +403,9 @@ def test_parse_acm_certificate_skips_failed_status():
 
 
 def test_parse_acm_certificate_skips_inactive_status():
-    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
     from cert_factory import CertFactory
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     pem = CertFactory.create(cn="inactive.example.com")
     describe = _make_describe_response(Status="INACTIVE")
@@ -399,8 +415,9 @@ def test_parse_acm_certificate_skips_inactive_status():
 
 
 def test_parse_acm_certificate_ecdsa_algorithm():
-    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
     from cert_factory import CertFactory
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     pem = CertFactory.create(cn="ecdsa.example.com")
     describe = _make_describe_response(KeyAlgorithm="EC_prime256v1")
@@ -414,8 +431,9 @@ def test_parse_acm_certificate_ecdsa_algorithm():
 
 
 def test_parse_acm_certificate_rsa_4096():
-    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
     from cert_factory import CertFactory
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     pem = CertFactory.create(cn="rsa4k.example.com")
     describe = _make_describe_response(KeyAlgorithm="RSA_4096")
@@ -440,9 +458,11 @@ def test_parse_acm_certificate_invalid_pem_returns_none():
 
 def test_parse_acm_certificate_missing_optional_fields():
     """Defensive parsing: missing SANs / Issuer / Serial — use sensible defaults."""
-    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
-    from cert_factory import CertFactory
     from datetime import datetime, timezone
+
+    from cert_factory import CertFactory
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     pem = CertFactory.create(cn="minimal.example.com")
     # describe response with only the essentials
