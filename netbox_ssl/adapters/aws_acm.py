@@ -368,5 +368,15 @@ class AwsAcmAdapter(BaseAdapter):
         return certificates
 
     def get_certificate_detail(self, external_id: str) -> FetchedCertificate | None:
-        """Fetch a single certificate by ARN. Implemented in Task 13."""
-        raise NotImplementedError("Implemented in Task 13")
+        """Fetch a single certificate by its ARN.
+
+        Used for on-demand refresh of a known cert (e.g., admin clicks
+        "Refresh from source" in the UI).
+
+        Args:
+            external_id: The certificate ARN.
+
+        Returns:
+            FetchedCertificate, or None if not found / inaccessible.
+        """
+        return self._describe_and_get(external_id)

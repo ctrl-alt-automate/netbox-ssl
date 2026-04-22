@@ -822,3 +822,49 @@ def test_fetch_certificates_skips_failed_per_cert_errors():
     # Good cert returned; bad cert silently skipped (not raised through fetch)
     cns = [c.common_name for c in certs]
     assert cns == ["good.example.com"]
+
+
+def test_get_certificate_detail_found():
+    from unittest.mock import MagicMock
+
+    import boto3
+    from moto import mock_aws
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    @mock_aws
+    def run():
+        client = boto3.client("acm", region_name="eu-west-1")
+        arn = _import_test_cert(client, "lookup.example.com")
+
+        source = MagicMock()
+        source.region = "eu-west-1"
+        source.auth_method = "aws_instance_role"
+        source.auth_credentials = {}
+        adapter = AwsAcmAdapter(source)
+        return adapter.get_certificate_detail(arn)
+
+    cert = run()
+    assert cert is not None
+    assert cert.common_name == "lookup.example.com"
+
+
+def test_get_certificate_detail_not_found_returns_none():
+    from unittest.mock import MagicMock
+
+    from moto import mock_aws
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    @mock_aws
+    def run():
+        source = MagicMock()
+        source.region = "eu-west-1"
+        source.auth_method = "aws_instance_role"
+        source.auth_credentials = {}
+        adapter = AwsAcmAdapter(source)
+        return adapter.get_certificate_detail(
+            "arn:aws:acm:eu-west-1:000000000000:certificate/00000000-0000-0000-0000-000000000000"
+        )
+
+    assert run() is None
