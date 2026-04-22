@@ -111,6 +111,7 @@ nav:
       - how-to/compliance-policies.md
       - how-to/external-sources.md
       - how-to/ari-monitoring.md
+      - how-to/aws-acm-sync.md
   - Reference:
       - reference/api.md
       - reference/data-models.md
