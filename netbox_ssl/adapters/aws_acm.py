@@ -13,6 +13,7 @@ Design spec: docs/superpowers/specs/2026-04-22-aws-acm-adapter-design.md
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 
 try:
     import boto3
@@ -249,6 +250,22 @@ class AwsAcmAdapter(BaseAdapter):
         except (KeyError, TypeError) as e:
             logger.warning("Failed to parse ACM certificate: %s", e)
             return None
+
+    def _list_certificate_arns(self) -> Iterator[str]:
+        """Yield every certificate ARN in the source's region via boto3 paginator.
+
+        boto3 handles NextToken automatically. Returns an empty iterator
+        for accounts with no certs in this region.
+
+        Yields:
+            Certificate ARN strings.
+        """
+        paginator = self._get_client().get_paginator("list_certificates")
+        for page in paginator.paginate(PaginationConfig={"PageSize": 1000}):
+            for summary in page.get("CertificateSummaryList", []):
+                arn = summary.get("CertificateArn")
+                if arn:
+                    yield arn
 
     def test_connection(self) -> tuple[bool, str]:
         """Test connectivity to the ACM API. Implemented in Task 14."""
