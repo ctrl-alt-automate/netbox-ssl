@@ -14,6 +14,11 @@ _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
+# Add tests/ dir so cert_factory can be imported as a top-level module
+_tests_dir = Path(__file__).parent
+if str(_tests_dir) not in sys.path:
+    sys.path.insert(0, str(_tests_dir))
+
 # Mock netbox.plugins if not available (skip in Docker with real NetBox)
 try:
     _spec = importlib.util.find_spec("netbox")
@@ -300,3 +305,163 @@ def test_assert_no_prohibited_keys_pem_bundle_aws_alias_raises():
     dirty_response = {"pem_bundle": "..."}
     with pytest.raises(ValueError, match="failed safety check"):
         AwsAcmAdapter._assert_no_prohibited_keys(dirty_response)
+
+
+# ---------------------------------------------------------------------------
+# _parse_acm_certificate() tests
+# ---------------------------------------------------------------------------
+
+
+def _make_describe_response(**overrides):
+    """Build a realistic DescribeCertificate response dict with sensible defaults."""
+    from datetime import datetime, timezone
+
+    base = {
+        "CertificateArn": "arn:aws:acm:eu-west-1:123456789012:certificate/abc-def-ghi",
+        "DomainName": "example.com",
+        "SubjectAlternativeNames": ["example.com", "www.example.com"],
+        "NotBefore": datetime(2026, 1, 1, tzinfo=timezone.utc),
+        "NotAfter": datetime(2027, 1, 1, tzinfo=timezone.utc),
+        "Status": "ISSUED",
+        "Issuer": "Amazon",
+        "Serial": "0a:1b:2c:3d:4e:5f",
+        "KeyAlgorithm": "RSA_2048",
+        "Type": "AMAZON_ISSUED",
+    }
+    base.update(overrides)
+    return {"Certificate": base}
+
+
+def _make_get_response(pem: str, chain: str = "") -> dict:
+    """Build a realistic GetCertificate response dict."""
+    return {"Certificate": pem, "CertificateChain": chain}
+
+
+def test_parse_acm_certificate_happy_path_amazon_issued():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+    from cert_factory import CertFactory
+
+    pem = CertFactory.create(cn="example.com", sans=["www.example.com"])
+    chain_pem = CertFactory.create(cn="Test CA", issuer_cn="Test Root")
+    describe = _make_describe_response()
+    get = _make_get_response(pem=pem, chain=chain_pem)
+
+    cert = AwsAcmAdapter._parse_acm_certificate(describe, get)
+
+    assert cert is not None
+    assert cert.external_id == "arn:aws:acm:eu-west-1:123456789012:certificate/abc-def-ghi"
+    assert cert.common_name == "example.com"
+    assert cert.serial_number == "0a:1b:2c:3d:4e:5f"
+    assert cert.issuer == "Amazon"
+    assert cert.algorithm == "rsa"
+    assert cert.key_size == 2048
+    assert cert.pem_content == pem
+    assert cert.issuer_chain == chain_pem
+    assert cert.sans == ("example.com", "www.example.com")
+    assert len(cert.fingerprint_sha256) == 64  # SHA256 hex
+
+
+def test_parse_acm_certificate_imported_no_chain():
+    """IMPORTED certs may have empty CertificateChain — handle gracefully."""
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+    from cert_factory import CertFactory
+
+    pem = CertFactory.create(cn="imported.example.com")
+    describe = _make_describe_response(Type="IMPORTED")
+    get = _make_get_response(pem=pem, chain="")  # no chain
+
+    cert = AwsAcmAdapter._parse_acm_certificate(describe, get)
+
+    assert cert is not None
+    assert cert.issuer_chain == ""
+
+
+def test_parse_acm_certificate_skips_failed_status():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+    from cert_factory import CertFactory
+
+    pem = CertFactory.create(cn="failed.example.com")
+    describe = _make_describe_response(Status="FAILED")
+    get = _make_get_response(pem=pem)
+
+    assert AwsAcmAdapter._parse_acm_certificate(describe, get) is None
+
+
+def test_parse_acm_certificate_skips_inactive_status():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+    from cert_factory import CertFactory
+
+    pem = CertFactory.create(cn="inactive.example.com")
+    describe = _make_describe_response(Status="INACTIVE")
+    get = _make_get_response(pem=pem)
+
+    assert AwsAcmAdapter._parse_acm_certificate(describe, get) is None
+
+
+def test_parse_acm_certificate_ecdsa_algorithm():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+    from cert_factory import CertFactory
+
+    pem = CertFactory.create(cn="ecdsa.example.com")
+    describe = _make_describe_response(KeyAlgorithm="EC_prime256v1")
+    get = _make_get_response(pem=pem)
+
+    cert = AwsAcmAdapter._parse_acm_certificate(describe, get)
+
+    assert cert is not None
+    assert cert.algorithm == "ecdsa"
+    assert cert.key_size is None  # ECDSA doesn't carry a parseable size in KeyAlgorithm
+
+
+def test_parse_acm_certificate_rsa_4096():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+    from cert_factory import CertFactory
+
+    pem = CertFactory.create(cn="rsa4k.example.com")
+    describe = _make_describe_response(KeyAlgorithm="RSA_4096")
+    get = _make_get_response(pem=pem)
+
+    cert = AwsAcmAdapter._parse_acm_certificate(describe, get)
+
+    assert cert is not None
+    assert cert.algorithm == "rsa"
+    assert cert.key_size == 4096
+
+
+def test_parse_acm_certificate_invalid_pem_returns_none():
+    """If PEM is unparseable, return None (skip cert) rather than raise."""
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    describe = _make_describe_response()
+    get = _make_get_response(pem="-----BEGIN CERTIFICATE-----\nNOT-VALID\n-----END CERTIFICATE-----")
+
+    assert AwsAcmAdapter._parse_acm_certificate(describe, get) is None
+
+
+def test_parse_acm_certificate_missing_optional_fields():
+    """Defensive parsing: missing SANs / Issuer / Serial — use sensible defaults."""
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+    from cert_factory import CertFactory
+    from datetime import datetime, timezone
+
+    pem = CertFactory.create(cn="minimal.example.com")
+    # describe response with only the essentials
+    describe = {
+        "Certificate": {
+            "CertificateArn": "arn:aws:acm:eu-west-1:000:certificate/min",
+            "DomainName": "minimal.example.com",
+            "NotBefore": datetime(2026, 1, 1, tzinfo=timezone.utc),
+            "NotAfter": datetime(2027, 1, 1, tzinfo=timezone.utc),
+            "Status": "ISSUED",
+            "KeyAlgorithm": "RSA_2048",
+            # No SANs, no Issuer, no Serial
+        }
+    }
+    get = _make_get_response(pem=pem)
+
+    cert = AwsAcmAdapter._parse_acm_certificate(describe, get)
+
+    assert cert is not None
+    assert cert.sans == ()
+    assert cert.issuer == ""
+    assert cert.serial_number == ""

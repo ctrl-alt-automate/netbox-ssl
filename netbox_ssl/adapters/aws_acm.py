@@ -167,6 +167,89 @@ class AwsAcmAdapter(BaseAdapter):
             logger.error("ACM response contained prohibited keys: %s", forbidden)
             raise ValueError("Adapter response failed safety check")
 
+    @staticmethod
+    def _parse_acm_certificate(describe_response: dict, get_response: dict) -> FetchedCertificate | None:
+        """Parse paired DescribeCertificate + GetCertificate responses into FetchedCertificate.
+
+        Returns None if:
+        - The cert's Status maps to None (skip — FAILED/INACTIVE/VALIDATION_TIMED_OUT)
+        - The PEM in get_response is unparseable
+        - Required fields are missing/invalid
+
+        Args:
+            describe_response: Body of boto3 ACM describe_certificate() call.
+                               Has shape {"Certificate": {...}}.
+            get_response:      Body of boto3 ACM get_certificate() call.
+                               Has shape {"Certificate": "<PEM>", "CertificateChain": "<PEM>"}.
+
+        Returns:
+            FetchedCertificate or None to skip.
+        """
+        try:
+            cert_meta = describe_response["Certificate"]
+
+            # Status filter — skip non-mappable statuses
+            status = cert_meta.get("Status", "")
+            if AwsAcmAdapter._map_acm_status(status) is None:
+                return None
+
+            # KeyAlgorithm parsing: "RSA_2048" → ("rsa", 2048); "EC_prime256v1" → ("ecdsa", None)
+            key_alg_raw = cert_meta.get("KeyAlgorithm", "").upper()
+            algorithm = "unknown"
+            key_size: int | None = None
+            if key_alg_raw.startswith("RSA"):
+                algorithm = "rsa"
+                # "RSA_2048" → 2048
+                _, _, size_str = key_alg_raw.partition("_")
+                if size_str.isdigit():
+                    key_size = int(size_str)
+            elif key_alg_raw.startswith("EC"):
+                algorithm = "ecdsa"
+
+            # PEM + fingerprint
+            pem = get_response.get("Certificate", "")
+            if not pem:
+                logger.warning(
+                    "ACM cert %s has no PEM in GetCertificate response — skipping",
+                    cert_meta.get("CertificateArn", "<unknown>"),
+                )
+                return None
+
+            from cryptography import x509
+            from cryptography.hazmat.primitives import hashes
+
+            try:
+                x509_cert = x509.load_pem_x509_certificate(pem.encode("utf-8"))
+                fingerprint = x509_cert.fingerprint(hashes.SHA256()).hex()
+            except (ValueError, TypeError) as e:
+                logger.warning(
+                    "ACM cert %s has invalid PEM: %s — skipping",
+                    cert_meta.get("CertificateArn", "<unknown>"),
+                    e,
+                )
+                return None
+
+            sans_raw = cert_meta.get("SubjectAlternativeNames", [])
+            sans = tuple(str(s) for s in sans_raw if s)
+
+            return FetchedCertificate(
+                external_id=str(cert_meta["CertificateArn"]),
+                common_name=str(cert_meta.get("DomainName", "")),
+                serial_number=str(cert_meta.get("Serial", "")),
+                fingerprint_sha256=fingerprint,
+                issuer=str(cert_meta.get("Issuer", "")),
+                valid_from=cert_meta["NotBefore"],
+                valid_to=cert_meta["NotAfter"],
+                sans=sans,
+                key_size=key_size,
+                algorithm=algorithm,
+                pem_content=pem,
+                issuer_chain=str(get_response.get("CertificateChain", "")),
+            )
+        except (KeyError, TypeError) as e:
+            logger.warning("Failed to parse ACM certificate: %s", e)
+            return None
+
     def test_connection(self) -> tuple[bool, str]:
         """Test connectivity to the ACM API. Implemented in Task 14."""
         raise NotImplementedError("Implemented in Task 14")
