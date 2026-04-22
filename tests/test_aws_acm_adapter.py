@@ -683,3 +683,142 @@ def test_describe_and_get_returns_none_for_filtered_status():
 
     assert result is None
     mock_client.get_certificate.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# fetch_certificates() tests
+# ---------------------------------------------------------------------------
+
+
+def _import_test_cert(client, cn: str) -> str:
+    """Helper: import a test cert into mocked ACM, return ARN."""
+    from cert_factory import CertFactory
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    pem = CertFactory.create(cn=cn)
+    key_pem = (
+        rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        .private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        .decode()
+    )
+    return client.import_certificate(Certificate=pem.encode(), PrivateKey=key_pem.encode())["CertificateArn"]
+
+
+def test_fetch_certificates_empty_account_returns_empty_list():
+    from unittest.mock import MagicMock
+
+    from moto import mock_aws
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    @mock_aws
+    def run():
+        source = MagicMock()
+        source.region = "eu-west-1"
+        source.auth_method = "aws_instance_role"
+        source.auth_credentials = {}
+        adapter = AwsAcmAdapter(source)
+        return adapter.fetch_certificates()
+
+    assert run() == []
+
+
+def test_fetch_certificates_returns_imported_certs():
+    from unittest.mock import MagicMock
+
+    import boto3
+    from moto import mock_aws
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    @mock_aws
+    def run():
+        client = boto3.client("acm", region_name="eu-west-1")
+        _import_test_cert(client, "first.example.com")
+        _import_test_cert(client, "second.example.com")
+
+        source = MagicMock()
+        source.region = "eu-west-1"
+        source.auth_method = "aws_instance_role"
+        source.auth_credentials = {}
+        adapter = AwsAcmAdapter(source)
+        return adapter.fetch_certificates()
+
+    certs = run()
+    cns = sorted(c.common_name for c in certs)
+    assert cns == ["first.example.com", "second.example.com"]
+
+
+def test_fetch_certificates_isolated_per_region():
+    """ExternalSource configured for eu-west-1 only sees eu-west-1 certs."""
+    from unittest.mock import MagicMock
+
+    import boto3
+    from moto import mock_aws
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    @mock_aws
+    def run():
+        eu_client = boto3.client("acm", region_name="eu-west-1")
+        us_client = boto3.client("acm", region_name="us-east-1")
+        _import_test_cert(eu_client, "europe.example.com")
+        _import_test_cert(us_client, "america.example.com")
+
+        source = MagicMock()
+        source.region = "eu-west-1"
+        source.auth_method = "aws_instance_role"
+        source.auth_credentials = {}
+        adapter = AwsAcmAdapter(source)
+        return adapter.fetch_certificates()
+
+    certs = run()
+    cns = [c.common_name for c in certs]
+    assert cns == ["europe.example.com"]
+
+
+def test_fetch_certificates_skips_failed_per_cert_errors():
+    """If one cert raises during fetch, others still succeed."""
+    from unittest.mock import MagicMock, patch
+
+    import boto3
+    from botocore.exceptions import ClientError
+    from moto import mock_aws
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    @mock_aws
+    def run():
+        client = boto3.client("acm", region_name="eu-west-1")
+        _import_test_cert(client, "good.example.com")
+        bad_arn = _import_test_cert(client, "bad.example.com")
+
+        source = MagicMock()
+        source.region = "eu-west-1"
+        source.auth_method = "aws_instance_role"
+        source.auth_credentials = {}
+        adapter = AwsAcmAdapter(source)
+
+        # Wrap _describe_and_get to fail for one specific ARN
+        original = adapter._describe_and_get
+
+        def wrapped(arn):
+            if arn == bad_arn:
+                raise ClientError(
+                    error_response={"Error": {"Code": "InternalServerError", "Message": "boom"}},
+                    operation_name="DescribeCertificate",
+                )
+            return original(arn)
+
+        with patch.object(adapter, "_describe_and_get", side_effect=wrapped):
+            return adapter.fetch_certificates()
+
+    certs = run()
+    # Good cert returned; bad cert silently skipped (not raised through fetch)
+    cns = [c.common_name for c in certs]
+    assert cns == ["good.example.com"]

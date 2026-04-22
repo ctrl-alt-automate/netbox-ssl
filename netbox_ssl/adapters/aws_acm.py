@@ -316,8 +316,56 @@ class AwsAcmAdapter(BaseAdapter):
         raise NotImplementedError("Implemented in Task 14")
 
     def fetch_certificates(self) -> list[FetchedCertificate]:
-        """Fetch all certificates. Implemented in Task 12."""
-        raise NotImplementedError("Implemented in Task 12")
+        """Fetch all certificates from the configured ACM region.
+
+        Iterates ARNs via ListCertificates paginator, then calls
+        DescribeCertificate + GetCertificate for each. Skips certs that:
+        - Have a non-mappable status (FAILED/INACTIVE/VALIDATION_TIMED_OUT)
+        - Fail per-cert API calls (logged, not raised)
+        - Have unparseable PEM
+
+        Returns:
+            List of FetchedCertificate. Empty list on connection failure.
+        """
+        certificates: list[FetchedCertificate] = []
+        skipped = 0
+        try:
+            arns = list(self._list_certificate_arns())
+        except botocore.exceptions.ClientError as e:
+            logger.error("ListCertificates failed for source '%s': %s", self.source.name, e)
+            return []
+        except botocore.exceptions.NoCredentialsError as e:
+            logger.error("No AWS credentials available for source '%s': %s", self.source.name, e)
+            return []
+        except botocore.exceptions.EndpointConnectionError as e:
+            logger.error(
+                "Cannot reach ACM in region '%s' for source '%s': %s",
+                self.source.region,
+                self.source.name,
+                e,
+            )
+            return []
+
+        for arn in arns:
+            try:
+                cert = self._describe_and_get(arn)
+            except botocore.exceptions.ClientError as e:
+                logger.warning("Per-cert error for %s: %s — skipping", arn, e)
+                skipped += 1
+                continue
+            if cert is None:
+                skipped += 1
+                continue
+            certificates.append(cert)
+
+        logger.info(
+            "ACM source '%s' (region=%s): fetched %d, skipped %d",
+            self.source.name,
+            self.source.region,
+            len(certificates),
+            skipped,
+        )
+        return certificates
 
     def get_certificate_detail(self, external_id: str) -> FetchedCertificate | None:
         """Fetch a single certificate by ARN. Implemented in Task 13."""
