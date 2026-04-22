@@ -269,9 +269,10 @@ def test_get_client_passes_explicit_credentials():
     }
     adapter = AwsAcmAdapter(source)
 
-    with patch.dict(os.environ, {"T_AKID": "AKIA", "T_SECRET": "shh"}), patch(
-        "netbox_ssl.adapters.aws_acm.boto3.client"
-    ) as mock_factory:
+    with (
+        patch.dict(os.environ, {"T_AKID": "AKIA", "T_SECRET": "shh"}),
+        patch("netbox_ssl.adapters.aws_acm.boto3.client") as mock_factory,
+    ):
         adapter._get_client()
 
     mock_factory.assert_called_once_with(
@@ -489,7 +490,9 @@ def test_parse_acm_certificate_missing_optional_fields():
 
 def test_list_certificate_arns_empty_account():
     from unittest.mock import MagicMock
+
     from moto import mock_aws
+
     from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     @mock_aws
@@ -507,25 +510,31 @@ def test_list_certificate_arns_empty_account():
 
 
 def test_list_certificate_arns_single_cert():
-    import boto3
     from unittest.mock import MagicMock
-    from moto import mock_aws
-    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    import boto3
     from cert_factory import CertFactory
+    from moto import mock_aws
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     @mock_aws
     def run():
         client = boto3.client("acm", region_name="eu-west-1")
         pem = CertFactory.create(cn="single.example.com")
         # Use any non-empty private key — moto only validates basic shape
-        from cryptography import x509
         from cryptography.hazmat.primitives import serialization
         from cryptography.hazmat.primitives.asymmetric import rsa
-        key_pem = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        ).decode()
+
+        key_pem = (
+            rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            .private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+            .decode()
+        )
         client.import_certificate(Certificate=pem.encode(), PrivateKey=key_pem.encode())
 
         source = MagicMock()
