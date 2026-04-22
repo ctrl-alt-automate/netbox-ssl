@@ -144,3 +144,75 @@ def test_map_acm_status_unknown_returns_none():
     from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
 
     assert AwsAcmAdapter._map_acm_status("BOGUS_STATUS") is None
+
+
+def test_build_client_kwargs_aws_explicit_minimal():
+    """Explicit creds with only required fields (no session_token)."""
+    import os
+    from unittest.mock import MagicMock, patch
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    source = MagicMock()
+    source.region = "eu-west-1"
+    source.auth_method = "aws_explicit"
+    source.auth_credentials = {
+        "access_key_id": "env:TEST_AKID",
+        "secret_access_key": "env:TEST_SECRET",
+    }
+    adapter = AwsAcmAdapter(source)
+
+    with patch.dict(os.environ, {"TEST_AKID": "AKIATEST", "TEST_SECRET": "secretval"}):
+        kwargs = adapter._build_client_kwargs()
+
+    assert kwargs == {
+        "region_name": "eu-west-1",
+        "aws_access_key_id": "AKIATEST",
+        "aws_secret_access_key": "secretval",
+    }
+
+
+def test_build_client_kwargs_aws_explicit_with_session_token():
+    """Explicit creds with optional session_token."""
+    import os
+    from unittest.mock import MagicMock, patch
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    source = MagicMock()
+    source.region = "us-east-1"
+    source.auth_method = "aws_explicit"
+    source.auth_credentials = {
+        "access_key_id": "env:TEST_AKID",
+        "secret_access_key": "env:TEST_SECRET",
+        "session_token": "env:TEST_SESSION",
+    }
+    adapter = AwsAcmAdapter(source)
+
+    with patch.dict(os.environ, {
+        "TEST_AKID": "AKIATEST",
+        "TEST_SECRET": "secretval",
+        "TEST_SESSION": "sessionval",
+    }):
+        kwargs = adapter._build_client_kwargs()
+
+    assert kwargs == {
+        "region_name": "us-east-1",
+        "aws_access_key_id": "AKIATEST",
+        "aws_secret_access_key": "secretval",
+        "aws_session_token": "sessionval",
+    }
+
+
+def test_build_client_kwargs_aws_instance_role_omits_credentials():
+    """Instance-role auth: only region, no credential kwargs."""
+    from unittest.mock import MagicMock
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    source = MagicMock()
+    source.region = "ap-southeast-2"
+    source.auth_method = "aws_instance_role"
+    source.auth_credentials = {}
+    adapter = AwsAcmAdapter(source)
+
+    kwargs = adapter._build_client_kwargs()
+
+    assert kwargs == {"region_name": "ap-southeast-2"}

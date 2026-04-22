@@ -106,6 +106,30 @@ class AwsAcmAdapter(BaseAdapter):
         super().__init__(source)
         self._client = None  # lazy: built on first use by _get_client()
 
+    def _build_client_kwargs(self) -> dict[str, str]:
+        """Build boto3 client kwargs from source credentials + region.
+
+        For aws_explicit: includes aws_access_key_id, aws_secret_access_key,
+        and optionally aws_session_token (resolved via Phase 1 multi-cred
+        infrastructure).
+
+        For aws_instance_role: omits all credential kwargs so boto3 falls
+        back to its default credential chain (EC2 IMDSv2, ECS task role,
+        Lambda execution role).
+
+        Returns:
+            Mapping suitable for `boto3.client('acm', **kwargs)`.
+        """
+        kwargs: dict[str, str] = {"region_name": self.source.region}
+        if self.source.auth_method == "aws_explicit":
+            creds = self.resolve_credentials()  # dict[str, str]
+            kwargs["aws_access_key_id"] = creds["access_key_id"]
+            kwargs["aws_secret_access_key"] = creds["secret_access_key"]
+            if "session_token" in creds:
+                kwargs["aws_session_token"] = creds["session_token"]
+        # aws_instance_role: no credential kwargs — boto3 default chain handles it
+        return kwargs
+
     def test_connection(self) -> tuple[bool, str]:
         """Test connectivity to the ACM API. Implemented in Task 14."""
         raise NotImplementedError("Implemented in Task 14")
