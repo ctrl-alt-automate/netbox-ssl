@@ -79,6 +79,29 @@ class AwsAcmAdapter(BaseAdapter):
             f"AwsAcmAdapter does not support auth_method '{auth_method}'. Supported: {list(cls.SUPPORTED_AUTH_METHODS)}"
         )
 
+    # ACM Status string → plugin Certificate.status value.
+    # Statuses NOT in this map are skipped during fetch (returns None).
+    # FAILED / INACTIVE / VALIDATION_TIMED_OUT have no useful inventory value
+    # (no valid PEM, no usable cert) — skip per spec §4.
+    _STATUS_MAP: dict[str, str] = {
+        "ISSUED": "active",
+        "EXPIRED": "expired",
+        "REVOKED": "revoked",
+        "PENDING_VALIDATION": "pending",
+    }
+
+    @staticmethod
+    def _map_acm_status(acm_status: str) -> str | None:
+        """Map an ACM Status to a plugin Certificate.status, or None to skip.
+
+        Args:
+            acm_status: The Status field from ACM DescribeCertificate response.
+
+        Returns:
+            Plugin status string (active/expired/revoked/pending) or None.
+        """
+        return AwsAcmAdapter._STATUS_MAP.get(acm_status)
+
     def __init__(self, source) -> None:
         super().__init__(source)
         self._client = None  # lazy: built on first use by _get_client()

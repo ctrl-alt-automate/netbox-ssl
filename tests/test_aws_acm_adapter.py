@@ -96,3 +96,51 @@ def test_credential_schema_rejects_unsupported_method():
 
     with pytest.raises(ValueError, match="does not support"):
         AwsAcmAdapter.credential_schema("bearer")
+
+
+def test_map_acm_status_issued_to_active():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    assert AwsAcmAdapter._map_acm_status("ISSUED") == "active"
+
+
+def test_map_acm_status_expired_to_expired():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    assert AwsAcmAdapter._map_acm_status("EXPIRED") == "expired"
+
+
+def test_map_acm_status_revoked_to_revoked():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    assert AwsAcmAdapter._map_acm_status("REVOKED") == "revoked"
+
+
+def test_map_acm_status_pending_validation_to_pending():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    assert AwsAcmAdapter._map_acm_status("PENDING_VALIDATION") == "pending"
+
+
+def test_map_acm_status_failed_returns_none():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    assert AwsAcmAdapter._map_acm_status("FAILED") is None
+
+
+def test_map_acm_status_inactive_returns_none():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    assert AwsAcmAdapter._map_acm_status("INACTIVE") is None
+
+
+def test_map_acm_status_validation_timed_out_returns_none():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    assert AwsAcmAdapter._map_acm_status("VALIDATION_TIMED_OUT") is None
+
+
+def test_map_acm_status_unknown_returns_none():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    assert AwsAcmAdapter._map_acm_status("BOGUS_STATUS") is None
