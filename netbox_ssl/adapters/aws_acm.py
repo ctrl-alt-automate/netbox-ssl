@@ -20,7 +20,7 @@ try:
 except ImportError as exc:  # pragma: no cover — covered by lazy registry test
     raise ImportError("AWS ACM adapter requires boto3. Install with: pip install netbox-ssl[aws]") from exc
 
-from .base import (  # noqa: F401 — CredentialField used in credential_schema() (Task 4)
+from .base import (
     BaseAdapter,
     CredentialField,
     FetchedCertificate,
@@ -44,6 +44,40 @@ class AwsAcmAdapter(BaseAdapter):
     IMPLICIT_AUTH_METHODS: tuple[str, ...] = ("aws_instance_role",)
     REQUIRES_BASE_URL: bool = False
     REQUIRES_REGION: bool = True
+
+    @classmethod
+    def credential_schema(cls, auth_method: str) -> dict[str, CredentialField]:
+        """Return the credential component schema for a given auth_method.
+
+        - aws_explicit:      access_key_id + secret_access_key + optional session_token
+        - aws_instance_role: empty dict (boto3 default credential chain handles it)
+        """
+        if auth_method == "aws_explicit":
+            return {
+                "access_key_id": CredentialField(
+                    required=True,
+                    label="Access Key ID",
+                    secret=True,
+                    help_text="AWS access key ID for the IAM user/role",
+                ),
+                "secret_access_key": CredentialField(
+                    required=True,
+                    label="Secret Access Key",
+                    secret=True,
+                    help_text="AWS secret access key (env-var ref recommended)",
+                ),
+                "session_token": CredentialField(
+                    required=False,
+                    label="Session Token",
+                    secret=True,
+                    help_text="Optional STS session token for temporary credentials",
+                ),
+            }
+        if auth_method == "aws_instance_role":
+            return {}
+        raise ValueError(
+            f"AwsAcmAdapter does not support auth_method '{auth_method}'. Supported: {list(cls.SUPPORTED_AUTH_METHODS)}"
+        )
 
     def __init__(self, source) -> None:
         super().__init__(source)

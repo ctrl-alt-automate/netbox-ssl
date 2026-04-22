@@ -63,3 +63,36 @@ def test_aws_acm_adapter_inherits_from_base_adapter():
     from netbox_ssl.adapters.base import BaseAdapter
 
     assert issubclass(AwsAcmAdapter, BaseAdapter)
+
+
+def test_credential_schema_aws_explicit_returns_three_fields():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    schema = AwsAcmAdapter.credential_schema("aws_explicit")
+    assert set(schema.keys()) == {"access_key_id", "secret_access_key", "session_token"}
+
+
+def test_credential_schema_aws_explicit_required_and_secret_flags():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    schema = AwsAcmAdapter.credential_schema("aws_explicit")
+    assert schema["access_key_id"].required is True
+    assert schema["access_key_id"].secret is True
+    assert schema["secret_access_key"].required is True
+    assert schema["secret_access_key"].secret is True
+    assert schema["session_token"].required is False
+    assert schema["session_token"].secret is True
+
+
+def test_credential_schema_aws_instance_role_returns_empty():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    schema = AwsAcmAdapter.credential_schema("aws_instance_role")
+    assert schema == {}
+
+
+def test_credential_schema_rejects_unsupported_method():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    with pytest.raises(ValueError, match="does not support"):
+        AwsAcmAdapter.credential_schema("bearer")
