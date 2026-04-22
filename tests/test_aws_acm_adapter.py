@@ -216,3 +216,53 @@ def test_build_client_kwargs_aws_instance_role_omits_credentials():
     kwargs = adapter._build_client_kwargs()
 
     assert kwargs == {"region_name": "ap-southeast-2"}
+
+
+def test_get_client_builds_lazily():
+    """First call builds the client; second call returns the cached one."""
+    from unittest.mock import MagicMock, patch
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    source = MagicMock()
+    source.region = "eu-west-1"
+    source.auth_method = "aws_instance_role"
+    source.auth_credentials = {}
+    adapter = AwsAcmAdapter(source)
+
+    assert adapter._client is None  # not built yet
+
+    with patch("netbox_ssl.adapters.aws_acm.boto3.client") as mock_client_factory:
+        mock_client_factory.return_value = MagicMock(name="acm_client")
+        client1 = adapter._get_client()
+        client2 = adapter._get_client()
+
+    assert client1 is client2  # cached
+    assert mock_client_factory.call_count == 1  # built only once
+    mock_client_factory.assert_called_once_with("acm", region_name="eu-west-1")
+
+
+def test_get_client_passes_explicit_credentials():
+    """boto3.client called with credential kwargs when aws_explicit."""
+    import os
+    from unittest.mock import MagicMock, patch
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    source = MagicMock()
+    source.region = "eu-west-1"
+    source.auth_method = "aws_explicit"
+    source.auth_credentials = {
+        "access_key_id": "env:T_AKID",
+        "secret_access_key": "env:T_SECRET",
+    }
+    adapter = AwsAcmAdapter(source)
+
+    with patch.dict(os.environ, {"T_AKID": "AKIA", "T_SECRET": "shh"}):
+        with patch("netbox_ssl.adapters.aws_acm.boto3.client") as mock_factory:
+            adapter._get_client()
+
+    mock_factory.assert_called_once_with(
+        "acm",
+        region_name="eu-west-1",
+        aws_access_key_id="AKIA",
+        aws_secret_access_key="shh",
+    )

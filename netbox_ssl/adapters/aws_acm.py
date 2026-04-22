@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 
 try:
-    import boto3  # noqa: F401 — used in _get_client() (Task 7)
+    import boto3
     import botocore.exceptions  # noqa: F401 — used in error handling (Task 14)
 except ImportError as exc:  # pragma: no cover — covered by lazy registry test
     raise ImportError("AWS ACM adapter requires boto3. Install with: pip install netbox-ssl[aws]") from exc
@@ -129,6 +129,20 @@ class AwsAcmAdapter(BaseAdapter):
                 kwargs["aws_session_token"] = creds["session_token"]
         # aws_instance_role: no credential kwargs — boto3 default chain handles it
         return kwargs
+
+    def _get_client(self):
+        """Lazily build and cache the boto3 ACM client.
+
+        First call constructs the client using kwargs from
+        `_build_client_kwargs()`. Subsequent calls return the cached client.
+
+        Returns:
+            A boto3 ACM client instance.
+        """
+        if self._client is None:
+            kwargs = self._build_client_kwargs()
+            self._client = boto3.client("acm", **kwargs)
+        return self._client
 
     def test_connection(self) -> tuple[bool, str]:
         """Test connectivity to the ACM API. Implemented in Task 14."""
