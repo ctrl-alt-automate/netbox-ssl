@@ -868,3 +868,127 @@ def test_get_certificate_detail_not_found_returns_none():
         )
 
     assert run() is None
+
+
+# ---------------------------------------------------------------------------
+# test_connection() tests
+# ---------------------------------------------------------------------------
+
+
+def test_test_connection_success_with_empty_account():
+    from unittest.mock import MagicMock
+
+    from moto import mock_aws
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    @mock_aws
+    def run():
+        source = MagicMock()
+        source.region = "eu-west-1"
+        source.auth_method = "aws_instance_role"
+        source.auth_credentials = {}
+        adapter = AwsAcmAdapter(source)
+        return adapter.test_connection()
+
+    success, message = run()
+    assert success is True
+    assert "successful" in message.lower()
+
+
+def test_test_connection_returns_generic_message_on_access_denied():
+    """AccessDenied → False with generic message; full error logged internally."""
+    from unittest.mock import MagicMock, patch
+
+    from botocore.exceptions import ClientError
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    source = MagicMock()
+    source.region = "eu-west-1"
+    source.auth_method = "aws_instance_role"
+    source.auth_credentials = {}
+    adapter = AwsAcmAdapter(source)
+
+    mock_client = MagicMock()
+    mock_client.list_certificates.side_effect = ClientError(
+        error_response={"Error": {"Code": "AccessDeniedException", "Message": "no perm"}},
+        operation_name="ListCertificates",
+    )
+    with patch.object(adapter, "_get_client", return_value=mock_client):
+        success, message = adapter.test_connection()
+
+    assert success is False
+    assert "Insufficient permissions" in message
+    # Generic — never echoes raw AWS message
+    assert "no perm" not in message
+
+
+def test_test_connection_returns_generic_message_on_invalid_credentials():
+    from unittest.mock import MagicMock, patch
+
+    from botocore.exceptions import ClientError
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    source = MagicMock()
+    source.region = "eu-west-1"
+    source.auth_method = "aws_explicit"
+    source.auth_credentials = {"access_key_id": "env:X", "secret_access_key": "env:Y"}
+    adapter = AwsAcmAdapter(source)
+
+    mock_client = MagicMock()
+    mock_client.list_certificates.side_effect = ClientError(
+        error_response={"Error": {"Code": "InvalidClientTokenId", "Message": "bad key"}},
+        operation_name="ListCertificates",
+    )
+    with patch.object(adapter, "_get_client", return_value=mock_client):
+        success, message = adapter.test_connection()
+
+    assert success is False
+    assert "AWS authentication failed" in message
+
+
+def test_test_connection_no_credentials_error():
+    from unittest.mock import MagicMock, patch
+
+    from botocore.exceptions import NoCredentialsError
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    source = MagicMock()
+    source.region = "eu-west-1"
+    source.auth_method = "aws_instance_role"
+    source.auth_credentials = {}
+    adapter = AwsAcmAdapter(source)
+
+    with patch.object(adapter, "_get_client", side_effect=NoCredentialsError()):
+        success, message = adapter.test_connection()
+
+    assert success is False
+    assert "No AWS credentials" in message
+
+
+def test_test_connection_endpoint_connection_error():
+    from unittest.mock import MagicMock, patch
+
+    from botocore.exceptions import EndpointConnectionError
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    source = MagicMock()
+    source.region = "fake-region-99"
+    source.auth_method = "aws_instance_role"
+    source.auth_credentials = {}
+    adapter = AwsAcmAdapter(source)
+
+    with patch.object(
+        adapter,
+        "_get_client",
+        side_effect=EndpointConnectionError(endpoint_url="https://acm.fake-region-99.amazonaws.com"),
+    ):
+        success, message = adapter.test_connection()
+
+    assert success is False
+    assert "Cannot reach ACM" in message
+    assert "fake-region-99" in message

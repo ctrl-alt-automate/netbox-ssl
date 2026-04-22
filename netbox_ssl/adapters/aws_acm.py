@@ -312,8 +312,49 @@ class AwsAcmAdapter(BaseAdapter):
         return self._parse_acm_certificate(describe, get)
 
     def test_connection(self) -> tuple[bool, str]:
-        """Test connectivity to the ACM API. Implemented in Task 14."""
-        raise NotImplementedError("Implemented in Task 14")
+        """Test connectivity + permissions by calling ListCertificates(MaxItems=1).
+
+        Returns generic user-facing messages; full AWS error details are
+        logged internally (never echoed in response — could leak account
+        identifiers, region info, etc.).
+
+        Returns:
+            (True, "Connection successful") on success,
+            (False, "<generic explanation>") on any failure.
+        """
+        try:
+            client = self._get_client()
+            client.list_certificates(MaxItems=1)
+            return True, "Connection successful"
+        except botocore.exceptions.NoCredentialsError as e:
+            logger.warning("ACM source '%s': no credentials: %s", self.source.name, e)
+            return False, ("No AWS credentials available — check that the host has an IAM role attached")
+        except botocore.exceptions.PartialCredentialsError as e:
+            logger.warning("ACM source '%s': partial credentials: %s", self.source.name, e)
+            return False, ("Incomplete AWS credentials — verify access_key_id and secret_access_key are both set")
+        except botocore.exceptions.EndpointConnectionError as e:
+            logger.warning("ACM source '%s': endpoint unreachable: %s", self.source.name, e)
+            return False, (
+                f"Cannot reach ACM in region '{self.source.region}' — verify region name and network connectivity"
+            )
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "")
+            logger.warning("ACM source '%s': ClientError %s: %s", self.source.name, code, e)
+            if code in ("InvalidClientTokenId", "SignatureDoesNotMatch"):
+                return False, "AWS authentication failed — verify access key is valid and active"
+            if code == "UnrecognizedClientException":
+                return False, "AWS credentials rejected — IAM user may have been deleted"
+            if code == "AccessDeniedException":
+                return False, (
+                    "Insufficient permissions for ACM — adapter needs "
+                    "acm:ListCertificates, acm:DescribeCertificate, acm:GetCertificate"
+                )
+            if code == "RequestExpired":
+                return False, "Request signature expired — check system clock"
+            return False, f"Connection failed: {code or 'unknown error'}"
+        except Exception as e:
+            logger.error("ACM source '%s': unexpected error: %s", self.source.name, e)
+            return False, "Connection test failed due to an unexpected error"
 
     def fetch_certificates(self) -> list[FetchedCertificate]:
         """Fetch all certificates from the configured ACM region.
