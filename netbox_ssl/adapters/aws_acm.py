@@ -17,7 +17,7 @@ from collections.abc import Iterator
 
 try:
     import boto3
-    import botocore.exceptions  # noqa: F401 — used in error handling (Task 14)
+    import botocore.exceptions
 except ImportError as exc:  # pragma: no cover — covered by lazy registry test
     raise ImportError("AWS ACM adapter requires boto3. Install with: pip install netbox-ssl[aws]") from exc
 
@@ -266,6 +266,50 @@ class AwsAcmAdapter(BaseAdapter):
                 arn = summary.get("CertificateArn")
                 if arn:
                     yield arn
+
+    def _describe_and_get(self, arn: str) -> FetchedCertificate | None:
+        """Fetch metadata + PEM for one cert ARN, parse, and return.
+
+        Performs early status-filter optimization: if DescribeCertificate's
+        Status maps to None (skip), GetCertificate is NOT called — saves an
+        API round-trip per filtered cert.
+
+        Args:
+            arn: The certificate ARN.
+
+        Returns:
+            FetchedCertificate, or None if:
+            - DescribeCertificate or GetCertificate raises ClientError
+            - Status maps to skip
+            - Parser returns None
+        """
+        client = self._get_client()
+        try:
+            describe = client.describe_certificate(CertificateArn=arn)
+        except botocore.exceptions.ClientError as e:
+            logger.warning("DescribeCertificate failed for %s: %s — skipping", arn, e)
+            return None
+
+        # Early status filter — skip GetCertificate for non-mappable statuses
+        cert_meta = describe.get("Certificate", {})
+        status = cert_meta.get("Status", "")
+        if self._map_acm_status(status) is None:
+            return None
+
+        try:
+            get = client.get_certificate(CertificateArn=arn)
+        except botocore.exceptions.ClientError as e:
+            logger.warning("GetCertificate failed for %s: %s — skipping", arn, e)
+            return None
+
+        try:
+            self._assert_no_prohibited_keys(describe)
+            self._assert_no_prohibited_keys(get)
+        except ValueError as e:
+            logger.error("Safety check failed for %s: %s — skipping", arn, e)
+            return None
+
+        return self._parse_acm_certificate(describe, get)
 
     def test_connection(self) -> tuple[bool, str]:
         """Test connectivity to the ACM API. Implemented in Task 14."""

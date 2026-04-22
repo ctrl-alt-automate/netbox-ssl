@@ -547,3 +547,139 @@ def test_list_certificate_arns_single_cert():
     arns = run()
     assert len(arns) == 1
     assert arns[0].startswith("arn:aws:acm:eu-west-1:")
+
+
+# ---------------------------------------------------------------------------
+# _describe_and_get() tests
+# ---------------------------------------------------------------------------
+
+
+def test_describe_and_get_happy_path():
+    from unittest.mock import MagicMock
+
+    import boto3
+    from cert_factory import CertFactory
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from moto import mock_aws
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    @mock_aws
+    def run():
+        client = boto3.client("acm", region_name="eu-west-1")
+        pem = CertFactory.create(cn="happy.example.com")
+        key_pem = (
+            rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            .private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+            .decode()
+        )
+        arn = client.import_certificate(Certificate=pem.encode(), PrivateKey=key_pem.encode())["CertificateArn"]
+
+        source = MagicMock()
+        source.region = "eu-west-1"
+        source.auth_method = "aws_instance_role"
+        source.auth_credentials = {}
+        adapter = AwsAcmAdapter(source)
+        return adapter._describe_and_get(arn)
+
+    cert = run()
+    assert cert is not None
+    assert cert.common_name == "happy.example.com"
+
+
+def test_describe_and_get_returns_none_on_describe_client_error():
+    """Per-cert ClientError on DescribeCertificate → return None (skip)."""
+    from unittest.mock import MagicMock, patch
+
+    from botocore.exceptions import ClientError
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    source = MagicMock()
+    source.region = "eu-west-1"
+    source.auth_method = "aws_instance_role"
+    source.auth_credentials = {}
+    adapter = AwsAcmAdapter(source)
+
+    mock_client = MagicMock()
+    mock_client.describe_certificate.side_effect = ClientError(
+        error_response={"Error": {"Code": "ResourceNotFoundException", "Message": "Cert deleted"}},
+        operation_name="DescribeCertificate",
+    )
+    with patch.object(adapter, "_get_client", return_value=mock_client):
+        result = adapter._describe_and_get("arn:aws:acm:eu-west-1:000:certificate/missing")
+
+    assert result is None
+
+
+def test_describe_and_get_returns_none_on_get_client_error():
+    """Per-cert ClientError on GetCertificate → return None (skip)."""
+    from datetime import datetime, timezone
+    from unittest.mock import MagicMock, patch
+
+    from botocore.exceptions import ClientError
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    source = MagicMock()
+    source.region = "eu-west-1"
+    source.auth_method = "aws_instance_role"
+    source.auth_credentials = {}
+    adapter = AwsAcmAdapter(source)
+
+    mock_client = MagicMock()
+    mock_client.describe_certificate.return_value = {
+        "Certificate": {
+            "CertificateArn": "arn:test",
+            "DomainName": "x.example.com",
+            "Status": "ISSUED",
+            "NotBefore": datetime(2026, 1, 1, tzinfo=timezone.utc),
+            "NotAfter": datetime(2027, 1, 1, tzinfo=timezone.utc),
+            "KeyAlgorithm": "RSA_2048",
+        }
+    }
+    mock_client.get_certificate.side_effect = ClientError(
+        error_response={"Error": {"Code": "AccessDeniedException", "Message": "no perm"}},
+        operation_name="GetCertificate",
+    )
+    with patch.object(adapter, "_get_client", return_value=mock_client):
+        result = adapter._describe_and_get("arn:test")
+
+    assert result is None
+
+
+def test_describe_and_get_returns_none_for_filtered_status():
+    """Status FAILED → describe still called, but parser returns None."""
+    from datetime import datetime, timezone
+    from unittest.mock import MagicMock, patch
+
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    source = MagicMock()
+    source.region = "eu-west-1"
+    source.auth_method = "aws_instance_role"
+    source.auth_credentials = {}
+    adapter = AwsAcmAdapter(source)
+
+    mock_client = MagicMock()
+    mock_client.describe_certificate.return_value = {
+        "Certificate": {
+            "CertificateArn": "arn:failed",
+            "DomainName": "f.example.com",
+            "Status": "FAILED",
+            "NotBefore": datetime(2026, 1, 1, tzinfo=timezone.utc),
+            "NotAfter": datetime(2027, 1, 1, tzinfo=timezone.utc),
+            "KeyAlgorithm": "RSA_2048",
+        }
+    }
+    # get_certificate should NOT be called since status filter trips first
+    with patch.object(adapter, "_get_client", return_value=mock_client):
+        result = adapter._describe_and_get("arn:failed")
+
+    assert result is None
+    mock_client.get_certificate.assert_not_called()
