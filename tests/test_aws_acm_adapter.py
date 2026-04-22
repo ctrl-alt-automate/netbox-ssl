@@ -266,3 +266,37 @@ def test_get_client_passes_explicit_credentials():
         aws_access_key_id="AKIA",
         aws_secret_access_key="shh",
     )
+
+
+def test_assert_no_prohibited_keys_clean_response_passes():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    clean_response = {"CertificateArn": "arn:aws:acm:...", "DomainName": "example.com"}
+    # Should not raise
+    AwsAcmAdapter._assert_no_prohibited_keys(clean_response)
+
+
+def test_assert_no_prohibited_keys_with_private_key_raises():
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    dirty_response = {"CertificateArn": "arn:aws:acm:...", "private_key": "-----BEGIN..."}
+    with pytest.raises(ValueError, match="failed safety check"):
+        AwsAcmAdapter._assert_no_prohibited_keys(dirty_response)
+
+
+def test_assert_no_prohibited_keys_case_insensitive():
+    """PROHIBITED_SYNC_FIELDS is lowercase; check normalises response keys."""
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    dirty_response = {"PRIVATE_KEY": "..."}  # uppercase version
+    with pytest.raises(ValueError, match="failed safety check"):
+        AwsAcmAdapter._assert_no_prohibited_keys(dirty_response)
+
+
+def test_assert_no_prohibited_keys_pem_bundle_aws_alias_raises():
+    """v1.1 PROHIBITED_SYNC_FIELDS includes pem_bundle (AWS ACM alias)."""
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    dirty_response = {"pem_bundle": "..."}
+    with pytest.raises(ValueError, match="failed safety check"):
+        AwsAcmAdapter._assert_no_prohibited_keys(dirty_response)

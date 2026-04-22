@@ -21,6 +21,7 @@ except ImportError as exc:  # pragma: no cover — covered by lazy registry test
     raise ImportError("AWS ACM adapter requires boto3. Install with: pip install netbox-ssl[aws]") from exc
 
 from .base import (
+    PROHIBITED_SYNC_FIELDS,
     BaseAdapter,
     CredentialField,
     FetchedCertificate,
@@ -143,6 +144,28 @@ class AwsAcmAdapter(BaseAdapter):
             kwargs = self._build_client_kwargs()
             self._client = boto3.client("acm", **kwargs)
         return self._client
+
+    @staticmethod
+    def _assert_no_prohibited_keys(response: dict) -> None:
+        """Defensive guard — ACM responses must never contain private key material.
+
+        ACM's read-only API (Describe/List/GetCertificate) does not expose
+        private keys. This check enforces that invariant: if a hypothetical
+        future ACM API change starts returning sensitive fields, the adapter
+        fails hard rather than silently leaking them into NetBox.
+
+        Args:
+            response: A dict from boto3 (e.g. DescribeCertificate response body).
+
+        Raises:
+            ValueError: If any response key matches PROHIBITED_SYNC_FIELDS
+                        (case-insensitive comparison).
+        """
+        keys_lower = {k.lower() for k in response}
+        forbidden = keys_lower & PROHIBITED_SYNC_FIELDS
+        if forbidden:
+            logger.error("ACM response contained prohibited keys: %s", forbidden)
+            raise ValueError("Adapter response failed safety check")
 
     def test_connection(self) -> tuple[bool, str]:
         """Test connectivity to the ACM API. Implemented in Task 14."""
