@@ -1,13 +1,39 @@
 """External source adapter framework."""
 
+import logging
+
 from .base import BaseAdapter, CredentialField, FetchedCertificate
 from .generic_rest import GenericRESTAdapter
 from .lemur import LemurAdapter
 
-_REGISTRY: dict[str, type[BaseAdapter]] = {
-    "lemur": LemurAdapter,
-    "generic_rest": GenericRESTAdapter,
-}
+logger = logging.getLogger("netbox_ssl.adapters")
+
+
+def _build_registry() -> dict[str, type[BaseAdapter]]:
+    """Build the adapter registry, lazy-importing optional adapters.
+
+    Adapters with optional dependencies (e.g., aws_acm requires the [aws]
+    extras for boto3) are wrapped in try/except so a missing extra does
+    not break the entire plugin — the adapter is simply unavailable.
+    """
+    registry: dict[str, type[BaseAdapter]] = {
+        "lemur": LemurAdapter,
+        "generic_rest": GenericRESTAdapter,
+    }
+    # Optional adapter — requires netbox-ssl[aws]
+    try:
+        from .aws_acm import AwsAcmAdapter
+
+        registry["aws_acm"] = AwsAcmAdapter
+    except ImportError as exc:
+        logger.info(
+            "AWS ACM adapter not registered (boto3 not installed): %s. Install with: pip install netbox-ssl[aws]",
+            exc,
+        )
+    return registry
+
+
+_REGISTRY: dict[str, type[BaseAdapter]] = _build_registry()
 
 
 def get_adapter_class(source_type: str) -> type[BaseAdapter]:
@@ -20,7 +46,8 @@ def get_adapter_class(source_type: str) -> type[BaseAdapter]:
         The registered adapter class.
 
     Raises:
-        KeyError: If no adapter is registered for the source_type.
+        KeyError: If no adapter is registered for the source_type
+                  (either unknown source_type, or optional extras missing).
     """
     adapter_cls = _REGISTRY.get(source_type)
     if adapter_cls is None:

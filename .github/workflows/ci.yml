@@ -97,11 +97,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytest cryptography django requests
+          pip install pytest cryptography django requests boto3 'moto[acm]>=5.0,<6.0'
 
       - name: Run unit tests
         run: |
-          python -m pytest tests/test_parser.py tests/test_models.py tests/test_events.py tests/test_expiry_scan.py -v -p no:django
+          python -m pytest tests/test_parser.py tests/test_models.py tests/test_events.py \
+                           tests/test_expiry_scan.py tests/test_aws_acm_adapter.py \
+                           -v -p no:django
 
   build-package:
     name: Build Package
@@ -274,7 +276,7 @@ jobs:
       - name: Install pytest in NetBox container
         run: |
           docker compose exec -T netbox bash -c "curl -sS https://bootstrap.pypa.io/get-pip.py | /opt/netbox/venv/bin/python"
-          docker compose exec -T netbox /opt/netbox/venv/bin/pip install pytest
+          docker compose exec -T netbox /opt/netbox/venv/bin/pip install pytest boto3 'moto[acm]>=5.0,<6.0'
 
       - name: Copy tests to container
         run: |

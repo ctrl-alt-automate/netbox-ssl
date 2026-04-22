@@ -81,10 +81,12 @@ class ExternalSourceTypeChoices(ChoiceSet):
 
     TYPE_LEMUR = "lemur"
     TYPE_GENERIC_REST = "generic_rest"
+    TYPE_AWS_ACM = "aws_acm"
 
     CHOICES = [
         (TYPE_LEMUR, "Lemur", "purple"),
         (TYPE_GENERIC_REST, "Generic REST API", "blue"),
+        (TYPE_AWS_ACM, "AWS Certificate Manager", "orange"),
     ]
 
 
