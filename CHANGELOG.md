@@ -30,6 +30,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`ExternalSource.snapshot()` credential redaction** — changelog entries
   redact reference values to `<redacted>` while preserving key-level audit
   trail (adds/removes of credential components stay visible).
+- **AWS ACM read-only adapter** ([#100](https://github.com/ctrl-alt-automate/netbox-ssl/issues/100)):
+  ingest certificate metadata from AWS Certificate Manager. Supports
+  `aws_explicit` (access key + secret + optional session token) and
+  `aws_instance_role` (boto3 default credential chain) auth methods. One
+  ExternalSource per AWS region. Read-only: never writes to ACM, never
+  fetches private key material. Requires the `[aws]` optional extras:
+  `pip install netbox-ssl[aws]`. See
+  [docs/how-to/aws-acm-sync.md](docs/how-to/aws-acm-sync.md) for the
+  minimum IAM policy and configuration walkthrough.
 
 ### Deprecated
 
