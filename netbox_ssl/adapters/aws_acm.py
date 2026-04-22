@@ -1,0 +1,62 @@
+"""AWS Certificate Manager (ACM) adapter — read-only ingestion of cert metadata.
+
+Requires the `[aws]` optional extras: `pip install netbox-ssl[aws]`.
+
+Architecturally diverges from Lemur/GenericREST: uses boto3 directly instead of
+`requests` via `BaseAdapter._make_request()`. Reuses Phase 1 multi-credential
+infrastructure for credential resolution, schema validation, and snapshot
+redaction.
+
+Design spec: docs/superpowers/specs/2026-04-22-aws-acm-adapter-design.md
+"""
+
+from __future__ import annotations
+
+import logging
+
+try:
+    import boto3  # noqa: F401 — used in _get_client() (Task 7)
+    import botocore.exceptions  # noqa: F401 — used in error handling (Task 14)
+except ImportError as exc:  # pragma: no cover — covered by lazy registry test
+    raise ImportError("AWS ACM adapter requires boto3. Install with: pip install netbox-ssl[aws]") from exc
+
+from .base import (  # noqa: F401 — CredentialField used in credential_schema() (Task 4)
+    BaseAdapter,
+    CredentialField,
+    FetchedCertificate,
+)
+
+logger = logging.getLogger("netbox_ssl.adapters.aws_acm")
+
+
+class AwsAcmAdapter(BaseAdapter):
+    """Read-only adapter for AWS Certificate Manager.
+
+    Supports two auth methods:
+    - aws_explicit:        operator-supplied access_key_id + secret_access_key (+ optional session_token)
+    - aws_instance_role:   boto3 default credential chain (EC2 IMDSv2, ECS task role, Lambda exec role)
+
+    One ExternalSource = one AWS region. Multi-region operators create one
+    source per region (matches Lemur/GenericREST one-source-per-endpoint).
+    """
+
+    SUPPORTED_AUTH_METHODS: tuple[str, ...] = ("aws_explicit", "aws_instance_role")
+    IMPLICIT_AUTH_METHODS: tuple[str, ...] = ("aws_instance_role",)
+    REQUIRES_BASE_URL: bool = False
+    REQUIRES_REGION: bool = True
+
+    def __init__(self, source) -> None:
+        super().__init__(source)
+        self._client = None  # lazy: built on first use by _get_client()
+
+    def test_connection(self) -> tuple[bool, str]:
+        """Test connectivity to the ACM API. Implemented in Task 14."""
+        raise NotImplementedError("Implemented in Task 14")
+
+    def fetch_certificates(self) -> list[FetchedCertificate]:
+        """Fetch all certificates. Implemented in Task 12."""
+        raise NotImplementedError("Implemented in Task 12")
+
+    def get_certificate_detail(self, external_id: str) -> FetchedCertificate | None:
+        """Fetch a single certificate by ARN. Implemented in Task 13."""
+        raise NotImplementedError("Implemented in Task 13")
