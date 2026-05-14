@@ -317,6 +317,60 @@ def test_assert_no_prohibited_keys_pem_bundle_aws_alias_raises():
         AwsAcmAdapter._assert_no_prohibited_keys(dirty_response)
 
 
+def test_assert_no_prohibited_keys_camelcase_aws_format_raises():
+    """AWS uses CamelCase (`PrivateKey`); must normalise to match `private_key`."""
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    dirty_response = {"CertificateArn": "arn:aws:acm:...", "PrivateKey": "-----BEGIN..."}
+    with pytest.raises(ValueError, match="failed safety check"):
+        AwsAcmAdapter._assert_no_prohibited_keys(dirty_response)
+
+
+def test_assert_no_prohibited_keys_nested_inside_certificate_raises():
+    """ACM DescribeCertificate wraps metadata in {"Certificate": {...}}; nested keys must be caught."""
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    dirty_response = {
+        "Certificate": {
+            "CertificateArn": "arn:aws:acm:...",
+            "PrivateKey": "-----BEGIN...",
+        }
+    }
+    with pytest.raises(ValueError, match="failed safety check"):
+        AwsAcmAdapter._assert_no_prohibited_keys(dirty_response)
+
+
+def test_assert_no_prohibited_keys_nested_inside_list_raises():
+    """Recurse into lists of dicts (e.g. paginated CertificateSummaryList entries)."""
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    dirty_response = {
+        "CertificateSummaryList": [
+            {"CertificateArn": "arn:1"},
+            {"CertificateArn": "arn:2", "secret_value": "..."},  # Azure-style key alias
+        ]
+    }
+    with pytest.raises(ValueError, match="failed safety check"):
+        AwsAcmAdapter._assert_no_prohibited_keys(dirty_response)
+
+
+def test_assert_no_prohibited_keys_deeply_nested_clean_passes():
+    """Realistic nested structures with no prohibited keys must not raise."""
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    clean_response = {
+        "Certificate": {
+            "CertificateArn": "arn:aws:acm:...",
+            "DomainValidationOptions": [
+                {"DomainName": "example.com", "ValidationStatus": "SUCCESS"},
+            ],
+        },
+        "ResponseMetadata": {"HTTPStatusCode": 200},
+    }
+    # Should not raise
+    AwsAcmAdapter._assert_no_prohibited_keys(clean_response)
+
+
 # ---------------------------------------------------------------------------
 # _parse_acm_certificate() tests
 # ---------------------------------------------------------------------------

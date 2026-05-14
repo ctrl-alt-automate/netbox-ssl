@@ -13,7 +13,12 @@ Design spec: docs/superpowers/specs/2026-04-22-aws-acm-adapter-design.md
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Iterator
+from typing import Any
+
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
 
 try:
     import boto3
@@ -29,6 +34,19 @@ from .base import (
 )
 
 logger = logging.getLogger("netbox_ssl.adapters.aws_acm")
+
+# Normalize keys for prohibited-fields comparison: lowercase + alphanumerics only.
+# This collapses "PrivateKey" (AWS CamelCase) and "private_key" (snake_case) to
+# the same canonical form so PROHIBITED_SYNC_FIELDS catches both spellings.
+_KEY_NORMALIZE_PATTERN = re.compile(r"[^a-z0-9]")
+
+
+def _normalize_key(key: str) -> str:
+    return _KEY_NORMALIZE_PATTERN.sub("", key.lower())
+
+
+# Pre-normalize the canonical prohibited-field set once at import time.
+_PROHIBITED_NORMALIZED: frozenset[str] = frozenset(_normalize_key(f) for f in PROHIBITED_SYNC_FIELDS)
 
 
 class AwsAcmAdapter(BaseAdapter):
@@ -147,26 +165,36 @@ class AwsAcmAdapter(BaseAdapter):
         return self._client
 
     @staticmethod
-    def _assert_no_prohibited_keys(response: dict) -> None:
+    def _assert_no_prohibited_keys(response: Any) -> None:
         """Defensive guard — ACM responses must never contain private key material.
 
         ACM's read-only API (Describe/List/GetCertificate) does not expose
         private keys. This check enforces that invariant: if a hypothetical
-        future ACM API change starts returning sensitive fields, the adapter
-        fails hard rather than silently leaking them into NetBox.
+        future ACM API change starts returning sensitive fields at any
+        nesting level, the adapter fails hard rather than silently leaking
+        them into NetBox.
+
+        Walks the response recursively through dicts and lists. Key
+        comparison is normalised (lowercase + alphanumerics only) so AWS
+        CamelCase (`PrivateKey`) and snake_case (`private_key`) both
+        match the canonical entries in PROHIBITED_SYNC_FIELDS.
 
         Args:
-            response: A dict from boto3 (e.g. DescribeCertificate response body).
+            response: A dict (or any boto3 response value) to inspect.
 
         Raises:
-            ValueError: If any response key matches PROHIBITED_SYNC_FIELDS
-                        (case-insensitive comparison).
+            ValueError: If any key at any depth matches PROHIBITED_SYNC_FIELDS
+                        after normalisation.
         """
-        keys_lower = {k.lower() for k in response}
-        forbidden = keys_lower & PROHIBITED_SYNC_FIELDS
-        if forbidden:
-            logger.error("ACM response contained prohibited keys: %s", forbidden)
-            raise ValueError("Adapter response failed safety check")
+        if isinstance(response, dict):
+            for key, value in response.items():
+                if _normalize_key(str(key)) in _PROHIBITED_NORMALIZED:
+                    logger.error("ACM response contained prohibited key: %s", key)
+                    raise ValueError("Adapter response failed safety check")
+                AwsAcmAdapter._assert_no_prohibited_keys(value)
+        elif isinstance(response, list):
+            for item in response:
+                AwsAcmAdapter._assert_no_prohibited_keys(item)
 
     @staticmethod
     def _parse_acm_certificate(describe_response: dict, get_response: dict) -> FetchedCertificate | None:
@@ -215,9 +243,6 @@ class AwsAcmAdapter(BaseAdapter):
                     cert_meta.get("CertificateArn", "<unknown>"),
                 )
                 return None
-
-            from cryptography import x509
-            from cryptography.hazmat.primitives import hashes
 
             try:
                 x509_cert = x509.load_pem_x509_certificate(pem.encode("utf-8"))
