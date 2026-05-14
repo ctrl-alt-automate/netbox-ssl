@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **NetBox 4.6.x compatibility** ([#89](https://github.com/ctrl-alt-automate/netbox-ssl/issues/89)):
+  `max_version` bumped from `4.5.99` to `4.6.99`. NetBox 4.6.0 (released
+  2026-05-05) upgrades to Django 6.0 and deprecates several APIs; static
+  analysis confirmed the plugin does not use any of the deprecated
+  features (`username`/`request_id` in event payloads, `DEFAULT_ACTION_PERMISSIONS`,
+  `querystring` template tag, `LOGIN_REQUIRED` setting, `expand_ipaddress_pattern`,
+  legacy app registry `models` key). Added v4.6.0 to the integration test
+  matrix (shares the v4.5 `API_TOKEN_PEPPERS` configuration pattern).
 - **Multi-credential auth pattern for External Sources** ([#99](https://github.com/ctrl-alt-automate/netbox-ssl/issues/99)):
   new `ExternalSource.auth_credentials` JSONField stores credential-component
   references (e.g., `{"access_key_id": "env:AWS_KEY", "secret_access_key": "env:AWS_SECRET"}`)
