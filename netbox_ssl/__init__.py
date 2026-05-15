@@ -21,7 +21,7 @@ class NetBoxSSLConfig(PluginConfig):
     author_email = "info@example.com"
     base_url = "ssl"
     min_version = "4.4.0"
-    max_version = "4.5.99"
+    max_version = "4.6.99"
     required_settings = []
     default_settings = {
         "expiry_warning_days": 30,
