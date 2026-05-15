@@ -249,3 +249,33 @@ def test_generic_rest_does_not_declare_implicit_auth():
     from netbox_ssl.adapters.generic_rest import GenericRESTAdapter
 
     assert GenericRESTAdapter.IMPLICIT_AUTH_METHODS == ()
+
+
+def test_get_adapter_class_returns_aws_acm():
+    """When boto3 is available, aws_acm is registered."""
+    from netbox_ssl.adapters import get_adapter_class
+    from netbox_ssl.adapters.aws_acm import AwsAcmAdapter
+
+    assert get_adapter_class("aws_acm") is AwsAcmAdapter
+
+
+def test_get_supported_auth_methods_for_aws_acm():
+    from netbox_ssl.adapters import get_supported_auth_methods
+
+    assert get_supported_auth_methods("aws_acm") == ("aws_explicit", "aws_instance_role")
+
+
+def test_get_credential_schema_for_aws_acm_explicit():
+    from netbox_ssl.adapters import get_credential_schema
+
+    schema = get_credential_schema("aws_acm", "aws_explicit")
+    assert "access_key_id" in schema
+    assert "secret_access_key" in schema
+    assert "session_token" in schema
+    assert schema["session_token"].required is False
+
+
+def test_get_credential_schema_for_aws_acm_instance_role():
+    from netbox_ssl.adapters import get_credential_schema
+
+    assert get_credential_schema("aws_acm", "aws_instance_role") == {}

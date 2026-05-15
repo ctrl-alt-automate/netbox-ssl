@@ -313,3 +313,16 @@ def test_external_source_base_url_is_optional():
 
     base_url_field = ExternalSource._meta.get_field("base_url")
     assert base_url_field.blank is True
+
+
+@pytest.mark.unit
+def test_external_source_type_choices_include_aws_acm():
+    from netbox_ssl.models.external_source import ExternalSourceTypeChoices
+
+    values = [choice[0] for choice in ExternalSourceTypeChoices.CHOICES]
+    assert "aws_acm" in values
+    # Existing types must remain
+    assert "lemur" in values
+    assert "generic_rest" in values
+    # Sanity check: TYPE_AWS_ACM constant exists
+    assert ExternalSourceTypeChoices.TYPE_AWS_ACM == "aws_acm"
