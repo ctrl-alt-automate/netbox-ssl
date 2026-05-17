@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-17
+
+**Minor release** — External Source multi-credential auth, AWS ACM
+read-only adapter, and NetBox 4.6.x support. One additive migration
+(`0021`), one deprecation (`auth_credentials_reference`, removed in
+v2.0.0), no breaking changes.
+
+### Added
+
+- **NetBox 4.6.x compatibility** ([#89](https://github.com/ctrl-alt-automate/netbox-ssl/issues/89)):
+  `max_version` bumped from `4.5.99` to `4.6.99`. NetBox 4.6.0 upgrades to
+  Django 6.0; the plugin uses no deprecated APIs. Added v4.6.0 to the
+  integration test matrix.
+- **Multi-credential auth pattern for External Sources** ([#99](https://github.com/ctrl-alt-automate/netbox-ssl/issues/99)):
+  new `ExternalSource.auth_credentials` JSONField stores credential-component
+  references (e.g., `{"access_key_id": "env:AWS_KEY", "secret_access_key": "env:AWS_SECRET"}`)
+  instead of a single-string token. Enables first-class role-based auth
+  (`aws_instance_role`, `azure_managed_identity`) where the cloud SDK resolves
+  credentials via the host identity and `auth_credentials` stays empty.
+- **Per-adapter credential schemas** — each adapter class declares a
+  `credential_schema(auth_method)` classmethod; the ExternalSource form
+  and API serializer validate submitted credentials against the schema
+  at save time, surfacing field-specific errors (missing required key,
+  unknown key, unsupported reference scheme).
+- **Four new `auth_method` values**: `aws_explicit`, `aws_instance_role`,
+  `azure_explicit`, `azure_managed_identity`. Form dropdowns filter
+  per-source-type automatically via the adapter's `SUPPORTED_AUTH_METHODS`.
+- **`has_credentials` computed field** on the GraphQL type + API serializer —
+  returns `True` for role-based auth methods even when `auth_credentials`
+  is empty, so UI consumers can show "configured" state without seeing
+  reference values.
+- **`ExternalSource.snapshot()` credential redaction** — changelog entries
+  redact reference values to `<redacted>` while preserving key-level audit
+  trail (adds/removes of credential components stay visible).
+- **AWS ACM read-only adapter** ([#100](https://github.com/ctrl-alt-automate/netbox-ssl/issues/100)):
+  ingest certificate metadata from AWS Certificate Manager. Supports
+  `aws_explicit` (access key + secret + optional session token) and
+  `aws_instance_role` (boto3 default credential chain) auth methods. One
+  ExternalSource per AWS region. Read-only: never writes to ACM, never
+  fetches private key material. Requires the `[aws]` optional extras:
+  `pip install netbox-ssl[aws]`. See
+  [docs/how-to/aws-acm-sync.md](docs/how-to/aws-acm-sync.md) for the
+  minimum IAM policy and configuration walkthrough.
+
+### Deprecated
+
+- **`ExternalSource.auth_credentials_reference`** (single-string CharField
+  from v0.8) deprecated in favor of the new JSONField. Migration 0021
+  auto-wraps existing values as `{"token": "..."}`. Field stays functional
+  through v1.1.x; removed in v2.0.0 — see [ROADMAP §8.2](project-requirement-document/ROADMAP.md#82-removal-of-auth_credentials_reference-field-on-externalsource).
+
+### Migration notes
+
+One new migration (`0021_external_source_auth_credentials`) adds the field
+and backfills it from the legacy CharField. Run:
+
+```bash
+python manage.py migrate netbox_ssl
+```
+
+The migration is idempotent (safe to re-run) and additive (safe to downgrade to v1.0.x — the old field remains).
+
 ## [1.0.1] - 2026-04-20
 
 **Patch release** — two post-GA bugfixes surfaced while producing fresh

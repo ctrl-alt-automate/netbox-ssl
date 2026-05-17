@@ -97,11 +97,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytest cryptography django requests
+          pip install pytest cryptography django requests boto3 'moto[acm]>=5.0,<6.0'
 
       - name: Run unit tests
         run: |
-          python -m pytest tests/test_parser.py tests/test_models.py tests/test_events.py tests/test_expiry_scan.py -v -p no:django
+          python -m pytest tests/test_parser.py tests/test_models.py tests/test_events.py \
+                           tests/test_expiry_scan.py tests/test_aws_acm_adapter.py \
+                           -v -p no:django
 
   build-package:
     name: Build Package
@@ -132,6 +134,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - netbox_version: "v4.6.0"
+            netbox_major: "v4.6"
           - netbox_version: "v4.5-4.0.0"
             netbox_major: "v4.5"
           - netbox_version: "v4.4"
@@ -144,8 +148,8 @@ jobs:
           mkdir -p env development/configuration
 
           # Create NetBox environment file (version-specific settings)
-          if [[ "${{ matrix.netbox_major }}" == "v4.5" ]]; then
-            # v4.5: Skip automatic superuser creation (v2 token incompatibility)
+          if [[ "${{ matrix.netbox_major }}" == "v4.5" || "${{ matrix.netbox_major }}" == "v4.6" ]]; then
+            # v4.5/v4.6: Skip automatic superuser creation (v2 token incompatibility)
             printf '%s\n' \
               'CORS_ORIGIN_ALLOW_ALL=True' \
               'DB_HOST=postgres' \
@@ -214,7 +218,7 @@ jobs:
           echo "REDIS_PASSWORD=netbox" > env/redis-cache.env
 
           # Create plugins configuration with version-specific settings
-          if [[ "${{ matrix.netbox_major }}" == "v4.5" ]]; then
+          if [[ "${{ matrix.netbox_major }}" == "v4.5" || "${{ matrix.netbox_major }}" == "v4.6" ]]; then
             printf '%s\n' \
               'PLUGINS = ["netbox_ssl"]' \
               'PLUGINS_CONFIG = {' \
@@ -258,8 +262,8 @@ jobs:
           timeout 1800 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting for NetBox..."; sleep 15; done'
           echo "NetBox is ready!"
 
-      - name: Create superuser for v4.5
-        if: matrix.netbox_major == 'v4.5'
+      - name: Create superuser for v4.5/v4.6
+        if: matrix.netbox_major == 'v4.5' || matrix.netbox_major == 'v4.6'
         run: |
           docker compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "
           from django.contrib.auth import get_user_model
@@ -274,7 +278,7 @@ jobs:
       - name: Install pytest in NetBox container
         run: |
           docker compose exec -T netbox bash -c "curl -sS https://bootstrap.pypa.io/get-pip.py | /opt/netbox/venv/bin/python"
-          docker compose exec -T netbox /opt/netbox/venv/bin/pip install pytest
+          docker compose exec -T netbox /opt/netbox/venv/bin/pip install pytest boto3 'moto[acm]>=5.0,<6.0'
 
       - name: Copy tests to container
         run: |

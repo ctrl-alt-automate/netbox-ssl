@@ -9,6 +9,7 @@ import requests
 
 from .base import (
     BaseAdapter,
+    CredentialField,
     FetchedCertificate,
 )
 
@@ -24,6 +25,25 @@ class LemurAdapter(BaseAdapter):
     Lemur API docs: https://lemur.readthedocs.io/
     Uses GET {base_url}/api/1/certificates with Bearer auth.
     """
+
+    SUPPORTED_AUTH_METHODS: tuple[str, ...] = ("bearer",)
+
+    @classmethod
+    def credential_schema(cls, auth_method: str) -> dict[str, CredentialField]:
+        """Lemur uses a single bearer token — one credential component."""
+        if auth_method != "bearer":
+            raise ValueError(
+                f"LemurAdapter does not support auth_method '{auth_method}'. "
+                f"Supported: {list(cls.SUPPORTED_AUTH_METHODS)}"
+            )
+        return {
+            "token": CredentialField(
+                required=True,
+                label="API Token",
+                secret=True,
+                help_text="Lemur API bearer token",
+            ),
+        }
 
     def _validate_pagination_url(self, next_url: str) -> bool:
         """Validate that a pagination URL shares the same origin as the base URL.

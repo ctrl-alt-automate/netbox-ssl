@@ -268,3 +268,61 @@ class TestPluginSettings:
         assert "external_source_sync_enabled" in content
         assert "external_source_default_interval" in content
         assert "external_source_never_fetch_keys" in content
+
+
+@pytest.mark.unit
+def test_auth_method_choices_include_cloud_methods():
+    from netbox_ssl.models.external_source import AuthMethodChoices
+
+    values = [choice[0] for choice in AuthMethodChoices.CHOICES]
+    assert "bearer" in values
+    assert "api_key" in values
+    assert "aws_explicit" in values
+    assert "aws_instance_role" in values
+    assert "azure_explicit" in values
+    assert "azure_managed_identity" in values
+
+
+@pytest.mark.unit
+def test_external_source_has_auth_credentials_field():
+    if not _NETBOX_AVAILABLE:
+        pytest.skip("requires Django+NetBox metaclass infrastructure")
+    from netbox_ssl.models.external_source import ExternalSource
+
+    field_names = [f.name for f in ExternalSource._meta.get_fields() if not f.many_to_many and not f.one_to_many]
+    assert "auth_credentials" in field_names
+    assert "auth_credentials_reference" in field_names  # still present, deprecated
+
+
+@pytest.mark.unit
+def test_external_source_has_region_field():
+    if not _NETBOX_AVAILABLE:
+        pytest.skip("requires Django+NetBox metaclass infrastructure")
+    from netbox_ssl.models.external_source import ExternalSource
+
+    field_names = [f.name for f in ExternalSource._meta.get_fields() if not f.many_to_many and not f.one_to_many]
+    assert "region" in field_names
+
+
+@pytest.mark.unit
+def test_external_source_base_url_is_optional():
+    """base_url becomes optional in v1.1 so AWS ACM sources can omit it."""
+    if not _NETBOX_AVAILABLE:
+        pytest.skip("requires Django+NetBox metaclass infrastructure")
+    from netbox_ssl.models.external_source import ExternalSource
+
+    base_url_field = ExternalSource._meta.get_field("base_url")
+    assert base_url_field.blank is True
+
+
+@pytest.mark.unit
+def test_external_source_type_choices_include_aws_acm():
+    from netbox_ssl.models.external_source import ExternalSourceTypeChoices
+
+    values = [choice[0] for choice in ExternalSourceTypeChoices.CHOICES]
+    assert "aws_acm" in values
+    # Existing types must remain
+    assert "lemur" in values
+    assert "generic_rest" in values
+    # Sanity check: TYPE_AWS_ACM constant exists
+    assert ExternalSourceTypeChoices.TYPE_AWS_ACM == "aws_acm"

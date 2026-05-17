@@ -83,7 +83,7 @@ python manage.py check --tag netbox_ssl
 Then navigate to **Plugins > SSL Certificates** in the NetBox UI. You should see the Certificates menu item.
 
 <p align="center">
-  <img src="images/certificate-list.png" alt="Certificate List" width="700">
+  <img src="images/certificate-list-dark.png" alt="Certificate List" width="700">
 </p>
 
 ---
