@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-17
+
+**Minor release** — External Source multi-credential auth, AWS ACM
+read-only adapter, and NetBox 4.6.x support. One additive migration
+(`0021`), one deprecation (`auth_credentials_reference`, removed in
+v2.0.0), no breaking changes.
+
 ### Added
 
 - **NetBox 4.6.x compatibility** ([#89](https://github.com/ctrl-alt-automate/netbox-ssl/issues/89)):
