@@ -59,6 +59,7 @@ class ExternalSourceSerializer(NetBoxModelSerializer):
             "last_sync_message",
             "verify_ssl",
             "certificate_count",
+            "comments",
             "tags",
             "custom_fields",
             "created",
