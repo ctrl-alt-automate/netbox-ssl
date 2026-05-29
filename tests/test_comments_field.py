@@ -25,17 +25,20 @@ _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-_in_netbox_env = os.path.exists("/opt/netbox/netbox/netbox/settings.py") or "DJANGO_SETTINGS_MODULE" in os.environ
+import importlib.util
 
-if _in_netbox_env:
+try:
+    _spec = importlib.util.find_spec("netbox")
+    NETBOX_AVAILABLE = _spec is not None and _spec.origin is not None
+except (ValueError, ModuleNotFoundError):
+    NETBOX_AVAILABLE = False
+
+if NETBOX_AVAILABLE:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "netbox.settings")
     import django
 
-    with contextlib.suppress(RuntimeError):
+    with contextlib.suppress(Exception):
         django.setup()
-    NETBOX_AVAILABLE = True
-else:
-    NETBOX_AVAILABLE = False
 
 requires_netbox = pytest.mark.skipif(
     not NETBOX_AVAILABLE,
