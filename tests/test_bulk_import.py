@@ -390,6 +390,13 @@ def django_api_available():
         if not settings.configured:
             return False
 
+        # These tests hit the API + DB in-process and need pytest-django for
+        # proper test-database isolation. Without it they mutate the live DB
+        # and previously only skipped by accident (sys.modules contamination).
+        # Require pytest-django so they skip *deterministically* until it is
+        # adopted (tracked follow-up) instead of erroring in the suite.
+        import pytest_django  # noqa: F401
+
         # Try to import REST framework test client
         from django.contrib.auth import get_user_model  # noqa: F401
         from rest_framework.test import APIClient  # noqa: F401

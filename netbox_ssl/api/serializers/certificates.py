@@ -98,6 +98,7 @@ class CertificateSerializer(NetBoxModelSerializer):
             "external_source",
             "external_id",
             "source_removed",
+            "comments",
             "tags",
             "custom_fields",
             "created",

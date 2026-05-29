@@ -86,6 +86,10 @@ class CertificateAuthority(NetBoxModel):
         help_text="Whether this CA is approved for use in the organization",
     )
 
+    # Free-form comments (NetBox standard field; surfaced via CommentField in the form).
+    # null=True for consistency with the historical comments columns (0001/0003).
+    comments = models.TextField(blank=True, null=True)
+
     class Meta:
         ordering = ["name"]
         verbose_name = "Certificate Authority"

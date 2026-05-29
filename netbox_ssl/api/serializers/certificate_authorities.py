@@ -32,6 +32,7 @@ class CertificateAuthoritySerializer(NetBoxModelSerializer):
             "renewal_instructions",
             "is_approved",
             "certificate_count",
+            "comments",
             "tags",
             "custom_fields",
             "created",

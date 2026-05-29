@@ -46,6 +46,7 @@ class CertificateSigningRequestSerializer(NetBoxModelSerializer):
             "notes",
             "resulting_certificate",
             "tenant",
+            "comments",
             "tags",
             "custom_fields",
             "created",
