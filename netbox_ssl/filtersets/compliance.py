@@ -20,10 +20,10 @@ class CompliancePolicyFilterSet(NetBoxModelFilterSet):
 
     name = django_filters.CharFilter(lookup_expr="icontains")
     policy_type = django_filters.MultipleChoiceFilter(
-        choices=CompliancePolicyTypeChoices.CHOICES,
+        choices=CompliancePolicyTypeChoices,
     )
     severity = django_filters.MultipleChoiceFilter(
-        choices=ComplianceSeverityChoices.CHOICES,
+        choices=ComplianceSeverityChoices,
     )
     enabled = django_filters.BooleanFilter()
     tenant_id = django_filters.NumberFilter()
@@ -65,11 +65,11 @@ class ComplianceCheckFilterSet(NetBoxModelFilterSet):
         lookup_expr="icontains",
     )
     result = django_filters.MultipleChoiceFilter(
-        choices=ComplianceResultChoices.CHOICES,
+        choices=ComplianceResultChoices,
     )
     severity = django_filters.MultipleChoiceFilter(
         field_name="policy__severity",
-        choices=ComplianceSeverityChoices.CHOICES,
+        choices=ComplianceSeverityChoices,
     )
     checked_after = django_filters.DateTimeFilter(
         field_name="checked_at",
