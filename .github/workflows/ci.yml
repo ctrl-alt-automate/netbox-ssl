@@ -283,6 +283,9 @@ jobs:
       - name: Copy tests to container
         run: |
           docker cp tests/. $(docker compose ps -q netbox):/tmp/plugin_tests/
+          # Ship the plugin's pytest.ini so the in-container run uses the
+          # plugin's (strict) marker config, not NetBox's own.
+          docker cp pytest.ini $(docker compose ps -q netbox):/tmp/plugin_tests/pytest.ini
 
       - name: Create test data
         run: |
@@ -296,6 +299,30 @@ jobs:
       - name: Run Django system checks
         run: |
           docker compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py check --tag netbox_ssl
+
+      - name: Validate OpenAPI schema (#111 regression gate)
+        run: |
+          # Regenerates the exact document served by /api/schema/ (Swagger UI).
+          # A serializer/filterset that drf-spectacular cannot introspect fails
+          # HERE instead of 500-ing in production — this is precisely how #111
+          # shipped undetected. Runs on every NetBox version in the matrix.
+          docker compose exec -T netbox /opt/netbox/venv/bin/python \
+            /opt/netbox/netbox/manage.py spectacular --file /tmp/schema.yml --validate
+          echo "OpenAPI schema generated and validated successfully."
+
+      - name: Regression gates must run (not skip) (#111/#112)
+        run: |
+          # Run the targeted regression tests in an isolated invocation and
+          # assert they actually executed. A silently-skipped @requires_netbox
+          # test is not a gate — a silent skip is how #111 stayed invisible.
+          NB=$(docker compose ps -q netbox)
+          docker compose exec -T netbox /opt/netbox/venv/bin/python -m pytest \
+            /tmp/plugin_tests/test_api_schema.py /tmp/plugin_tests/test_comments_field.py \
+            /tmp/plugin_tests/test_field_parity.py /tmp/plugin_tests/test_security_invariants.py \
+            -o addopts='' -p no:cacheprovider --junitxml=/tmp/reg.xml -q
+          docker cp "$NB":/tmp/reg.xml reg.xml
+          python3 -m pip install --quiet defusedxml 2>/dev/null || true
+          python3 scripts/assert_tests_ran.py reg.xml
 
       - name: Show logs on failure
         if: failure()
