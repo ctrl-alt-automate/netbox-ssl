@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-05-29
+
+**Patch release** — two bug fixes for issues reported on v1.1.0, plus a test &
+CI hardening pass to catch this class of bug before release. One additive
+migration (`0022`), no breaking changes.
+
+### Fixed
+
+- **`/api/schema/` (Swagger UI) returned HTTP 500 on NetBox 4.6** ([#111](https://github.com/ctrl-alt-automate/netbox-ssl/issues/111)):
+  the compliance FilterSets passed a raw colored `ChoiceSet.CHOICES` list
+  (3-tuples of `value, label, color`) to `MultipleChoiceFilter`. drf-spectacular
+  cannot unpack 3-tuple choices, which aborted generation of the **entire**
+  OpenAPI schema for any install with the plugin enabled — even with zero
+  certificates. Now passes the ChoiceSet class, consistent with every other
+  filterset.
+- **Certificate comments were not retained after save** ([#112](https://github.com/ctrl-alt-automate/netbox-ssl/issues/112)):
+  the edit forms exposed a `comments` field but the models (which inherit
+  `NetBoxModel`, not `PrimaryModel`) had no `comments` column, so input was
+  silently discarded. Added a real `comments` field to `Certificate`,
+  `CertificateAuthority`, `CertificateSigningRequest` and `ExternalSource`
+  (migration `0022`, additive), exposed it in the REST API, and rendered a
+  Comments panel on the detail pages.
+
+### Changed
+
+- **Test & CI hardening** to catch the #111/#112 bug classes before release: an
+  OpenAPI schema-generation gate (`spectacular --validate`) on every supported
+  NetBox version; a non-skippable regression gate; `publish.yml` now requires a
+  passing CI run for the tagged commit before releasing to PyPI; a single
+  strict pytest configuration; and new generalized tests for form↔model field
+  parity and security invariants (CSV-injection sanitization, view
+  authentication). Several pre-existing serializer tests were rewritten to
+  exercise the real DRF serializers instead of hand-built fakes. Follow-ups
+  tracked in [#116](https://github.com/ctrl-alt-automate/netbox-ssl/issues/116)–[#119](https://github.com/ctrl-alt-automate/netbox-ssl/issues/119).
+
 ## [1.1.0] - 2026-05-17
 
 **Minor release** — External Source multi-credential auth, AWS ACM
@@ -577,7 +612,9 @@ Initial release of NetBox SSL Plugin.
 - NetBox 4.4.0 - 4.5.x
 - Python 3.10+
 
-[Unreleased]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.0.1...v1.1.0
 [0.7.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.5.0...v0.5.1
