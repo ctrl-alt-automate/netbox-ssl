@@ -77,6 +77,11 @@ class CertificateSigningRequest(NetBoxModel):
         help_text="Requested Subject Alternative Names (DNS names, IPs, etc.)",
     )
 
+    # Free-form comments (NetBox standard field; surfaced via CommentField in the form).
+    # null=True matches the historical column from migration 0003 and avoids a
+    # risky NOT NULL alter on existing installs.
+    comments = models.TextField(blank=True, null=True)
+
     # Key information
     key_size = models.PositiveIntegerField(
         null=True,

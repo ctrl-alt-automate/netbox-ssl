@@ -223,6 +223,11 @@ class Certificate(NetBoxModel):
         help_text="Custom renewal instructions for this specific certificate. Overrides CA-level instructions.",
     )
 
+    # Free-form comments (NetBox standard field; surfaced via CommentField in the form).
+    # null=True matches the historical column from migration 0001 and avoids a
+    # risky NOT NULL alter on existing installs.
+    comments = models.TextField(blank=True, null=True)
+
     # Renewal tracking (Janus workflow)
     replaced_by = models.ForeignKey(
         "self",

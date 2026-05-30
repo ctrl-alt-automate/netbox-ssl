@@ -10,8 +10,42 @@ permissions:
   contents: write
 
 jobs:
+  verify-ci:
+    name: Require a passing CI run for this commit
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Require CI success before publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A tag push publishes to PyPI. Without this gate a release ships even
+          # if CI is red — which is exactly how #111/#112 reached v1.1.0. Require
+          # the CI workflow for this commit to have concluded successfully.
+          sha="${GITHUB_SHA}"
+          echo "Requiring a successful 'CI' run for commit $sha before publishing."
+          for i in $(seq 1 30); do
+            status=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --commit "$sha" --json status -q '.[0].status' 2>/dev/null || true)
+            concl=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --commit "$sha" --json conclusion -q '.[0].conclusion' 2>/dev/null || true)
+            echo "attempt $i: status='${status}' conclusion='${concl}'"
+            if [ "$status" = "completed" ]; then
+              if [ "$concl" = "success" ]; then
+                echo "CI passed for $sha — proceeding to publish."
+                exit 0
+              fi
+              echo "::error::CI for $sha concluded '${concl}' (not success). Refusing to publish."
+              exit 1
+            fi
+            sleep 20
+          done
+          echo "::error::Timed out waiting for CI to complete for $sha. Re-run this workflow once CI is green."
+          exit 1
+
   publish:
     name: Build and publish to PyPI
+    needs: verify-ci
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
