@@ -18,6 +18,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   import — so this exposes nothing beyond the metadata already shown. Aligned
   with the plugin's passive-administration model: no new active capability.
 
+### Fixed
+
+- **Migration drift on the compliance models and ExternalSource** ([#118](https://github.com/ctrl-alt-automate/netbox-ssl/issues/118)):
+  `ComplianceCheck` and `CompliancePolicy` (both `NetBoxModel` subclasses) were
+  created without their `tags` field in the migration history, and several
+  `custom_field_data` / `tags` field definitions had drifted out of sync with
+  the models — the same class of issue as the v1.0.1 `ComplianceTrendSnapshot`
+  fix. Migration `0023` reconciles the state (adds `tags` to both compliance
+  models, aligns the `CustomFieldJSONEncoder`, drops a stale Certificate
+  constraint). All operations are additive / metadata-only and safe on existing
+  installs. A `makemigrations netbox_ssl --check` CI gate (pinned to NetBox 4.6)
+  now fails the build on any future drift.
+
+### Documentation
+
+- **Docs deploys no longer race on release** ([#110](https://github.com/ctrl-alt-automate/netbox-ssl/issues/110)):
+  the `Docs Deploy` workflow now serializes gh-pages pushes via a `concurrency`
+  group, so the release-critical tag-triggered deploy can no longer be rejected
+  by the concurrent `main`-push deploy.
+
 ## [1.1.1] - 2026-05-29
 
 **Patch release** — two bug fixes for issues reported on v1.1.0, plus a test &
