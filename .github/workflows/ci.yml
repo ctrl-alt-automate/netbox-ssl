@@ -316,6 +316,20 @@ jobs:
             /opt/netbox/netbox/manage.py spectacular --file /tmp/schema.yml --validate
           echo "OpenAPI schema generated and validated successfully."
 
+      - name: Check for migration drift (#118)
+        if: matrix.netbox_major == 'v4.6'
+        run: |
+          # `makemigrations --check` exits non-zero if the models have changes
+          # not captured in a migration. This is the gate that would have caught
+          # the v1.0.1 ComplianceTrendSnapshot 500 and the #118 compliance-tags
+          # drift before release. Pinned to v4.6 only: cross-version field churn
+          # (encoder/through-table internals differ per NetBox/Django) would make
+          # a multi-version gate flaky. NetBox's makemigrations override allows
+          # `--check` without DEVELOPER=True (it only blocks actual file writes).
+          docker compose exec -T netbox /opt/netbox/venv/bin/python \
+            /opt/netbox/netbox/manage.py makemigrations netbox_ssl --check
+          echo "No migration drift detected."
+
       - name: Regression gates must run (not skip) (#111/#112)
         run: |
           # Run the targeted regression tests in an isolated invocation and
