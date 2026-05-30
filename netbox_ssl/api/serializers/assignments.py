@@ -2,6 +2,8 @@
 REST API serializers for CertificateAssignment model.
 """
 
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from netbox.api.fields import ContentTypeField
 from netbox.api.serializers import NetBoxModelSerializer
 from rest_framework import serializers
@@ -87,6 +89,7 @@ class CertificateAssignmentSerializer(NetBoxModelSerializer):
 
         return data
 
+    @extend_schema_field(OpenApiTypes.OBJECT)
     def get_assigned_object(self, obj):
         """Return basic info about the assigned object."""
         if obj.assigned_object:

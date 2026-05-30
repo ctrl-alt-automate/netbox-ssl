@@ -9,6 +9,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Count
 from django.http import HttpResponse
+from drf_spectacular.utils import extend_schema
 from netbox.api.viewsets import NetBoxModelViewSet
 from rest_framework import serializers, status
 from rest_framework.decorators import action
@@ -383,6 +384,8 @@ class CertificateViewSet(NetBoxModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(methods=["GET"], operation_id="plugins_ssl_certificates_export_list")
+    @extend_schema(methods=["POST"], operation_id="plugins_ssl_certificates_export_create")
     @action(detail=False, methods=["get", "post"], url_path="export")
     def export(self, request):
         """
@@ -490,6 +493,7 @@ class CertificateViewSet(NetBoxModelViewSet):
 
         return response
 
+    @extend_schema(operation_id="plugins_ssl_certificates_export_single")
     @action(detail=True, methods=["get"], url_path="export")
     def export_single(self, request, pk=None):
         """

@@ -47,6 +47,6 @@ class CertificateAuthoritySerializer(NetBoxModelSerializer):
             "is_approved",
         ]
 
-    def get_certificate_count(self, obj):
+    def get_certificate_count(self, obj) -> int:
         """Get the number of certificates issued by this CA."""
         return obj.certificates.count()

@@ -2,6 +2,8 @@
 REST API serializers for compliance reporting models.
 """
 
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from netbox.api.serializers import NetBoxModelSerializer
 from rest_framework import serializers
 from tenancy.api.serializers import TenantSerializer
@@ -51,7 +53,7 @@ class CompliancePolicySerializer(NetBoxModelSerializer):
             "enabled",
         ]
 
-    def get_check_count(self, obj):
+    def get_check_count(self, obj) -> int:
         """Get the number of checks performed with this policy."""
         return obj.checks.count()
 
@@ -97,6 +99,7 @@ class ComplianceCheckSerializer(NetBoxModelSerializer):
             "checked_at",
         ]
 
+    @extend_schema_field(OpenApiTypes.OBJECT)
     def get_certificate(self, obj):
         """Get basic certificate information."""
         return {
