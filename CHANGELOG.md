@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **OpenAPI schema is now generated warning-free, enforced by CI** ([#119](https://github.com/ctrl-alt-automate/netbox-ssl/issues/119)):
+  the five plugin `SerializerMethodField`s that drf-spectacular could not type
+  now declare a return type (`-> int`) or `@extend_schema_field`, and the two
+  colliding `export` action operation IDs are disambiguated. The schema gate is
+  promoted to `spectacular --validate --fail-on-warn`, so a future serializer
+  field or custom action added without a type hint / `@extend_schema` fails CI
+  instead of silently shipping a permissive or empty schema (the same
+  soft-warning-becomes-hard-error vector as #111). Improves the Swagger UI
+  request/response docs; no runtime behavior change.
+
 ### Fixed
 
 - **Migration drift on the compliance models and ExternalSource** ([#118](https://github.com/ctrl-alt-automate/netbox-ssl/issues/118)):

@@ -312,8 +312,14 @@ jobs:
           # A serializer/filterset that drf-spectacular cannot introspect fails
           # HERE instead of 500-ing in production — this is precisely how #111
           # shipped undetected. Runs on every NetBox version in the matrix.
+          # --fail-on-warn (#119): every custom serializer field and action is
+          # annotated, so drf-spectacular emits zero warnings. Promoting warnings
+          # to errors locks that in — a future field/action added without a type
+          # hint or @extend_schema fails CI instead of silently shipping a
+          # permissive/empty schema (the soft-warning -> hard-error path is the
+          # same vector as #111).
           docker compose exec -T netbox /opt/netbox/venv/bin/python \
-            /opt/netbox/netbox/manage.py spectacular --file /tmp/schema.yml --validate
+            /opt/netbox/netbox/manage.py spectacular --file /tmp/schema.yml --validate --fail-on-warn
           echo "OpenAPI schema generated and validated successfully."
 
       - name: Check for migration drift (#118)
