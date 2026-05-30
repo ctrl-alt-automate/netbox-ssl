@@ -312,15 +312,26 @@ jobs:
           # A serializer/filterset that drf-spectacular cannot introspect fails
           # HERE instead of 500-ing in production — this is precisely how #111
           # shipped undetected. Runs on every NetBox version in the matrix.
-          # --fail-on-warn (#119): every custom serializer field and action is
-          # annotated, so drf-spectacular emits zero warnings. Promoting warnings
-          # to errors locks that in — a future field/action added without a type
-          # hint or @extend_schema fails CI instead of silently shipping a
-          # permissive/empty schema (the soft-warning -> hard-error path is the
-          # same vector as #111).
           docker compose exec -T netbox /opt/netbox/venv/bin/python \
-            /opt/netbox/netbox/manage.py spectacular --file /tmp/schema.yml --validate --fail-on-warn
+            /opt/netbox/netbox/manage.py spectacular --file /tmp/schema.yml --validate
           echo "OpenAPI schema generated and validated successfully."
+
+      - name: OpenAPI schema is warning-free (#119)
+        if: matrix.netbox_major == 'v4.6'
+        run: |
+          # --fail-on-warn promotes drf-spectacular warnings to errors, so a new
+          # serializer field or custom action added without a type hint /
+          # @extend_schema fails CI instead of silently shipping a permissive or
+          # empty schema (the soft-warning -> hard-error vector of #111).
+          # Pinned to v4.6 only: older NetBox cores (4.4/4.5) ship their own
+          # unfixable drf-spectacular warnings (e.g. circuits filtersets) AND the
+          # TagFilter/django-filter "cannot guess choice type" warnings that the
+          # NetBoxModelFilterSet machinery emits on older versions — neither is
+          # under the plugin's control, so a multi-version --fail-on-warn gate
+          # would fail on upstream issues. v4.6 is clean for both core and plugin.
+          docker compose exec -T netbox /opt/netbox/venv/bin/python \
+            /opt/netbox/netbox/manage.py spectacular --file /tmp/schema_warn.yml --validate --fail-on-warn
+          echo "OpenAPI schema generated warning-free on NetBox 4.6."
 
       - name: Check for migration drift (#118)
         if: matrix.netbox_major == 'v4.6'
