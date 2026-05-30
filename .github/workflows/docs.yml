@@ -15,6 +15,18 @@ on:
 permissions:
   contents: write
 
+# Serialize gh-pages deploys (issue #110). On release, the dev->main merge and
+# the version-tag push fire within seconds; both trigger this workflow and both
+# `mike deploy --push` to the SAME gh-pages branch, so one is rejected
+# non-fast-forward (and it was the release-critical tag run that lost in v1.1.0).
+# A single fixed group (NOT keyed on github.ref — that would give each ref its
+# own group and defeat serialization) queues the runs. cancel-in-progress MUST
+# be false: each run writes a distinct mike slot/alias, so cancelling would drop
+# a needed versioned-docs or `latest` update.
+concurrency:
+  group: gh-pages-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy versioned docs
