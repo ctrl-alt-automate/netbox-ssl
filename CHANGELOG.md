@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Public certificate PEM on the detail page** ([#113](https://github.com/ctrl-alt-automate/netbox-ssl/issues/113)):
+  the stored public PEM is now shown in a collapsible "Certificate PEM" card on
+  the certificate detail page, with copy-to-clipboard and download controls,
+  visible to any user with **view** permission (previously the PEM was only
+  reachable from the edit form, forcing operators to be granted edit rights).
+  The field holds the public certificate only — private keys are rejected at
+  import — so this exposes nothing beyond the metadata already shown. Aligned
+  with the plugin's passive-administration model: no new active capability.
+
 ### Changed
 
 - **OpenAPI schema is now generated warning-free, enforced by CI** ([#119](https://github.com/ctrl-alt-automate/netbox-ssl/issues/119)):

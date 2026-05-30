@@ -125,6 +125,77 @@
   </div>
 </div>
 
+{# Public certificate PEM — visible to any user with view permission (issue #113). #}
+{# pem_content holds the public certificate only; private keys are rejected at import. #}
+{% if object.pem_content %}
+<div class="row mb-3">
+  <div class="col col-12">
+    <div class="card">
+      <h5 class="card-header d-flex justify-content-between align-items-center">
+        <button class="btn btn-link p-0 text-decoration-none" type="button"
+                data-bs-toggle="collapse" data-bs-target="#pem-collapse"
+                aria-expanded="false" aria-controls="pem-collapse">
+          <i class="mdi mdi-certificate"></i> Certificate PEM
+        </button>
+        <span>
+          <button type="button" class="btn btn-sm btn-secondary" id="pem-copy-btn">
+            <i class="mdi mdi-content-copy"></i> Copy
+          </button>
+          <button type="button" class="btn btn-sm btn-primary" id="pem-download-btn">
+            <i class="mdi mdi-download"></i> Download
+          </button>
+        </span>
+      </h5>
+      <div class="collapse" id="pem-collapse">
+        <div class="card-body">
+          <pre id="pem-content" class="mb-0" style="max-height: 24rem; overflow-y: auto;">{{ object.pem_content }}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="text/javascript">
+  (function () {
+    // The public PEM as a JS string (escapejs keeps newlines/quotes intact).
+    const pem = "{{ object.pem_content|escapejs }}";
+    const filename = "{{ object.common_name|escapejs|default:'certificate' }}.pem";
+
+    const copyBtn = document.getElementById("pem-copy-btn");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", function () {
+        const done = function () {
+          const original = copyBtn.innerHTML;
+          copyBtn.innerHTML = '<i class="mdi mdi-check"></i> Copied';
+          setTimeout(function () { copyBtn.innerHTML = original; }, 2000);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(pem).then(done).catch(function () {
+            window.prompt("Copy the certificate PEM:", pem);
+          });
+        } else {
+          window.prompt("Copy the certificate PEM:", pem);
+        }
+      });
+    }
+
+    const dlBtn = document.getElementById("pem-download-btn");
+    if (dlBtn) {
+      dlBtn.addEventListener("click", function () {
+        const blob = new Blob([pem], { type: "application/x-pem-file" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    }
+  })();
+</script>
+{% endif %}
+
 {% if object.is_acme %}
 <div class="row mb-3">
   <div class="col col-12">
