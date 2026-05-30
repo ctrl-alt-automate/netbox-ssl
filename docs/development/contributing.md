@@ -163,6 +163,16 @@ days. For urgent security issues, see [SECURITY.md](https://github.com/ctrl-alt-
 8. Push tag → triggers `publish.yml` (PyPI) and `docs.yml` (GH Pages)
 9. Close the milestone's issues with link to the release
 
+!!! note "Docs deploy ordering (gh-pages)"
+    The `dev → main` merge (step 6) and the tag push (step 8) both trigger
+    `docs.yml`, and both `mike deploy --push` to the same `gh-pages` branch. The
+    workflow declares a `concurrency: { group: gh-pages-deploy }` group so these
+    runs **serialize instead of racing** (a non-fast-forward push rejection
+    killed the release-critical tag deploy before this was added — issue #110).
+    As extra insurance, allow the `main`-push Docs Deploy to finish before
+    pushing the tag; if a deploy is ever rejected, re-run the failed run once the
+    competing run completes.
+
 See [versioning.md](versioning.md) for the semver policy.
 
 ## Questions?
