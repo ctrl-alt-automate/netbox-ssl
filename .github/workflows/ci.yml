@@ -97,13 +97,19 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytest cryptography django requests boto3 'moto[acm]>=5.0,<6.0'
+          pip install pytest pytest-randomly cryptography django requests boto3 \
+                      'moto[acm]>=5.0,<6.0' jsonpath-ng pyyaml
 
       - name: Run unit tests
         run: |
-          python -m pytest tests/test_parser.py tests/test_models.py tests/test_events.py \
-                           tests/test_expiry_scan.py tests/test_aws_acm_adapter.py \
-                           -v -p no:django
+          # Run the ENTIRE unit suite (not a hand-picked allowlist), so every
+          # host-runnable test is exercised on all three Python versions. The
+          # 5-file allowlist previously hid the test_checks Python-3.10 failure
+          # (issue #116). pytest-randomly shuffles collection order each run so
+          # any future order-dependence fails CI instead of shipping silently.
+          # -p no:django is required: pytest.ini sets DJANGO_SETTINGS_MODULE
+          # (for the in-container integration run), which is absent here.
+          python -m pytest tests/ -m unit -p no:django
 
   build-package:
     name: Build Package

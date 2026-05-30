@@ -94,6 +94,19 @@ if not _NETBOX_AVAILABLE:
 
     sys.modules.setdefault("netbox_ssl.models", MagicMock())
 
+    # issue #116: bind each mocked submodule onto its parent package so that
+    # unittest.mock.patch() target resolution works on Python 3.10. On 3.10
+    # mock._dot_lookup walks getattr(parent, child) rather than consulting
+    # sys.modules, so patch("django.db.connection") and
+    # patch("netbox_ssl.models.Certificate") resolved to a different object than
+    # the code imported — or raised AttributeError, because the real netbox_ssl
+    # package has no bound `models` attribute. Python 3.11+ consults sys.modules
+    # and was unaffected (which is why this only failed on 3.10).
+    sys.modules["django"].db = sys.modules["django.db"]
+    import netbox_ssl
+
+    netbox_ssl.models = sys.modules["netbox_ssl.models"]
+
     Info = _Info
     Warning = _Warning
 else:
