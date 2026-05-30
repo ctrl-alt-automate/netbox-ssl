@@ -97,13 +97,20 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytest cryptography django requests boto3 'moto[acm]>=5.0,<6.0'
+          pip install pytest pytest-randomly cryptography django requests boto3 'moto[acm]>=5.0,<6.0'
 
       - name: Run unit tests
         run: |
-          python -m pytest tests/test_parser.py tests/test_models.py tests/test_events.py \
-                           tests/test_expiry_scan.py tests/test_aws_acm_adapter.py \
-                           -v -p no:django
+          # Run the whole unit-marked suite (not a hand-picked 5-file allowlist)
+          # so new unit tests cannot be silently excluded. Deterministic order.
+          python -m pytest tests/ -m unit -p no:django -p no:randomly
+
+      - name: Unit test order-independence canary
+        run: |
+          # pytest-randomly shuffles collection order to surface cross-file
+          # sys.modules contamination (#116) as an actionable failure, without
+          # flaking the deterministic gate above. The seed is printed for repro.
+          python -m pytest tests/ -m unit -p no:django -p randomly -q
 
   build-package:
     name: Build Package
