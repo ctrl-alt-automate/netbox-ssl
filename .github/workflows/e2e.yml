@@ -12,6 +12,7 @@ on:
       - 'netbox_ssl/navigation.py'
       - 'tests/test_janus_renewal.py'
       - 'tests/test_browser.py'
+      - 'tests/test_url_import.py'
       - 'tests/cert_factory.py'
       - 'tests/conftest.py'
       - '.github/workflows/e2e.yml'
@@ -26,6 +27,7 @@ on:
       - 'netbox_ssl/navigation.py'
       - 'tests/test_janus_renewal.py'
       - 'tests/test_browser.py'
+      - 'tests/test_url_import.py'
       - 'tests/cert_factory.py'
       - 'tests/conftest.py'
       - '.github/workflows/e2e.yml'
@@ -145,7 +147,7 @@ jobs:
 
       - name: Run E2E tests
         run: |
-          python -m pytest tests/test_janus_renewal.py tests/test_browser.py \
+          python -m pytest tests/test_janus_renewal.py tests/test_browser.py tests/test_url_import.py \
             -m browser -v -p no:django \
             --tb=short
 
