@@ -8,6 +8,7 @@ from .expiry_notification import CertificateExpiryNotification
 from .expiry_scan import CertificateExpiryScan
 from .external_sync import ExternalSourceSync
 from .scheduled_export import ScheduledCertificateExport
+from .url_scan import CertificateURLScan
 
 __all__ = [
     "CertificateARIPoll",
@@ -16,4 +17,5 @@ __all__ = [
     "CertificateExpiryScan",
     "ExternalSourceSync",
     "ScheduledCertificateExport",
+    "CertificateURLScan",
 ]
