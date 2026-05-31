@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Contact assignment on certificates** ([#128](https://github.com/ctrl-alt-automate/netbox-ssl/issues/128)):
+  certificates now support NetBox's native contact assignment via `ContactsMixin`,
+  the same mechanism used by Devices, VMs, and prefixes. Assign administrative /
+  technical / renewal / security contacts (using your own NetBox contact roles)
+  from a **Contacts** tab on the certificate detail page — so "who owns this cert?"
+  is answerable at renewal time. No new permission (uses the standard
+  `tenancy.*_contactassignment` permissions) and no database migration (contact
+  assignments live in NetBox's existing `tenancy.ContactAssignment` table).
+
 - **URL Certificate Import** ([#106](https://github.com/ctrl-alt-automate/netbox-ssl/issues/106)):
   import certificates by scraping them over a TLS handshake. A new
   "Import from URLs (CSV)" flow (Certificates menu) takes a CSV of URLs

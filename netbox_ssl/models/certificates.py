@@ -14,6 +14,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 from netbox.models import NetBoxModel
+from netbox.models.features import ContactsMixin
 from utilities.choices import ChoiceSet
 
 logger = logging.getLogger("netbox_ssl.models")
@@ -141,7 +142,7 @@ _ACME_PATTERNS = {
 }
 
 
-class Certificate(NetBoxModel):
+class Certificate(ContactsMixin, NetBoxModel):
     """
     A TLS/SSL certificate.
 
