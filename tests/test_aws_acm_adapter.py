@@ -542,6 +542,7 @@ def test_parse_acm_certificate_missing_optional_fields():
     assert cert.serial_number == ""
 
 
+@pytest.mark.django_db
 def test_list_certificate_arns_empty_account():
     from unittest.mock import MagicMock
 
@@ -563,6 +564,7 @@ def test_list_certificate_arns_empty_account():
     assert run() == []
 
 
+@pytest.mark.django_db
 def test_list_certificate_arns_single_cert():
     from unittest.mock import MagicMock
 
@@ -608,6 +610,7 @@ def test_list_certificate_arns_single_cert():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.django_db
 def test_describe_and_get_happy_path():
     from unittest.mock import MagicMock
 
@@ -763,6 +766,7 @@ def _import_test_cert(client, cn: str) -> str:
     return client.import_certificate(Certificate=pem.encode(), PrivateKey=key_pem.encode())["CertificateArn"]
 
 
+@pytest.mark.django_db
 def test_fetch_certificates_empty_account_returns_empty_list():
     from unittest.mock import MagicMock
 
@@ -782,6 +786,7 @@ def test_fetch_certificates_empty_account_returns_empty_list():
     assert run() == []
 
 
+@pytest.mark.django_db
 def test_fetch_certificates_returns_imported_certs():
     from unittest.mock import MagicMock
 
@@ -808,6 +813,7 @@ def test_fetch_certificates_returns_imported_certs():
     assert cns == ["first.example.com", "second.example.com"]
 
 
+@pytest.mark.django_db
 def test_fetch_certificates_isolated_per_region():
     """ExternalSource configured for eu-west-1 only sees eu-west-1 certs."""
     from unittest.mock import MagicMock
@@ -836,6 +842,7 @@ def test_fetch_certificates_isolated_per_region():
     assert cns == ["europe.example.com"]
 
 
+@pytest.mark.django_db
 def test_fetch_certificates_skips_failed_per_cert_errors():
     """If one cert raises during fetch, others still succeed."""
     from unittest.mock import MagicMock, patch
@@ -878,6 +885,7 @@ def test_fetch_certificates_skips_failed_per_cert_errors():
     assert cns == ["good.example.com"]
 
 
+@pytest.mark.django_db
 def test_get_certificate_detail_found():
     from unittest.mock import MagicMock
 
@@ -903,6 +911,7 @@ def test_get_certificate_detail_found():
     assert cert.common_name == "lookup.example.com"
 
 
+@pytest.mark.django_db
 def test_get_certificate_detail_not_found_returns_none():
     from unittest.mock import MagicMock
 
@@ -929,6 +938,7 @@ def test_get_certificate_detail_not_found_returns_none():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.django_db
 def test_test_connection_success_with_empty_account():
     from unittest.mock import MagicMock
 

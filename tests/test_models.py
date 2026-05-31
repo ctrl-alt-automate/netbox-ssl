@@ -546,6 +546,7 @@ class TestAssignmentModel:
         assert field.default is True
 
 
+@pytest.mark.django_db
 class TestAssignmentForm:
     """Tests for CertificateAssignmentForm."""
 

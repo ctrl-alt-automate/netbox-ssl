@@ -56,6 +56,7 @@ requires_netbox = pytest.mark.skipif(
 )
 
 
+@pytest.mark.django_db
 @requires_netbox
 def test_openapi_schema_generation_succeeds():
     """The full OpenAPI schema must generate without raising (regression #111).

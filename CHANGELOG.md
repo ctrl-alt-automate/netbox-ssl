@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Adopted `pytest-django` for database test isolation** ([#117](https://github.com/ctrl-alt-automate/netbox-ssl/issues/117)):
+  the in-container integration job now installs `pytest-django`, giving DB-touching
+  tests proper per-test transaction isolation. The 10 bulk-import API integration
+  tests (`TestBulkImportAPIIntegration`) — deterministically skipped since the
+  v1.1.1 stopgap — now run for real against the API + a test database. DB-touching
+  tests across the suite are marked `@pytest.mark.django_db` (the marker is
+  registered in `pytest.ini` so the `-p no:django` host unit lane stays clean under
+  `--strict-markers`). The cleaner isolation surfaced and fixed two latent test
+  bugs (an `IntegrityError` that poisoned the test transaction without a nested
+  `atomic()`, and a settings-mock helper that collapsed an explicit empty
+  recipient list to a fallback). Test-only change — no plugin code modified.
+
 ## [1.2.0] - 2026-05-31
 
 **Minor release** — three new features (URL certificate import, public-PEM display,
