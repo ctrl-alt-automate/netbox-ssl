@@ -36,7 +36,7 @@ Managing SSL certificates across your infrastructure shouldn't be a scavenger hu
 
 | Dependency | Version |
 |------------|---------|
-| NetBox     | 4.4.0 - 4.5.x |
+| NetBox     | 4.4.0 - 4.6.x |
 | Python     | 3.10+ |
 
 The plugin uses the Python [`cryptography`](https://cryptography.io/) library for X.509 certificate parsing (installed automatically as a dependency).
@@ -252,8 +252,9 @@ Add the widget to your NetBox dashboard to see:
 
 | NetBox Version | Plugin Version | Status |
 |:--------------:|:--------------:|:------:|
-| 4.5.x          | 0.7.x          | ✅ Primary |
-| 4.4.x          | 0.7.x          | ✅ Supported |
+| 4.6.x          | 1.1.x - 1.2.x  | ✅ Primary |
+| 4.5.x          | 1.1.x - 1.2.x  | ✅ Supported |
+| 4.4.x          | 1.1.x - 1.2.x  | ✅ Supported |
 | 4.3.x and older| —              | ❌ Unsupported |
 
 ## 📚 Documentation

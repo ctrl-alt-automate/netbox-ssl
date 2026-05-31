@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-05-31
+
+**Minor release** — three new features (URL certificate import, public-PEM display,
+certificate contacts), schema-generation hardening, and migration-drift fixes. Two
+additive migrations (`0023`, `0024`), no breaking changes; safe to upgrade from
+1.1.x.
+
 ### Added
 
 - **Contact assignment on certificates** ([#128](https://github.com/ctrl-alt-automate/netbox-ssl/issues/128)):
