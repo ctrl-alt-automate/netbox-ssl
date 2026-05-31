@@ -117,7 +117,7 @@ class CertificateSerializer(NetBoxModelSerializer):
             "is_acme",
         ]
 
-    def get_assignment_count(self, obj):
+    def get_assignment_count(self, obj) -> int:
         """Get the number of assignments for this certificate."""
         return obj.assignments.count()
 

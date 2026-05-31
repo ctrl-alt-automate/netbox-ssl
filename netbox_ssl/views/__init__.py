@@ -41,6 +41,9 @@ from .external_sources import (
     ExternalSourceListView,
     ExternalSourceView,
 )
+from .url_import import (
+    UrlImportView,
+)
 
 __all__ = [
     # Certificate views
@@ -53,6 +56,7 @@ __all__ = [
     "CertificateImportView",
     "CertificateRenewView",
     "CertificateBulkDataImportView",
+    "UrlImportView",
     # CSR views
     "CertificateSigningRequestListView",
     "CertificateSigningRequestView",

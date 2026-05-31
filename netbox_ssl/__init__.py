@@ -7,7 +7,7 @@ Provides a "Single Source of Truth" for certificate inventory and lifecycle mana
 
 from netbox.plugins import PluginConfig
 
-__version__ = "1.1.1"
+__version__ = "1.2.0"
 
 
 class NetBoxSSLConfig(PluginConfig):
@@ -45,6 +45,10 @@ class NetBoxSSLConfig(PluginConfig):
         "external_source_never_fetch_keys": True,
         "performance_prefetch_limit": 1000,
         "lazy_load_pem_content": True,
+        # URL Certificate Import (#106): CIDR ranges whose private/link-local
+        # addresses are permitted as scrape targets. Empty = no private ranges
+        # allowed (secure default); loopback is always blocked regardless.
+        "url_import_private_cidr_allowlist": [],
     }
 
     def ready(self):

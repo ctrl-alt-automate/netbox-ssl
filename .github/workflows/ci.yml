@@ -97,13 +97,19 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytest cryptography django requests boto3 'moto[acm]>=5.0,<6.0'
+          pip install pytest pytest-randomly cryptography django requests boto3 \
+                      'moto[acm]>=5.0,<6.0' jsonpath-ng pyyaml
 
       - name: Run unit tests
         run: |
-          python -m pytest tests/test_parser.py tests/test_models.py tests/test_events.py \
-                           tests/test_expiry_scan.py tests/test_aws_acm_adapter.py \
-                           -v -p no:django
+          # Run the ENTIRE unit suite (not a hand-picked allowlist), so every
+          # host-runnable test is exercised on all three Python versions. The
+          # 5-file allowlist previously hid the test_checks Python-3.10 failure
+          # (issue #116). pytest-randomly shuffles collection order each run so
+          # any future order-dependence fails CI instead of shipping silently.
+          # -p no:django is required: pytest.ini sets DJANGO_SETTINGS_MODULE
+          # (for the in-container integration run), which is absent here.
+          python -m pytest tests/ -m unit -p no:django
 
   build-package:
     name: Build Package
@@ -309,6 +315,37 @@ jobs:
           docker compose exec -T netbox /opt/netbox/venv/bin/python \
             /opt/netbox/netbox/manage.py spectacular --file /tmp/schema.yml --validate
           echo "OpenAPI schema generated and validated successfully."
+
+      - name: OpenAPI schema is warning-free (#119)
+        if: matrix.netbox_major == 'v4.6'
+        run: |
+          # --fail-on-warn promotes drf-spectacular warnings to errors, so a new
+          # serializer field or custom action added without a type hint /
+          # @extend_schema fails CI instead of silently shipping a permissive or
+          # empty schema (the soft-warning -> hard-error vector of #111).
+          # Pinned to v4.6 only: older NetBox cores (4.4/4.5) ship their own
+          # unfixable drf-spectacular warnings (e.g. circuits filtersets) AND the
+          # TagFilter/django-filter "cannot guess choice type" warnings that the
+          # NetBoxModelFilterSet machinery emits on older versions — neither is
+          # under the plugin's control, so a multi-version --fail-on-warn gate
+          # would fail on upstream issues. v4.6 is clean for both core and plugin.
+          docker compose exec -T netbox /opt/netbox/venv/bin/python \
+            /opt/netbox/netbox/manage.py spectacular --file /tmp/schema_warn.yml --validate --fail-on-warn
+          echo "OpenAPI schema generated warning-free on NetBox 4.6."
+
+      - name: Check for migration drift (#118)
+        if: matrix.netbox_major == 'v4.6'
+        run: |
+          # `makemigrations --check` exits non-zero if the models have changes
+          # not captured in a migration. This is the gate that would have caught
+          # the v1.0.1 ComplianceTrendSnapshot 500 and the #118 compliance-tags
+          # drift before release. Pinned to v4.6 only: cross-version field churn
+          # (encoder/through-table internals differ per NetBox/Django) would make
+          # a multi-version gate flaky. NetBox's makemigrations override allows
+          # `--check` without DEVELOPER=True (it only blocks actual file writes).
+          docker compose exec -T netbox /opt/netbox/venv/bin/python \
+            /opt/netbox/netbox/manage.py makemigrations netbox_ssl --check
+          echo "No migration drift detected."
 
       - name: Regression gates must run (not skip) (#111/#112)
         run: |

@@ -1,0 +1,169 @@
+{% extends 'generic/object_list.html' %}
+{% load helpers %}
+{% load i18n %}
+
+{% block title %}Import Certificates from URLs (CSV){% endblock %}
+
+{% block tabs %}{% endblock %}
+{% block table %}{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col col-md-12">
+
+    {% if step == "preview" %}
+    {# ── Preview step ── #}
+    <div class="card mb-3">
+      <h5 class="card-header">Scan Preview</h5>
+      <div class="card-body">
+        <p><strong>{{ row_count }}</strong> URL(s) ready to scan.</p>
+
+        {% if errors %}
+        <div class="alert alert-warning">
+          <strong>Validation warnings ({{ errors|length }}):</strong>
+          <ul class="mb-0">
+            {% for err in errors %}
+            <li>Row {{ err.row }}{% if err.field %}, field <code>{{ err.field }}</code>{% endif %}: {{ err.message }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        {% if rows %}
+        <div class="table-responsive">
+          <table class="table table-hover table-sm">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>URL</th>
+                <th>Host</th>
+                <th>Port</th>
+                <th>Verify chain</th>
+                <th>Tenant</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+              <tr>
+                <td>{{ row.row }}</td>
+                <td><code>{{ row.url }}</code></td>
+                <td>{{ row.host }}</td>
+                <td>{{ row.port }}</td>
+                <td>{% if row.verify_chain %}<span class="badge text-bg-success">Yes</span>{% else %}<span class="badge text-bg-warning">No</span>{% endif %}</td>
+                <td>{{ row.tenant|default:"—" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <form method="post" action="{% url 'plugins:netbox_ssl:certificate_url_import' %}">
+          {% csrf_token %}
+          <input type="hidden" name="confirm" value="yes">
+          <button type="submit" class="btn btn-primary">
+            <i class="mdi mdi-shield-search"></i> Run scan &amp; import
+          </button>
+          <a href="{% url 'plugins:netbox_ssl:certificate_url_import' %}" class="btn btn-outline-secondary">Cancel</a>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    {% elif step == "result" %}
+    {# ── Result step ── #}
+    <div class="card mb-3">
+      <h5 class="card-header">Scan Results</h5>
+      <div class="card-body">
+        <p><strong>{{ imported }}</strong> certificate(s) imported.</p>
+        <div class="table-responsive">
+          <table class="table table-hover table-sm">
+            <thead>
+              <tr><th>URL</th><th>Outcome</th><th>Detail</th></tr>
+            </thead>
+            <tbody>
+              {% for o in outcomes %}
+              <tr>
+                <td><code>{{ o.url }}</code></td>
+                <td>
+                  {% if o.status == "imported" %}<span class="badge text-bg-success">Imported</span>
+                  {% elif o.status == "imported_untrusted" %}<span class="badge text-bg-warning">Imported (untrusted chain)</span>
+                  {% elif o.status == "matched" %}<span class="badge text-bg-info">Matched existing</span>
+                  {% elif o.status == "blocked" %}<span class="badge text-bg-danger">Blocked (policy)</span>
+                  {% elif o.status == "unreachable" %}<span class="badge text-bg-secondary">Unreachable</span>
+                  {% else %}<span class="badge text-bg-danger">Error</span>{% endif %}
+                </td>
+                <td>
+                  {% if o.pk %}<a href="{% url 'plugins:netbox_ssl:certificate' pk=o.pk %}">{{ o.detail }}</a>
+                  {% else %}{{ o.detail }}{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <a href="{% url 'plugins:netbox_ssl:certificate_list' %}" class="btn btn-primary">View certificates</a>
+        <a href="{% url 'plugins:netbox_ssl:certificate_url_import' %}" class="btn btn-outline-secondary">Import more</a>
+      </div>
+    </div>
+
+    {% else %}
+    {# ── Input step ── #}
+    <div class="card mb-3">
+      <h5 class="card-header">Import Certificates from URLs</h5>
+      <div class="card-body">
+        <p class="text-muted">
+          Provide a CSV of URLs. For each row the plugin opens a TLS connection,
+          scrapes the certificate the server presents, and imports it. Only the
+          public certificate is stored — private keys are never transmitted in a
+          handshake. HTTPS only; private/loopback addresses are blocked unless an
+          administrator allowlists their range.
+        </p>
+
+        {% if errors %}
+        <div class="alert alert-danger">
+          <strong>Could not parse the CSV:</strong>
+          <ul class="mb-0">
+            {% for err in errors %}
+            <li>Row {{ err.row }}{% if err.field %}, field <code>{{ err.field }}</code>{% endif %}: {{ err.message }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" action="{% url 'plugins:netbox_ssl:certificate_url_import' %}">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label" for="id_csv_file">CSV file</label>
+            <input type="file" name="csv_file" id="id_csv_file" class="form-control" accept=".csv,.txt">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="id_csv_text">Or paste CSV</label>
+            <textarea name="csv_text" id="id_csv_text" rows="10" class="form-control font-monospace"
+              placeholder="url,assigned_device,tenant,verify_chain&#10;https://web.internal.example.com:8443,web01,acme,true">{{ csv_text }}</textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="id_default_tenant">Default tenant (optional)</label>
+            <input type="text" name="default_tenant" id="id_default_tenant" class="form-control"
+              placeholder="Tenant name, slug, or ID — applied to rows without a tenant column">
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <i class="mdi mdi-magnify"></i> Parse &amp; preview
+          </button>
+        </form>
+
+        <hr>
+        <h6>CSV columns</h6>
+        <ul class="text-muted small mb-0">
+          <li><code>url</code> — required, <code>https://host[:port]</code> or <code>host:port</code> (port defaults to 443)</li>
+          <li><code>assigned_device</code>, <code>assigned_vm</code>, <code>assigned_service</code> — optional, name or ID</li>
+          <li><code>tenant</code> — optional, name/slug/ID</li>
+          <li><code>verify_chain</code> — optional <code>true</code>/<code>false</code> (default <code>true</code>); <code>false</code> imports self-signed/untrusted certs with a flag</li>
+          <li><code>sni</code> — optional SNI override</li>
+        </ul>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

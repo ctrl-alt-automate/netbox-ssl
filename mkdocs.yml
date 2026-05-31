@@ -107,6 +107,7 @@ nav:
       - tutorials/03-expiry-monitoring.md
   - How-To Guides:
       - how-to/bulk-import.md
+      - how-to/url-import.md
       - how-to/acme-auto-renewal.md
       - how-to/compliance-policies.md
       - how-to/external-sources.md

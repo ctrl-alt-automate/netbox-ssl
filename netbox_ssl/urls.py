@@ -3,7 +3,7 @@ URL configuration for NetBox SSL plugin.
 """
 
 from django.urls import path
-from netbox.views.generic import ObjectChangeLogView
+from netbox.views.generic import ObjectChangeLogView, ObjectContactsView
 
 from . import models, views
 from .views.analytics import CertificateAnalyticsDashboardView
@@ -38,6 +38,11 @@ urlpatterns = [
         name="certificate_bulk_import",
     ),
     path(
+        "certificates/url-import/",
+        views.UrlImportView.as_view(),
+        name="certificate_url_import",
+    ),
+    path(
         "certificates/edit/",
         views.CertificateBulkEditView.as_view(),
         name="certificate_bulk_edit",
@@ -66,6 +71,12 @@ urlpatterns = [
         "certificates/<int:pk>/changelog/",
         ObjectChangeLogView.as_view(),
         name="certificate_changelog",
+        kwargs={"model": models.Certificate},
+    ),
+    path(
+        "certificates/<int:pk>/contacts/",
+        ObjectContactsView.as_view(),
+        name="certificate_contacts",
         kwargs={"model": models.Certificate},
     ),
     # Analytics / Insights URLs

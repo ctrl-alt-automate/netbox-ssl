@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-05-31
+
+**Minor release** — three new features (URL certificate import, public-PEM display,
+certificate contacts), schema-generation hardening, and migration-drift fixes. Two
+additive migrations (`0023`, `0024`), no breaking changes; safe to upgrade from
+1.1.x.
+
+### Added
+
+- **Contact assignment on certificates** ([#128](https://github.com/ctrl-alt-automate/netbox-ssl/issues/128)):
+  certificates now support NetBox's native contact assignment via `ContactsMixin`,
+  the same mechanism used by Devices, VMs, and prefixes. Assign administrative /
+  technical / renewal / security contacts (using your own NetBox contact roles)
+  from a **Contacts** tab on the certificate detail page — so "who owns this cert?"
+  is answerable at renewal time. No new permission (uses the standard
+  `tenancy.*_contactassignment` permissions) and no database migration (contact
+  assignments live in NetBox's existing `tenancy.ContactAssignment` table).
+
+- **URL Certificate Import** ([#106](https://github.com/ctrl-alt-automate/netbox-ssl/issues/106)):
+  import certificates by scraping them over a TLS handshake. A new
+  "Import from URLs (CSV)" flow (Certificates menu) takes a CSV of URLs
+  (`url`, optional `assigned_device`/`assigned_vm`/`assigned_service`/`tenant`/
+  `verify_chain`/`sni`); for each row the plugin opens a TLS connection, scrapes
+  the server-presented leaf + chain, parses it, and imports it with the same
+  serial+issuer dedup as Smart Paste — upload → preview → scan → results.
+  A `Certificate URL Scan` NetBox Script provides the same import for large
+  batches outside the request cycle. Only the public certificate is stored
+  (private keys are never exposed in a handshake). New `discovered_via_url` /
+  `last_seen_at` fields and a `run_urlimport` permission on `Certificate`
+  (migration `0024`, additive). **Security:** HTTPS-only; the scraper connects to
+  the validated IP and never re-resolves the hostname (DNS-rebinding defense);
+  hard timeout/size caps; private/loopback addresses are blocked unless an
+  administrator allowlists their CIDR via
+  `PLUGINS_CONFIG["netbox_ssl"]["url_import_private_cidr_allowlist"]` — loopback
+  is always blocked regardless. Self-signed/untrusted chains are imported with a
+  flag only when a row opts in with `verify_chain=false`.
+
+- **Public certificate PEM on the detail page** ([#113](https://github.com/ctrl-alt-automate/netbox-ssl/issues/113)):
+  the stored public PEM is now shown in a collapsible "Certificate PEM" card on
+  the certificate detail page, with copy-to-clipboard and download controls,
+  visible to any user with **view** permission (previously the PEM was only
+  reachable from the edit form, forcing operators to be granted edit rights).
+  The field holds the public certificate only — private keys are rejected at
+  import — so this exposes nothing beyond the metadata already shown. Aligned
+  with the plugin's passive-administration model: no new active capability.
+
+### Changed
+
+- **OpenAPI schema is now generated warning-free, enforced by CI** ([#119](https://github.com/ctrl-alt-automate/netbox-ssl/issues/119)):
+  the five plugin `SerializerMethodField`s that drf-spectacular could not type
+  now declare a return type (`-> int`) or `@extend_schema_field`, and the two
+  colliding `export` action operation IDs are disambiguated. A new
+  `spectacular --validate --fail-on-warn` CI gate (pinned to NetBox 4.6, where
+  both core and plugin are warning-clean) makes a future serializer field or
+  custom action added without a type hint / `@extend_schema` fail CI instead of
+  silently shipping a permissive or empty schema (the same
+  soft-warning-becomes-hard-error vector as #111). The existing `--validate`
+  gate still runs on every supported NetBox version. Improves the Swagger UI
+  request/response docs; no runtime behavior change.
+
+### Fixed
+
+- **Migration drift on the compliance models and ExternalSource** ([#118](https://github.com/ctrl-alt-automate/netbox-ssl/issues/118)):
+  `ComplianceCheck` and `CompliancePolicy` (both `NetBoxModel` subclasses) were
+  created without their `tags` field in the migration history, and several
+  `custom_field_data` / `tags` field definitions had drifted out of sync with
+  the models — the same class of issue as the v1.0.1 `ComplianceTrendSnapshot`
+  fix. Migration `0023` reconciles the state (adds `tags` to both compliance
+  models, aligns the `CustomFieldJSONEncoder`, drops a stale Certificate
+  constraint). All operations are additive / metadata-only and safe on existing
+  installs. A `makemigrations netbox_ssl --check` CI gate (pinned to NetBox 4.6)
+  now fails the build on any future drift.
+
+### Documentation
+
+- **Docs deploys no longer race on release** ([#110](https://github.com/ctrl-alt-automate/netbox-ssl/issues/110)):
+  the `Docs Deploy` workflow now serializes gh-pages pushes via a `concurrency`
+  group, so the release-critical tag-triggered deploy can no longer be rejected
+  by the concurrent `main`-push deploy.
+
 ## [1.1.1] - 2026-05-29
 
 **Patch release** — two bug fixes for issues reported on v1.1.0, plus a test &

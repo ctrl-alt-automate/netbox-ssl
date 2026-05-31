@@ -14,6 +14,7 @@ from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 from netbox.models import NetBoxModel
+from netbox.models.features import ContactsMixin
 from utilities.choices import ChoiceSet
 
 logger = logging.getLogger("netbox_ssl.models")
@@ -141,7 +142,7 @@ _ACME_PATTERNS = {
 }
 
 
-class Certificate(NetBoxModel):
+class Certificate(ContactsMixin, NetBoxModel):
     """
     A TLS/SSL certificate.
 
@@ -288,6 +289,19 @@ class Certificate(NetBoxModel):
         help_text="Certificate no longer present in the external source",
     )
 
+    # URL Certificate Import discovery metadata (#106)
+    discovered_via_url = models.CharField(
+        max_length=2048,
+        blank=True,
+        db_index=True,
+        help_text="URL this certificate was scraped from via TLS handshake import",
+    )
+    last_seen_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last time this certificate was successfully observed at its discovery URL",
+    )
+
     # Raw certificate data (PEM without private key)
     pem_content = models.TextField(
         blank=True,
@@ -414,6 +428,7 @@ class Certificate(NetBoxModel):
             ("import_certificate", "Can import certificates from PEM/DER/PKCS7"),
             ("renew_certificate", "Can perform certificate renewal"),
             ("bulk_operations", "Can perform bulk certificate operations"),
+            ("run_urlimport", "Can run URL certificate import"),
         ]
 
     def __init__(self, *args, **kwargs):

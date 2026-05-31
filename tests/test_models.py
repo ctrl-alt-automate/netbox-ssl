@@ -705,3 +705,37 @@ class TestAssignmentTableRendering:
 
         source = inspect.getsource(CertificateAssignmentTable.render_assigned_object)
         assert "format_html" in source
+
+
+class TestCertificateContacts:
+    """Tests for NetBox contact assignment support on Certificate (#128)."""
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_certificate_has_contacts_mixin(self):
+        """Certificate inherits NetBox's ContactsMixin."""
+        from netbox.models.features import ContactsMixin
+
+        from netbox_ssl.models import Certificate
+
+        assert ContactsMixin in Certificate.__mro__
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_contacts_is_non_concrete_generic_relation(self):
+        """The contacts field is a GenericRelation — no DB column, so migration-free."""
+        from django.contrib.contenttypes.fields import GenericRelation
+
+        from netbox_ssl.models import Certificate
+
+        field = Certificate._meta.get_field("contacts")
+        assert isinstance(field, GenericRelation)
+        assert field.concrete is False
+
+    @requires_netbox
+    @pytest.mark.unit
+    def test_get_contacts_is_callable(self):
+        """ContactsMixin provides get_contacts()."""
+        from netbox_ssl.models import Certificate
+
+        assert callable(getattr(Certificate, "get_contacts", None))
