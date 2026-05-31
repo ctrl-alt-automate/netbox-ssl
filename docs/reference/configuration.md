@@ -80,6 +80,31 @@ PLUGINS_CONFIG = {
 }
 ```
 
+### URL Certificate Import
+
+Control which private IP ranges the [URL Certificate Import](../how-to/url-import.md)
+feature is allowed to scrape:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `url_import_private_cidr_allowlist` | List | **[]** | CIDR ranges whose private/link-local addresses may be scraped. Empty = no private ranges allowed. |
+
+```python
+PLUGINS_CONFIG = {
+    "netbox_ssl": {
+        "url_import_private_cidr_allowlist": [
+            "10.0.0.0/8",
+            "192.168.0.0/16",
+        ],
+    },
+}
+```
+
+A URL resolving to an address inside an allowlisted CIDR is permitted; everything
+else private — and **all loopback** (`127.0.0.0/8`, `::1`) regardless of the
+allowlist — stays blocked. This is secure-by-default: with the empty default, only
+public addresses can be scraped.
+
 ---
 
 ## Custom Fields
