@@ -4,7 +4,7 @@ import importlib.util
 
 import pytest
 
-pytestmark = pytest.mark.unit
+pytestmark = [pytest.mark.unit, pytest.mark.django_db]
 
 try:
     _spec = importlib.util.find_spec("netbox")

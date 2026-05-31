@@ -65,6 +65,7 @@ def test_model_has_comments_field(model_name):
     assert "comments" in field_names, f"{model_name} is missing a 'comments' model field (#112)"
 
 
+@pytest.mark.django_db
 @requires_netbox
 @pytest.mark.parametrize("model_name,form_name", [(m, f) for m, f, _ in _AFFECTED])
 def test_form_comments_maps_to_model(model_name, form_name):

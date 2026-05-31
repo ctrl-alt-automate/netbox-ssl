@@ -95,6 +95,7 @@ class TestCATypeChoices:
             assert len(CATypeChoices.CHOICES) == 3
 
 
+@pytest.mark.django_db
 class TestCertificateAuthorityModel:
     """Tests for CertificateAuthority model."""
 
@@ -126,14 +127,18 @@ class TestCertificateAuthorityModel:
     @requires_netbox
     def test_ca_unique_name_constraint(self):
         """Test that CA names must be unique."""
+        from django.db import IntegrityError, transaction
+
         ca1 = CertificateAuthority.objects.create(
             name="Unique CA",
             type=CATypeChoices.TYPE_PUBLIC,
         )
 
-        from django.db import IntegrityError
-
-        with pytest.raises(IntegrityError):
+        # Wrap the failing INSERT in a savepoint: under pytest-django's per-test
+        # transaction, an unhandled IntegrityError poisons the whole transaction
+        # (TransactionManagementError on any later query). atomic() rolls back
+        # just this savepoint so the test transaction stays usable.
+        with pytest.raises(IntegrityError), transaction.atomic():
             CertificateAuthority.objects.create(
                 name="Unique CA",
                 type=CATypeChoices.TYPE_INTERNAL,
@@ -143,6 +148,7 @@ class TestCertificateAuthorityModel:
         ca1.delete()
 
 
+@pytest.mark.django_db
 class TestCertificateAuthorityAutoDetection:
     """Tests for CA auto-detection functionality."""
 
@@ -274,6 +280,7 @@ class TestDefaultCertificateAuthorities:
             assert "issuer_pattern" in ca
 
 
+@pytest.mark.django_db
 class TestCertificateIssuingCA:
     """Tests for the issuing_ca field on Certificate model."""
 
@@ -359,6 +366,7 @@ class TestCertificateIssuingCA:
         cert.delete()
 
 
+@pytest.mark.django_db
 class TestCertificateAuthorityFilters:
     """Tests for CertificateAuthority filtersets."""
 
@@ -440,6 +448,7 @@ class TestCertificateAuthorityFilters:
             ca3.delete()
 
 
+@pytest.mark.django_db
 class TestCertificateFilterByIssuingCA:
     """Tests for filtering certificates by issuing CA."""
 

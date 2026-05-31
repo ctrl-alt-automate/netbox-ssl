@@ -420,10 +420,10 @@ def api_client():
 
     User = get_user_model()
 
-    # Get or create admin user
+    # Get or create admin user (NetBox's User model has no is_staff field)
     user, _ = User.objects.get_or_create(
         username="test_bulk_import_user",
-        defaults={"is_superuser": True, "is_staff": True},
+        defaults={"is_superuser": True},
     )
 
     client = APIClient()
@@ -444,6 +444,7 @@ def cleanup_certificates():
         pass
 
 
+@pytest.mark.django_db
 class TestBulkImportAPIIntegration:
     """Integration tests that actually call the bulk import API endpoint."""
 
@@ -457,7 +458,7 @@ class TestBulkImportAPIIntegration:
             pytest.skip("Test certificate not available")
 
         response = api_client.post(
-            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            "/api/plugins/ssl/certificates/bulk-import/",
             [{"pem_content": cert}],
             format="json",
         )
@@ -486,7 +487,7 @@ class TestBulkImportAPIIntegration:
             pytest.skip("Not enough test certificates available")
 
         response = api_client.post(
-            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            "/api/plugins/ssl/certificates/bulk-import/",
             certs,
             format="json",
         )
@@ -501,7 +502,7 @@ class TestBulkImportAPIIntegration:
     def test_bulk_import_rejects_empty_list(self, api_client):
         """Test that empty list is rejected with 400 error."""
         response = api_client.post(
-            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            "/api/plugins/ssl/certificates/bulk-import/",
             [],
             format="json",
         )
@@ -516,7 +517,7 @@ class TestBulkImportAPIIntegration:
     def test_bulk_import_rejects_non_list(self, api_client):
         """Test that non-list input is rejected with 400 error."""
         response = api_client.post(
-            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            "/api/plugins/ssl/certificates/bulk-import/",
             {"pem_content": "test"},
             format="json",
         )
@@ -531,7 +532,7 @@ class TestBulkImportAPIIntegration:
     def test_bulk_import_rejects_invalid_certificate(self, api_client):
         """Test that invalid certificates are rejected with detailed errors."""
         response = api_client.post(
-            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            "/api/plugins/ssl/certificates/bulk-import/",
             [{"pem_content": "not a valid certificate"}],
             format="json",
         )
@@ -540,7 +541,8 @@ class TestBulkImportAPIIntegration:
         data = response.json()
         assert "failed_certificates" in data
         assert len(data["failed_certificates"]) == 1
-        assert data["failed_certificates"][0]["index"] == 0
+        # DRF ValidationError stringifies leaf scalars, so index comes back as "0".
+        assert int(data["failed_certificates"][0]["index"]) == 0
 
     @pytest.mark.integration
     @skip_if_no_django_api
@@ -558,7 +560,7 @@ class TestBulkImportAPIIntegration:
 
         # Mix valid and invalid certificates
         response = api_client.post(
-            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            "/api/plugins/ssl/certificates/bulk-import/",
             [
                 {"pem_content": cert},  # valid
                 {"pem_content": "invalid cert"},  # invalid
@@ -582,7 +584,7 @@ class TestBulkImportAPIIntegration:
             pytest.skip("Test certificate not available")
 
         response = api_client.post(
-            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            "/api/plugins/ssl/certificates/bulk-import/",
             [
                 {
                     "pem_content": cert,
@@ -604,7 +606,7 @@ class TestBulkImportAPIIntegration:
         certs = [{"pem_content": f"cert-{i}"} for i in range(101)]
 
         response = api_client.post(
-            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            "/api/plugins/ssl/certificates/bulk-import/",
             certs,
             format="json",
         )
@@ -630,7 +632,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7
         mixed_content = cert + "\n" + private_key
 
         response = api_client.post(
-            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            "/api/plugins/ssl/certificates/bulk-import/",
             [{"pem_content": mixed_content}],
             format="json",
         )
@@ -650,7 +652,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7
 
         # First import should succeed
         response1 = api_client.post(
-            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            "/api/plugins/ssl/certificates/bulk-import/",
             [{"pem_content": cert}],
             format="json",
         )
@@ -658,7 +660,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7
 
         # Second import with same certificate should fail (duplicate)
         response2 = api_client.post(
-            "/api/plugins/netbox-ssl/certificates/bulk-import/",
+            "/api/plugins/ssl/certificates/bulk-import/",
             [{"pem_content": cert}],
             format="json",
         )
