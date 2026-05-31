@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **URL Certificate Import — foundation** ([#106](https://github.com/ctrl-alt-automate/netbox-ssl/issues/106)):
+  groundwork for importing certificates by scraping them over a TLS handshake.
+  Adds a `tls_scraper` utility (connects to a pre-validated IP, returns the
+  leaf + chain as PEM, with hard timeout/size caps and a DNS-rebinding defense),
+  extends the SSRF URL validator with an opt-in private-CIDR allowlist
+  (`url_import_private_cidr_allowlist`; loopback is always blocked regardless),
+  and adds `discovered_via_url` / `last_seen_at` fields plus a `run_urlimport`
+  permission to `Certificate` (migration `0024`, additive). The user-facing
+  import flow (CSV upload → preview → scan → results) follows in subsequent PRs.
+
 - **Public certificate PEM on the detail page** ([#113](https://github.com/ctrl-alt-automate/netbox-ssl/issues/113)):
   the stored public PEM is now shown in a collapsible "Certificate PEM" card on
   the certificate detail page, with copy-to-clipboard and download controls,

@@ -141,3 +141,58 @@ class TestEdgeCases:
     def test_public_literal_ip_accepted(self):
         """Public IP address as hostname is accepted."""
         validate_https_url("https://93.184.216.34/api")
+
+
+class TestCIDRAllowlist:
+    """Test the optional private-CIDR allowlist (#106 URL Certificate Import)."""
+
+    def test_private_ip_in_allowlist_accepted(self):
+        """A private IP inside an allowlisted CIDR is permitted."""
+        validate_https_url("https://10.50.0.10/api", cidr_allowlist=["10.50.0.0/16"])
+
+    def test_private_ip_outside_allowlist_rejected(self):
+        """A private IP NOT in the allowlist is still blocked."""
+        with pytest.raises(URLValidationError, match="private"):
+            validate_https_url("https://192.168.1.1/api", cidr_allowlist=["10.0.0.0/8"])
+
+    def test_loopback_blocked_even_when_allowlisted(self):
+        """SECURITY: loopback is rejected even if its range is allowlisted."""
+        with pytest.raises(URLValidationError, match="loopback"):
+            validate_https_url("https://127.0.0.1/api", cidr_allowlist=["127.0.0.0/8"])
+
+    def test_dns_resolved_private_ip_in_allowlist_accepted(self):
+        """A hostname resolving to an allowlisted private IP is permitted."""
+        with patch("netbox_ssl.utils.url_validation.socket.getaddrinfo") as mock_dns:
+            mock_dns.return_value = [(None, None, None, None, ("10.50.0.5", 443))]
+            validate_https_url("https://internal.corp.example.com", cidr_allowlist=["10.50.0.0/16"])
+
+    def test_dns_resolved_private_ip_outside_allowlist_rejected(self):
+        """A hostname resolving to a private IP outside the allowlist is blocked."""
+        with patch("netbox_ssl.utils.url_validation.socket.getaddrinfo") as mock_dns:
+            mock_dns.return_value = [(None, None, None, None, ("172.16.0.9", 443))]
+            with pytest.raises(URLValidationError, match="private"):
+                validate_https_url("https://internal.corp.example.com", cidr_allowlist=["10.0.0.0/8"])
+
+    def test_cidr_boundary_outside_rejected(self):
+        """An IP one address outside an allowlisted /24 is rejected."""
+        with pytest.raises(URLValidationError, match="private"):
+            validate_https_url("https://192.168.2.1/api", cidr_allowlist=["192.168.1.0/24"])
+
+    def test_public_ip_unaffected_by_allowlist(self):
+        """A public IP is accepted regardless of the allowlist."""
+        validate_https_url("https://93.184.216.34/api", cidr_allowlist=["10.0.0.0/8"])
+
+    def test_malformed_cidr_in_allowlist_raises(self):
+        """A malformed CIDR entry raises a clear error."""
+        with pytest.raises(URLValidationError, match="Invalid CIDR"):
+            validate_https_url("https://10.50.0.10/api", cidr_allowlist=["not-a-cidr"])
+
+    def test_empty_allowlist_blocks_private(self):
+        """An empty allowlist (the secure default) still blocks private IPs."""
+        with pytest.raises(URLValidationError, match="private"):
+            validate_https_url("https://10.0.0.1/api", cidr_allowlist=[])
+
+    def test_existing_callers_unaffected(self):
+        """Omitting cidr_allowlist preserves the original blocking behavior."""
+        with pytest.raises(URLValidationError, match="private"):
+            validate_https_url("https://10.0.0.1/api")
