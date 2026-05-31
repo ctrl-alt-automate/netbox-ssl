@@ -9,15 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **URL Certificate Import — foundation** ([#106](https://github.com/ctrl-alt-automate/netbox-ssl/issues/106)):
-  groundwork for importing certificates by scraping them over a TLS handshake.
-  Adds a `tls_scraper` utility (connects to a pre-validated IP, returns the
-  leaf + chain as PEM, with hard timeout/size caps and a DNS-rebinding defense),
-  extends the SSRF URL validator with an opt-in private-CIDR allowlist
-  (`url_import_private_cidr_allowlist`; loopback is always blocked regardless),
-  and adds `discovered_via_url` / `last_seen_at` fields plus a `run_urlimport`
-  permission to `Certificate` (migration `0024`, additive). The user-facing
-  import flow (CSV upload → preview → scan → results) follows in subsequent PRs.
+- **URL Certificate Import** ([#106](https://github.com/ctrl-alt-automate/netbox-ssl/issues/106)):
+  import certificates by scraping them over a TLS handshake. A new
+  "Import from URLs (CSV)" flow (Certificates menu) takes a CSV of URLs
+  (`url`, optional `assigned_device`/`assigned_vm`/`assigned_service`/`tenant`/
+  `verify_chain`/`sni`); for each row the plugin opens a TLS connection, scrapes
+  the server-presented leaf + chain, parses it, and imports it with the same
+  serial+issuer dedup as Smart Paste — upload → preview → scan → results.
+  A `Certificate URL Scan` NetBox Script provides the same import for large
+  batches outside the request cycle. Only the public certificate is stored
+  (private keys are never exposed in a handshake). New `discovered_via_url` /
+  `last_seen_at` fields and a `run_urlimport` permission on `Certificate`
+  (migration `0024`, additive). **Security:** HTTPS-only; the scraper connects to
+  the validated IP and never re-resolves the hostname (DNS-rebinding defense);
+  hard timeout/size caps; private/loopback addresses are blocked unless an
+  administrator allowlists their CIDR via
+  `PLUGINS_CONFIG["netbox_ssl"]["url_import_private_cidr_allowlist"]` — loopback
+  is always blocked regardless. Self-signed/untrusted chains are imported with a
+  flag only when a row opts in with `verify_chain=false`.
 
 - **Public certificate PEM on the detail page** ([#113](https://github.com/ctrl-alt-automate/netbox-ssl/issues/113)):
   the stored public PEM is now shown in a collapsible "Certificate PEM" card on

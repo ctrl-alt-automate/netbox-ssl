@@ -24,6 +24,7 @@ from .external_sources import (
     ExternalSourceFilterForm,
     ExternalSourceForm,
 )
+from .url_import import UrlImportForm
 
 __all__ = [
     "CertificateForm",
@@ -42,4 +43,5 @@ __all__ = [
     "ExternalSourceForm",
     "ExternalSourceFilterForm",
     "ExternalSourceBulkEditForm",
+    "UrlImportForm",
 ]
