@@ -82,12 +82,12 @@ class UrlParseResult:
 
 def _parse_bool(value: str, row: int, errors: list[UrlRowError]) -> bool:
     """Parse a verify_chain cell, defaulting to True; record an error on garbage."""
-    token = (value or "").strip().lower()
-    if token == "":
+    cell = (value or "").strip().lower()
+    if not cell:
         return True  # absent -> default verify
-    if token in _TRUE:
+    if cell in _TRUE:
         return True
-    if token in _FALSE:
+    if cell in _FALSE:
         return False
     errors.append(UrlRowError(row=row, field="verify_chain", message=f"Expected true/false, got {value!r}"))
     return True
