@@ -81,7 +81,7 @@ class TestUrlImportUI:
         """Pasting a valid CSV advances to the preview table without scanning."""
         page.goto(f"{NETBOX_BASE_URL}{URL_IMPORT_PATH}")
         page.fill('textarea[name="csv_text"]', "url\nhttps://example.com:443\n")
-        page.click('button[type="submit"]')
+        page.click('button.btn-primary[type="submit"]')
         page.wait_for_load_state("networkidle")
         content = page.content()
         assert "Scan Preview" in content
@@ -93,7 +93,7 @@ class TestUrlImportUI:
         """A CSV without a url column surfaces a validation error, not a preview."""
         page.goto(f"{NETBOX_BASE_URL}{URL_IMPORT_PATH}")
         page.fill('textarea[name="csv_text"]', "hostname,port\nexample.com,443\n")
-        page.click('button[type="submit"]')
+        page.click('button.btn-primary[type="submit"]')
         page.wait_for_load_state("networkidle")
         content = page.content()
         assert "Scan Preview" not in content
