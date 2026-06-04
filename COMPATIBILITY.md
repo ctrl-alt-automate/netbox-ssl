@@ -6,7 +6,10 @@ This document tracks compatibility between NetBox SSL plugin versions and NetBox
 
 | Plugin Version | NetBox Version | Python Version | Status |
 |:--------------:|:--------------:|:--------------:|:------:|
-| 1.1.x          | 4.6.x          | 3.10 - 3.12   | Primary |
+| 1.2.x          | 4.6.x          | 3.10 - 3.12   | Primary |
+| 1.2.x          | 4.5.x          | 3.10 - 3.12   | Supported |
+| 1.2.x          | 4.4.x          | 3.10 - 3.12   | Supported |
+| 1.1.x          | 4.6.x          | 3.10 - 3.12   | Supported |
 | 1.1.x          | 4.5.x          | 3.10 - 3.12   | Supported |
 | 1.1.x          | 4.4.x          | 3.10 - 3.12   | Supported |
 | 1.0.x          | 4.5.x          | 3.10 - 3.12   | Supported |
