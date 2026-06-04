@@ -128,12 +128,24 @@ class CertificateImportView(LoginRequiredMixin, View):
 
     template_name = "netbox_ssl/certificate_import.html"
 
+    # Set per-request in dispatch(); gates the net-new import path in post().
+    can_import = False
+
     def dispatch(self, request, *args, **kwargs):
-        """Check import permission before dispatching (with v0.8.x fallback)."""
-        has_perm = request.user.has_perm("netbox_ssl.import_certificate") or request.user.has_perm(
+        """Gate the import workflow.
+
+        Net-new imports require ``import_certificate`` (with the v0.8.x
+        ``add_certificate`` fallback). The Renew workflow funnels the PEM paste
+        through this view before handing off to ``CertificateRenewView``, so
+        users holding only ``renew_certificate`` are also allowed in -- but
+        ``post()`` still blocks them from creating brand-new certificates so the
+        renew permission does not grant broader import rights (issue #136).
+        """
+        self.can_import = request.user.has_perm("netbox_ssl.import_certificate") or request.user.has_perm(
             "netbox_ssl.add_certificate"
         )
-        if not has_perm:
+        can_renew = request.user.has_perm("netbox_ssl.renew_certificate")
+        if not (self.can_import or can_renew):
             messages.error(request, _("You do not have permission to import certificates."))
             return redirect(reverse("plugins:netbox_ssl:certificate_list"))
         return super().dispatch(request, *args, **kwargs)
@@ -232,6 +244,20 @@ class CertificateImportView(LoginRequiredMixin, View):
                 request.session["renewal_candidate_id"] = renewal_candidate.pk
 
                 return redirect(reverse("plugins:netbox_ssl:certificate_renew"))
+
+            # Net-new import (no renewal candidate matched). Creating a brand-new
+            # certificate requires import/add permission. Renewal-only users
+            # (issue #136) are allowed through dispatch() to complete a renewal,
+            # but must not be able to import arbitrary new certificates here.
+            if not self.can_import:
+                messages.error(
+                    request,
+                    _(
+                        "You do not have permission to import new certificates. "
+                        "This certificate did not match an existing one for renewal."
+                    ),
+                )
+                return render(request, self.template_name, {"form": form})
 
             # Auto-detect issuing CA
             issuing_ca = detect_issuing_ca(parsed.issuer)
