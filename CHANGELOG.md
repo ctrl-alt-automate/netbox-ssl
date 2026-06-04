@@ -37,6 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `mark_safe` security finding). A new `tests/test_table_format_html.py`
   regression guard fails on any arg-less `format_html` in the tables package
   under any Python/Django version.
+- **`renew_certificate` permission no longer sufficient to renew certificates**
+  ([#136](https://github.com/ctrl-alt-automate/netbox-ssl/issues/136)): since
+  the renew workflow funnels the PEM paste through `CertificateImportView`, that
+  view's `import_certificate`/`add_certificate` gate blocked users who held only
+  `renew_certificate` — a regression for renewal-only roles. The import view now
+  also admits `renew_certificate` users, while a new guard keeps the net-new
+  import path gated on `import_certificate`/`add_certificate`, so renewal-only
+  users can complete renewals but cannot import brand-new certificates (no
+  privilege escalation). The detail-page **Renew** button is now wrapped in a
+  matching permission check.
 
 ## [1.2.0] - 2026-05-31
 
