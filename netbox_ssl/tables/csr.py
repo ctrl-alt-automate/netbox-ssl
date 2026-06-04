@@ -98,4 +98,4 @@ class CertificateSigningRequestTable(NetBoxTable):
                 value.get_absolute_url(),
                 value.common_name,
             )
-        return format_html('<span class="text-muted">—</span>')
+        return format_html('<span class="text-muted">{}</span>', "—")

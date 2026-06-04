@@ -186,6 +186,51 @@ class TestViewPermissionChecks:
         assert "import_certificate" in self.views_source
 
 
+class TestRenewThroughImportPermission:
+    """Regression tests for issue #136.
+
+    The Renew workflow funnels the PEM paste through CertificateImportView
+    before handing off to CertificateRenewView. Users holding only
+    ``renew_certificate`` must be allowed into the import view, but must NOT be
+    able to create brand-new certificates there (least privilege).
+    """
+
+    @pytest.fixture(autouse=True)
+    def _load_sources(self):
+        self.views_source = _read_source("views/certificates.py")
+        self.template_source = _read_source("templates/netbox_ssl/certificate.html")
+        # Isolate the CertificateImportView class body for precise assertions.
+        start = self.views_source.index("class CertificateImportView")
+        end = self.views_source.index("class CertificateRenewView")
+        self.import_view_source = self.views_source[start:end]
+
+    def test_import_dispatch_admits_renew_users(self):
+        """dispatch() lets renew_certificate users in (not just import/add)."""
+        assert "renew_certificate" in self.import_view_source, (
+            "CertificateImportView.dispatch must admit renew_certificate users "
+            "or the Renew button 500s for renewal-only roles (issue #136)."
+        )
+
+    def test_import_dispatch_tracks_import_capability(self):
+        """dispatch() records whether the user may perform a net-new import."""
+        assert "self.can_import" in self.import_view_source
+
+    def test_net_new_import_is_gated_on_import_capability(self):
+        """The net-new create path is guarded so renew-only users can't import."""
+        guard_idx = self.import_view_source.find("if not self.can_import")
+        create_idx = self.import_view_source.find("Certificate.objects.create(")
+        assert guard_idx != -1, "Missing net-new import guard (self.can_import)"
+        assert create_idx != -1, "Expected a Certificate.objects.create() call"
+        assert guard_idx < create_idx, (
+            "The can_import guard must come BEFORE Certificate.objects.create(), "
+            "otherwise renew-only users could import net-new certificates."
+        )
+
+    def test_renew_button_is_permission_guarded(self):
+        """The detail-page Renew button is wrapped in a perms check."""
+        assert "perms.netbox_ssl.renew_certificate" in self.template_source
+
+
 class TestDocumentation:
     """Test that permission documentation exists and is complete."""
 

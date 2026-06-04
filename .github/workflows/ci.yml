@@ -284,7 +284,7 @@ jobs:
       - name: Install pytest in NetBox container
         run: |
           docker compose exec -T netbox bash -c "curl -sS https://bootstrap.pypa.io/get-pip.py | /opt/netbox/venv/bin/python"
-          docker compose exec -T netbox /opt/netbox/venv/bin/pip install pytest boto3 'moto[acm]>=5.0,<6.0'
+          docker compose exec -T netbox /opt/netbox/venv/bin/pip install pytest 'pytest-django>=4.11' boto3 'moto[acm]>=5.0,<6.0'
 
       - name: Copy tests to container
         run: |

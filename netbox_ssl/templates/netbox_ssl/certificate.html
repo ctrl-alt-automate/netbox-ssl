@@ -286,6 +286,7 @@
 </div>
 
 {% if object.status == 'active' or object.status == 'expired' %}
+{% if perms.netbox_ssl.renew_certificate or perms.netbox_ssl.import_certificate or perms.netbox_ssl.add_certificate %}
 <div class="row mb-3">
   <div class="col col-12">
     <a href="{% url 'plugins:netbox_ssl:certificate_import' %}?renew_from={{ object.pk }}"
@@ -294,6 +295,7 @@
     </a>
   </div>
 </div>
+{% endif %}
 {% endif %}
 
 {# Tabbed secondary sections #}

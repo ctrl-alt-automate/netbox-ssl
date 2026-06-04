@@ -147,7 +147,5 @@ class CertificateTable(NetBoxTable):
         """Render assignment count with orphan warning."""
         count = record.assignments.count()
         if count == 0:
-            return format_html(
-                '<span class="badge text-bg-secondary" title="Orphan certificate">0</span>',
-            )
+            return format_html('<span class="badge text-bg-secondary" title="Orphan certificate">{}</span>', 0)
         return count

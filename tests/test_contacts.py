@@ -34,7 +34,7 @@ requires_netbox = pytest.mark.skipif(
     reason="NetBox not available - run these tests inside the Docker container",
 )
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
 
 def _make_certificate(serial="CONTACTS-IT"):

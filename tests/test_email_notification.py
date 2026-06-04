@@ -11,6 +11,8 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 # Mock netbox modules for local testing without NetBox
 _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
@@ -122,12 +124,18 @@ EMPTY_REPORT = {
 
 
 def _make_settings_mock(enabled: bool = True, recipients: list | None = None):
-    """Create a mock settings object."""
+    """Create a mock settings object.
+
+    Note: distinguish an explicit empty list (``[]`` — the "no recipients
+    configured" case) from the default (``None`` → a sample recipient). Using
+    ``recipients or [...]`` would collapse ``[]`` to the fallback and silently
+    break the no-recipients test.
+    """
     mock = MagicMock()
     mock.PLUGINS_CONFIG = {
         "netbox_ssl": {
             "notification_email_enabled": enabled,
-            "notification_email_recipients": recipients or ["admin@example.com"],
+            "notification_email_recipients": ["admin@example.com"] if recipients is None else recipients,
             "notification_email_subject_prefix": "[NetBox SSL]",
         }
     }
@@ -135,6 +143,7 @@ def _make_settings_mock(enabled: bool = True, recipients: list | None = None):
     return mock
 
 
+@pytest.mark.django_db
 class TestSendExpiryReport:
     @patch("netbox_ssl.utils.email.EmailMultiAlternatives")
     @patch("netbox_ssl.utils.email.render_to_string", side_effect=lambda t, c: f"rendered:{t}")

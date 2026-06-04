@@ -58,12 +58,8 @@ class CertificateAuthorityTable(NetBoxTable):
     def render_is_approved(self, value, record):
         """Render approval status with color coding."""
         if value:
-            return format_html(
-                '<span class="badge text-bg-success">Approved</span>',
-            )
-        return format_html(
-            '<span class="badge text-bg-warning">Not Approved</span>',
-        )
+            return format_html('<span class="badge text-bg-success">{}</span>', "Approved")
+        return format_html('<span class="badge text-bg-warning">{}</span>', "Not Approved")
 
     def render_certificate_count(self, value, record):
         """Render certificate count."""
