@@ -63,12 +63,8 @@ class ExternalSourceTable(NetBoxTable):
     def render_enabled(self, value, record):
         """Render enabled status with color coding."""
         if value:
-            return format_html(
-                '<span class="badge text-bg-success">Enabled</span>',
-            )
-        return format_html(
-            '<span class="badge text-bg-danger">Disabled</span>',
-        )
+            return format_html('<span class="badge text-bg-success">{}</span>', "Enabled")
+        return format_html('<span class="badge text-bg-danger">{}</span>', "Disabled")
 
     def render_sync_status(self, value, record):
         """Render sync status with color badges."""

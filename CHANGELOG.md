@@ -21,6 +21,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `atomic()`, and a settings-mock helper that collapsed an explicit empty
   recipient list to a fallback). Test-only change — no plugin code modified.
 
+### Fixed
+
+- **Certificate Authorities list page crashed with a `TypeError` on NetBox 4.6**
+  ([#137](https://github.com/ctrl-alt-automate/netbox-ssl/issues/137)): several
+  table `render_*` methods built static badges with `format_html("<span …>")`
+  and no interpolation arguments. Django 6.0 (shipped with NetBox 4.6) turned
+  that long-standing misuse from a deprecation warning into a hard
+  `TypeError: args or kwargs must be provided.`, so any list whose rows hit one
+  of those badges 500'd as soon as a row existed — the CA list, but also the
+  External Sources list (enabled/disabled badge), the Certificates list (orphan
+  badge), and the CSR list (empty placeholder). All six call sites now pass the
+  badge label as a `format_html` interpolation argument, satisfying Django 6.0
+  while keeping the static markup in the trusted format string (and avoiding a
+  `mark_safe` security finding). A new `tests/test_table_format_html.py`
+  regression guard fails on any arg-less `format_html` in the tables package
+  under any Python/Django version.
+
 ## [1.2.0] - 2026-05-31
 
 **Minor release** — three new features (URL certificate import, public-PEM display,
