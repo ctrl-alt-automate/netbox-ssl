@@ -2,6 +2,42 @@
 
 NetBox SSL includes built-in custom scripts for certificate management automation.
 
+## Making the scripts available to NetBox
+
+!!! important "Plugin scripts are not auto-registered"
+    NetBox only discovers scripts that live in its **`SCRIPTS_ROOT`** directory
+    (default `/opt/netbox/netbox/scripts/`). Scripts bundled *inside* a plugin
+    package — like the ones below — do **not** appear in
+    **Customization → Scripts** automatically when you install the plugin. You
+    expose them with a one-line wrapper module.
+
+Create a file in your `SCRIPTS_ROOT` (for example
+`/opt/netbox/netbox/scripts/netbox_ssl_scripts.py`) that imports the script
+classes you want:
+
+```python
+# /opt/netbox/netbox/scripts/netbox_ssl_scripts.py
+from netbox_ssl.scripts import (
+    CertificateExpiryScan,
+    CertificateExpiryNotification,
+    CertificateAutoArchive,
+    CertificateARIPoll,
+    ExternalSourceSync,
+    ScheduledCertificateExport,
+    CertificateURLScan,
+)
+```
+
+Then open **Customization → Scripts** in NetBox — the scripts now appear and can
+be run manually, scheduled, or invoked via the REST API (see below). The file
+must be readable by the NetBox service user; no restart is required.
+
+!!! note "Requires v1.2.2 or newer"
+    Earlier releases shipped scripts that failed to load on NetBox 4.x because a
+    filter field passed a model as a string to `ObjectVar`
+    ([#143](https://github.com/ctrl-alt-automate/netbox-ssl/issues/143)). Upgrade
+    to **1.2.2+** before registering the scripts.
+
 ## Certificate Expiry Notification
 
 The `CertificateExpiryNotification` script checks for certificates that are expiring soon and generates detailed reports suitable for webhook notifications.

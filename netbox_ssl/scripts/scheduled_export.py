@@ -9,6 +9,7 @@ Supported formats: CSV, JSON, YAML.
 
 from django.conf import settings
 from extras.scripts import ChoiceVar, ObjectVar, Script
+from tenancy.models import Tenant
 
 from netbox_ssl.models import Certificate, CertificateStatusChoices
 from netbox_ssl.utils.export import CertificateExporter
@@ -38,7 +39,7 @@ class ScheduledCertificateExport(Script):
         description="Export format",
     )
     tenant = ObjectVar(
-        model="tenancy.Tenant",
+        model=Tenant,
         description="Filter by tenant (empty = all)",
         required=False,
     )

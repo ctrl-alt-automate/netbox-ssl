@@ -13,6 +13,7 @@ has elapsed.
 from django.db import models
 from django.utils import timezone
 from extras.scripts import BooleanVar, ObjectVar, Script
+from tenancy.models import Tenant
 
 from netbox_ssl.models import Certificate
 from netbox_ssl.utils.ari import ARI_DIRECTORIES, ARIError, build_cert_id, discover_ari_endpoint, poll_ari
@@ -35,7 +36,7 @@ class CertificateARIPoll(Script):
         job_timeout = 600
 
     tenant = ObjectVar(
-        model="tenancy.Tenant",
+        model=Tenant,
         description="Filter by tenant (empty = all)",
         required=False,
     )
