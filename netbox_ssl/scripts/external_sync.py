@@ -13,6 +13,8 @@ import logging
 from django.utils import timezone
 from extras.scripts import BooleanVar, ObjectVar, Script
 
+from netbox_ssl.models import ExternalSource
+
 logger = logging.getLogger("netbox_ssl.scripts.external_sync")
 
 
@@ -37,7 +39,7 @@ class ExternalSourceSync(Script):
         job_timeout = 1800
 
     source = ObjectVar(
-        model="netbox_ssl.ExternalSource",
+        model=ExternalSource,
         description="Sync a specific source (leave empty for all enabled sources)",
         required=False,
     )

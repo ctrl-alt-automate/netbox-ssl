@@ -11,6 +11,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 from extras.scripts import BooleanVar, IntegerVar, ObjectVar, Script, StringVar
+from tenancy.models import Tenant
 
 from netbox_ssl.models import Certificate, CertificateStatusChoices
 
@@ -42,7 +43,7 @@ class CertificateExpiryNotification(Script):
         required=False,
     )
     tenant = ObjectVar(
-        model="tenancy.Tenant",
+        model=Tenant,
         description="Filter certificates by tenant (optional)",
         required=False,
     )

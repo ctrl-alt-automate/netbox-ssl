@@ -13,6 +13,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 from extras.scripts import BooleanVar, IntegerVar, ObjectVar, Script
+from tenancy.models import Tenant
 
 from netbox_ssl.models import Certificate, CertificateStatusChoices
 from netbox_ssl.utils.events import (
@@ -45,7 +46,7 @@ class CertificateAutoArchive(Script):
 
     # Script variables
     tenant = ObjectVar(
-        model="tenancy.Tenant",
+        model=Tenant,
         description="Filter certificates by tenant (optional)",
         required=False,
     )
