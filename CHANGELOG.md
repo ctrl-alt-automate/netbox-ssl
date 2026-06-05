@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-06-05
+
+**Patch release** — the bundled NetBox Scripts (expiry scan, expiry
+notification, auto-archive, ARI poll, scheduled export, external sync) could not
+be loaded on NetBox 4.x; they now register correctly. Includes a docs section on
+how to make the scripts available via `SCRIPTS_ROOT`. No migrations, no breaking
+changes; safe to upgrade from 1.2.x.
+
+### Fixed
+
+- **Bundled NetBox Scripts could not be loaded** ([#143](https://github.com/ctrl-alt-automate/netbox-ssl/issues/143)):
+  every script exposing a tenant/source filter passed `model=` to `ObjectVar` as
+  a **string** (e.g. `ObjectVar(model="tenancy.Tenant")`). NetBox's `ObjectVar`
+  requires a model **class** — it calls `model.objects.all()` — so the script
+  module raised `AttributeError: 'str' object has no attribute 'objects'` at
+  import time and could never be registered or run. Affected the expiry scan,
+  expiry notification, auto-archive, ARI poll, scheduled export, and external
+  sync scripts. All now import the model and pass the class
+  (`model=Tenant` / `model=ExternalSource`). The bug had hidden because NetBox
+  never imports plugin-bundled scripts at startup and the script tests skipped
+  themselves when the import failed; a new AST regression guard
+  (`tests/test_script_objectvar.py`) now fails on any string-model `ObjectVar`.
+
+### Documentation
+
+- **How to register the bundled scripts** ([#143](https://github.com/ctrl-alt-automate/netbox-ssl/issues/143)):
+  documented that NetBox does not auto-discover plugin-bundled scripts and added
+  a `SCRIPTS_ROOT` wrapper recipe to [Custom Scripts](reference/scripts.md) so
+  the expiry scan and friends actually appear under **Customization → Scripts**.
+
 ## [1.2.1] - 2026-06-04
 
 **Patch release** — two NetBox 4.6 / Django 6.0 regression fixes (the Certificate

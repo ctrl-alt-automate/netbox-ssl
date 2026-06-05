@@ -24,9 +24,17 @@ jobs:
           # A tag push publishes to PyPI. Without this gate a release ships even
           # if CI is red — which is exactly how #111/#112 reached v1.1.0. Require
           # the CI workflow for this commit to have concluded successfully.
+          #
+          # Budget note (#141): the tag is pushed right after the dev->main merge,
+          # so CI is still in_progress when this gate starts. The poll budget MUST
+          # exceed the slowest CI lane — the NetBox integration matrix (v4.4 + v4.5
+          # + v4.6) takes ~13 min, plus runner queue time. 90 * 20s = 30 min ceiling.
+          # Do NOT shrink this below the integration-matrix duration or releases
+          # will time out and need a manual re-run. The gate is idempotent: re-running
+          # once CI is green is always safe (nothing publishes until then).
           sha="${GITHUB_SHA}"
           echo "Requiring a successful 'CI' run for commit $sha before publishing."
-          for i in $(seq 1 30); do
+          for i in $(seq 1 90); do
             status=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --commit "$sha" --json status -q '.[0].status' 2>/dev/null || true)
             concl=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --commit "$sha" --json conclusion -q '.[0].conclusion' 2>/dev/null || true)
             echo "attempt $i: status='${status}' conclusion='${concl}'"
