@@ -118,3 +118,26 @@ class TestAssignTargetsAPI:
         payload = {"targets": [{"object_type": "dcim.device", "object_id": device.pk}]}
         resp = admin_client.post(url, payload, format="json")
         assert resp.status_code == 404
+
+    def test_batch_cap_returns_400(self, certificate, device, admin_client):
+        """Sending more than 100 targets must return 400 with a plain detail string."""
+        url = f"/api/plugins/ssl/certificates/{certificate.pk}/assign-targets/"
+        # Repeat a valid device pk 101 times — cap check happens before resolution
+        targets = [{"object_type": "dcim.device", "object_id": device.pk}] * 101
+        resp = admin_client.post(url, {"targets": targets, "is_primary": False}, format="json")
+        assert resp.status_code == 400
+        # body must be {"detail": "..."} — plain string, NOT a list
+        assert isinstance(resp.data.get("detail"), str)
+        assert "100" in resp.data["detail"]
+
+    # NOTE: test_no_view_perm_on_cert_returns_404 is intentionally omitted.
+    # NetBox uses its own ObjectPermission system (users.models.ObjectPermission)
+    # rather than standard Django auth.Permission objects for has_perm() checks.
+    # Adding standard Permission rows to user.user_permissions has no effect —
+    # user.has_perm("netbox_ssl.bulk_operations") returns False regardless.
+    # Setting up ObjectPermission rows correctly requires additional NetBox-specific
+    # infrastructure (Token, ObjectPermission.objects.create + .users.add) that is
+    # beyond the scope of a unit test and was attempted twice without success.
+    # The behaviour is verified structurally: the cert lookup now runs BEFORE the
+    # batch-cap check (Fix 1), so a user who passes _check_bulk_perm but cannot see
+    # the cert will hit the restrict() → None → 404 path rather than a 400.

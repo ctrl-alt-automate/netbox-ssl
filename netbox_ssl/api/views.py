@@ -1100,6 +1100,12 @@ class CertificateViewSet(NetBoxModelViewSet):
         if denied:
             return denied
 
+        # Fetch and authorise the certificate BEFORE the batch-cap check so that
+        # callers who cannot see this certificate always get 404, never 400.
+        certificate = Certificate.objects.restrict(request.user, "view").filter(pk=pk).first()
+        if certificate is None:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = AssignTargetsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         targets_data = serializer.validated_data["targets"]
@@ -1108,11 +1114,10 @@ class CertificateViewSet(NetBoxModelViewSet):
         plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
         max_batch_size = plugin_settings.get("bulk_assign_max_batch_size", 100)
         if len(targets_data) > max_batch_size:
-            raise serializers.ValidationError({"detail": f"Batch size exceeds maximum of {max_batch_size} targets."})
-
-        certificate = Certificate.objects.restrict(request.user, "view").filter(pk=pk).first()
-        if certificate is None:
-            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": f"Batch size exceeds maximum of {max_batch_size} targets."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         allowed_types = {"dcim.device", "dcim.service", "virtualization.virtualmachine"}
         resolved: list[tuple[ContentType, int]] = []
