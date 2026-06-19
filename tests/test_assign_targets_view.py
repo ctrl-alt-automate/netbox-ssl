@@ -44,6 +44,34 @@ class TestCertificateAssignTargetsView:
         assert resp.status_code == 200
         assert b"Assign certificate to objects" in resp.content
 
+    def test_get_renders_for_non_active_status(self, client, django_user_model):
+        """View must return 200 regardless of certificate status (no status gate)."""
+        import uuid
+
+        from netbox_ssl.models import Certificate
+        from netbox_ssl.models.certificates import CertificateStatusChoices
+
+        user = django_user_model.objects.create_user("viewer2", password="x", is_superuser=True)
+        client.force_login(user)
+        uid_int = int(uuid.uuid4().hex[:8], 16)
+        pairs = [f"{(uid_int >> (i * 8)) & 0xFF:02X}" for i in range(4)]
+        tail = [f"{i:02X}" for i in range(28)]
+        fp = ":".join(pairs + tail)
+        serial = f"02:BB:{uuid.uuid4().hex[:8].upper()}"
+        cert = Certificate.objects.create(
+            common_name="pending.example.com",
+            serial_number=serial,
+            issuer="Test CA",
+            fingerprint_sha256=fp,
+            algorithm="rsa",
+            valid_from="2026-01-01T00:00:00Z",
+            valid_to="2027-01-01T00:00:00Z",
+            status=CertificateStatusChoices.STATUS_PENDING,
+        )
+        url = f"/plugins/ssl/certificates/{cert.pk}/assign-targets/"
+        resp = client.get(url)
+        assert resp.status_code == 200
+
     def test_post_creates_assignment_and_redirects(self, client, django_user_model):
         import uuid
 
