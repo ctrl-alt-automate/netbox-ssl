@@ -84,6 +84,18 @@ class TestAssignCertificateToTargets:
 
         assert CertificateAssignment.objects.get(certificate=cert).is_primary is True
 
+    def test_is_primary_defaults_to_false(self):
+        from netbox_ssl.models import CertificateAssignment
+        from netbox_ssl.utils.assignments import assign_certificate_to_targets
+
+        cert = self._make_cert()
+        d1 = self._device("web01")
+        ct = ContentType.objects.get_for_model(d1)
+
+        assign_certificate_to_targets(cert, [(ct, d1.pk)])
+
+        assert CertificateAssignment.objects.get(certificate=cert).is_primary is False
+
     def test_empty_targets_raises(self):
         from netbox_ssl.utils.assignments import AssignmentError, assign_certificate_to_targets
 

@@ -43,7 +43,8 @@ def assign_certificate_to_targets(
 
     Existing assignments are skipped. Raises ``AssignmentError`` on an empty
     target list, an unsupported content type, a missing object, or a database
-    error.
+    error. The entire batch is atomic: if any target fails validation or a
+    database error occurs, the ENTIRE batch is rolled back.
     """
     if not targets:
         raise AssignmentError("No assignment targets provided.")
@@ -60,6 +61,8 @@ def assign_certificate_to_targets(
                     raise AssignmentError(f"Unsupported assignment type: {content_type.app_label}.{content_type.model}")
 
                 model_class = content_type.model_class()
+                if model_class is None:
+                    raise AssignmentError(f"Unknown content type: {content_type.app_label}.{content_type.model}")
                 if not model_class.objects.filter(pk=object_id).exists():
                     raise AssignmentError(f"{content_type.model} with id {object_id} does not exist.")
 
