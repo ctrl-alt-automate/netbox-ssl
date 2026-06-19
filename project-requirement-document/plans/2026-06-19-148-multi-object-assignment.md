@@ -26,19 +26,27 @@
 The service, API, and view all touch the ORM, so their tests are
 `@pytest.mark.django_db` and run **inside the NetBox Docker container** (per
 `CLAUDE.md` §"Tests in Docker Container"). Source files are hot-mounted; **test
-files must be copied in before each run**. The standard run command used
-throughout this plan:
+files AND `pytest.ini` must be copied in before each run** — `pytest.ini` is
+what supplies `DJANGO_SETTINGS_MODULE=netbox.settings`, without which
+pytest-django will not configure. The canonical run command used throughout
+this plan (the per-step `docker cp tests/...` lines below are shorthand for it):
 
 ```bash
 docker cp tests/. netbox-ssl-netbox-1:/tmp/plugin_tests/ \
-  && docker exec netbox-ssl-netbox-1 /opt/netbox/venv/bin/python -m pytest /tmp/plugin_tests/<FILE> -v
+  && docker cp pytest.ini netbox-ssl-netbox-1:/tmp/plugin_tests/pytest.ini \
+  && docker exec netbox-ssl-netbox-1 /opt/netbox/venv/bin/python -m pytest /tmp/plugin_tests/<FILE> -v --tb=short
 ```
 
-One-time container prep (if not already done):
+Note: each run takes ~90s — pytest-django rebuilds NetBox's (large) migration
+set for the test database. This is normal; be patient rather than assuming a
+hang.
+
+One-time container prep (already done for this environment; recorded for
+reproducibility — the venv lacks `ensurepip`, so bootstrap pip via get-pip):
 
 ```bash
-docker exec netbox-ssl-netbox-1 bash -c "curl -sS https://bootstrap.pypa.io/get-pip.py | /opt/netbox/venv/bin/python"
-docker exec netbox-ssl-netbox-1 /opt/netbox/venv/bin/pip install pytest pytest-django
+docker exec netbox-ssl-netbox-1 bash -c "curl -sS https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py && /opt/netbox/venv/bin/python /tmp/get-pip.py"
+docker exec netbox-ssl-netbox-1 /opt/netbox/venv/bin/python -m pip install pytest pytest-django
 ```
 
 ## File Structure
