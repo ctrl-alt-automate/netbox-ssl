@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Assign one certificate to many objects** ([#148](https://github.com/ctrl-alt-automate/netbox-ssl/issues/148)):
+  a wildcard or shared certificate can now be assigned to multiple Devices,
+  Virtual Machines, and Services in a single action — via an "Assign to objects"
+  button on the certificate detail page, or the new
+  `POST /api/plugins/ssl/certificates/{id}/assign-targets` REST action. Targets
+  already assigned are silently skipped; the result reports how many were
+  assigned and how many were skipped. No database migration.
+
 ## [1.2.2] - 2026-06-05
 
 **Patch release** — the bundled NetBox Scripts (expiry scan, expiry

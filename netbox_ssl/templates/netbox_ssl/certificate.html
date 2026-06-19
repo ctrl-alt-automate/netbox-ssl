@@ -288,11 +288,17 @@
 {% if object.status == 'active' or object.status == 'expired' %}
 {% if perms.netbox_ssl.renew_certificate or perms.netbox_ssl.import_certificate or perms.netbox_ssl.add_certificate %}
 <div class="row mb-3">
-  <div class="col col-12">
+  <div class="col col-12 d-flex gap-2 flex-wrap">
     <a href="{% url 'plugins:netbox_ssl:certificate_import' %}?renew_from={{ object.pk }}"
        class="btn btn-warning">
       <i class="mdi mdi-swap-horizontal"></i> Renew This Certificate
     </a>
+    {% if perms.netbox_ssl.add_certificateassignment %}
+    <a href="{% url 'plugins:netbox_ssl:certificate_assign_targets' pk=object.pk %}"
+       class="btn btn-primary">
+      <i class="mdi mdi-link-plus"></i> Assign to objects
+    </a>
+    {% endif %}
   </div>
 </div>
 {% endif %}
