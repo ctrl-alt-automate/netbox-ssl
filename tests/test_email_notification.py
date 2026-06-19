@@ -123,13 +123,21 @@ EMPTY_REPORT = {
 }
 
 
-def _make_settings_mock(enabled: bool = True, recipients: list | None = None):
+def _make_settings_mock(
+    enabled: bool = True,
+    recipients: list | None = None,
+    server_email: str | None = "server@example.com",
+):
     """Create a mock settings object.
 
     Note: distinguish an explicit empty list (``[]`` — the "no recipients
     configured" case) from the default (``None`` → a sample recipient). Using
     ``recipients or [...]`` would collapse ``[]`` to the fallback and silently
     break the no-recipients test.
+
+    ``server_email`` mirrors Django's ``SERVER_EMAIL``, which NetBox populates
+    from the ``EMAIL_FROM`` config setting (see #147). It is kept distinct from
+    ``DEFAULT_FROM_EMAIL`` so the from-address tests can tell which one is used.
     """
     mock = MagicMock()
     mock.PLUGINS_CONFIG = {
@@ -140,6 +148,7 @@ def _make_settings_mock(enabled: bool = True, recipients: list | None = None):
         }
     }
     mock.DEFAULT_FROM_EMAIL = "netbox@example.com"
+    mock.SERVER_EMAIL = server_email
     return mock
 
 
@@ -231,3 +240,45 @@ class TestSendExpiryReport:
 
         result = send_expiry_report(SAMPLE_REPORT)
         assert result is False
+
+    @patch("netbox_ssl.utils.email.EmailMultiAlternatives")
+    @patch("netbox_ssl.utils.email.render_to_string", side_effect=lambda t, c: f"rendered:{t}")
+    @patch("netbox_ssl.utils.email.settings", new=_make_settings_mock(True))
+    def test_uses_server_email_as_from_address(self, mock_render, mock_email_cls):
+        """Regression for #147.
+
+        NetBox maps the ``EMAIL_FROM`` configuration setting onto Django's
+        ``SERVER_EMAIL``, not ``DEFAULT_FROM_EMAIL``. The expiry report must
+        therefore send from ``SERVER_EMAIL`` so the operator's configured
+        address is honoured instead of the ``webmaster@localhost`` default.
+        """
+        from netbox_ssl.utils.email import send_expiry_report
+
+        mock_msg = MagicMock()
+        mock_email_cls.return_value = mock_msg
+
+        result = send_expiry_report(SAMPLE_REPORT)
+
+        assert result is True
+        # EmailMultiAlternatives(subject, body, from_email, recipients)
+        from_email = mock_email_cls.call_args[0][2]
+        assert from_email == "server@example.com"
+
+    @patch("netbox_ssl.utils.email.EmailMultiAlternatives")
+    @patch("netbox_ssl.utils.email.render_to_string", side_effect=lambda t, c: f"rendered:{t}")
+    @patch("netbox_ssl.utils.email.settings", new=_make_settings_mock(True, server_email=""))
+    def test_falls_back_to_default_from_email_when_server_email_unset(self, mock_render, mock_email_cls):
+        """If ``SERVER_EMAIL`` is empty, fall back to ``DEFAULT_FROM_EMAIL``.
+
+        Guards against a naive ``settings.SERVER_EMAIL`` fix sending mail with
+        an empty From header on installs that never configured ``EMAIL_FROM``.
+        """
+        from netbox_ssl.utils.email import send_expiry_report
+
+        mock_msg = MagicMock()
+        mock_email_cls.return_value = mock_msg
+
+        send_expiry_report(SAMPLE_REPORT)
+
+        from_email = mock_email_cls.call_args[0][2]
+        assert from_email == "netbox@example.com"
