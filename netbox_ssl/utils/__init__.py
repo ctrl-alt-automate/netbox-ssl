@@ -1,4 +1,5 @@
 from .analytics import CertificateAnalytics
+from .assignments import AssignmentError, AssignResult, assign_certificate_to_targets
 from .ca_detector import detect_issuing_ca, get_or_create_ca_from_issuer
 from .chain_validator import (
     ChainValidationError,
@@ -21,6 +22,9 @@ from .export import CertificateExporter, ExportFormatChoices
 from .parser import CertificateParseError, CertificateParser, PrivateKeyDetectedError
 
 __all__ = [
+    "AssignmentError",
+    "AssignResult",
+    "assign_certificate_to_targets",
     "CertificateAnalytics",
     "CertificateParser",
     "CertificateParseError",
