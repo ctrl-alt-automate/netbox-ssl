@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from django.db import transaction
 from django.utils import timezone
+
+if TYPE_CHECKING:
+    from ..models import MonitoredEndpoint
 
 from ..models import MonitoredEndpointCertificate, MonitoredEndpointStatusChoices
 from .events import (
@@ -22,7 +26,7 @@ from .url_validation import URLValidationError
 
 @dataclass(frozen=True)
 class PollResult:
-    endpoint: object
+    endpoint: MonitoredEndpoint
     status: str
     rotated: bool
     events_fired: tuple[str, ...]
@@ -33,7 +37,7 @@ def _host_port(url: str) -> tuple[str, int]:
     return parts.hostname or "", parts.port or 443
 
 
-def poll_endpoint(endpoint: object, *, allowlist: list) -> PollResult:
+def poll_endpoint(endpoint: MonitoredEndpoint, *, allowlist: list[str]) -> PollResult:
     """Scrape the endpoint's current cert and reconcile the endpoint record.
 
     Two-attempt trust detection:
@@ -48,21 +52,21 @@ def poll_endpoint(endpoint: object, *, allowlist: list) -> PollResult:
     - MonitoredEndpointCertificate history row upserted (get_or_create + bump last_seen).
     - Rotation detected when the previous cert pk differs from the new one.
     """
-    host, port = _host_port(endpoint.url)  # type: ignore[attr-defined]
-    sni = endpoint.sni or None  # type: ignore[attr-defined]
-    prev_cert_id = endpoint.certificate_id  # type: ignore[attr-defined]
+    host, port = _host_port(endpoint.url)
+    sni = endpoint.sni or None
+    prev_cert_id = endpoint.certificate_id
     events: list[str] = []
     now = timezone.now()
 
     def _do(verify: bool):
         return scrape_and_import(
-            endpoint.url,  # type: ignore[attr-defined]
+            endpoint.url,
             host,
             port,
             sni=sni,
             verify_chain=verify,
             allowlist=allowlist,
-            tenant=endpoint.tenant,  # type: ignore[attr-defined]
+            tenant=endpoint.tenant,
             set_discovered_url=True,
         )
 
@@ -74,34 +78,34 @@ def poll_endpoint(endpoint: object, *, allowlist: list) -> PollResult:
             outcome = _do(False)
             untrusted = True
         except (TLSScrapeError, URLValidationError) as exc:
-            endpoint.status = MonitoredEndpointStatusChoices.STATUS_UNREACHABLE  # type: ignore[attr-defined]
-            endpoint.last_checked = now  # type: ignore[attr-defined]
-            endpoint.last_error = str(exc)  # type: ignore[attr-defined]
-            endpoint.save(update_fields=["status", "last_checked", "last_error"])  # type: ignore[attr-defined]
+            endpoint.status = MonitoredEndpointStatusChoices.STATUS_UNREACHABLE
+            endpoint.last_checked = now
+            endpoint.last_error = str(exc)
+            endpoint.save(update_fields=["status", "last_checked", "last_error"])
             fire_endpoint_event(endpoint, EVENT_ENDPOINT_UNREACHABLE)
-            return PollResult(endpoint, endpoint.status, False, (EVENT_ENDPOINT_UNREACHABLE,))  # type: ignore[attr-defined]
+            return PollResult(endpoint, endpoint.status, False, (EVENT_ENDPOINT_UNREACHABLE,))
     except Exception as exc:  # noqa: BLE001 – record and continue (e.g. parse error)
-        endpoint.status = MonitoredEndpointStatusChoices.STATUS_UNREACHABLE  # type: ignore[attr-defined]
-        endpoint.last_checked = now  # type: ignore[attr-defined]
-        endpoint.last_error = str(exc)  # type: ignore[attr-defined]
-        endpoint.save(update_fields=["status", "last_checked", "last_error"])  # type: ignore[attr-defined]
+        endpoint.status = MonitoredEndpointStatusChoices.STATUS_UNREACHABLE
+        endpoint.last_checked = now
+        endpoint.last_error = str(exc)
+        endpoint.save(update_fields=["status", "last_checked", "last_error"])
         fire_endpoint_event(endpoint, EVENT_ENDPOINT_UNREACHABLE)
-        return PollResult(endpoint, endpoint.status, False, (EVENT_ENDPOINT_UNREACHABLE,))  # type: ignore[attr-defined]
+        return PollResult(endpoint, endpoint.status, False, (EVENT_ENDPOINT_UNREACHABLE,))
 
     cert = outcome.certificate
     rotated = prev_cert_id is not None and prev_cert_id != cert.pk
 
     with transaction.atomic():
-        endpoint.certificate = cert  # type: ignore[attr-defined]
-        endpoint.last_checked = now  # type: ignore[attr-defined]
-        endpoint.last_seen = now  # type: ignore[attr-defined]
-        endpoint.last_error = ""  # type: ignore[attr-defined]
-        endpoint.status = (  # type: ignore[attr-defined]
+        endpoint.certificate = cert
+        endpoint.last_checked = now
+        endpoint.last_seen = now
+        endpoint.last_error = ""
+        endpoint.status = (
             MonitoredEndpointStatusChoices.STATUS_UNTRUSTED
             if untrusted
             else MonitoredEndpointStatusChoices.STATUS_OK
         )
-        endpoint.save(  # type: ignore[attr-defined]
+        endpoint.save(
             update_fields=["certificate", "last_checked", "last_seen", "last_error", "status"]
         )
 
@@ -121,4 +125,4 @@ def poll_endpoint(endpoint: object, *, allowlist: list) -> PollResult:
         events.append(EVENT_ENDPOINT_CERT_ROTATED)
         fire_endpoint_event(endpoint, EVENT_ENDPOINT_CERT_ROTATED, extra={"previous_certificate_id": prev_cert_id})
 
-    return PollResult(endpoint, endpoint.status, rotated, tuple(events))  # type: ignore[attr-defined]
+    return PollResult(endpoint, endpoint.status, rotated, tuple(events))

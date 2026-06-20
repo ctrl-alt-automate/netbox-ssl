@@ -282,3 +282,4 @@ class TestPollEndpoint:
         ep.refresh_from_db()
         assert result.status == MonitoredEndpointStatusChoices.STATUS_UNREACHABLE
         assert ep.last_error
+        assert "private IP" in ep.last_error
