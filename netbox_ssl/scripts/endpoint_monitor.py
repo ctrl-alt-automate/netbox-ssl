@@ -31,7 +31,7 @@ class MonitoredEndpointPoll(Script):
         """Return a single plugin config value."""
         return settings.PLUGINS_CONFIG.get("netbox_ssl", {}).get(name, default)
 
-    def run(self, data, commit):  # noqa: ANN001,ANN201
+    def run(self, data: dict, commit: bool) -> str:
         """Iterate over MonitoredEndpoints, poll each one, and return a summary string."""
         allowlist: list[str] = self.get_plugin_setting("url_import_private_cidr_allowlist", [])
         dry_run: bool = bool(data.get("dry_run", False))
@@ -41,15 +41,19 @@ class MonitoredEndpointPoll(Script):
         if tenant:
             endpoints = endpoints.filter(tenant=tenant)
 
+        if dry_run:
+            total = endpoints.count()
+            for endpoint in endpoints:
+                self.log_info(f"[dry-run] would poll {endpoint.name} ({endpoint.url})")
+            msg = f"[dry-run] {total} endpoint(s) would be polled"
+            self.log_info(msg)
+            return msg
+
         # Materialise counts keyed by status value (all choices start at 0).
         counts: dict[str, int] = {choice[0]: 0 for choice in MonitoredEndpointStatusChoices.CHOICES}
         rotated = 0
 
         for endpoint in endpoints:
-            if dry_run:
-                self.log_info(f"[dry-run] would poll {endpoint.name} ({endpoint.url})")
-                continue
-
             result = poll_endpoint(endpoint, allowlist=allowlist)
             counts[result.status] = counts.get(result.status, 0) + 1
             if result.rotated:
@@ -62,10 +66,5 @@ class MonitoredEndpointPoll(Script):
         summary_parts = status_parts + ([f"rotated={rotated}"] if rotated else [])
         summary = ", ".join(summary_parts) if summary_parts else "no changes"
 
-        total = endpoints.count()
-        if dry_run:
-            self.log_info(f"[dry-run] {total} endpoint(s) would have been polled.")
-        else:
-            self.log_success(f"Polled {total} endpoint(s): {summary}")
-
+        self.log_success(f"Polled {endpoints.count()} endpoint(s): {summary}")
         return summary

@@ -38,8 +38,11 @@ class TestMonitoredEndpointPollScript:
         from netbox_ssl.scripts.endpoint_monitor import MonitoredEndpointPoll
 
         self._ep()
-        MonitoredEndpointPoll().run({"tenant": None, "dry_run": True}, commit=False)
+        self._ep()
+        result = MonitoredEndpointPoll().run({"tenant": None, "dry_run": True}, commit=False)
         mock_poll.assert_not_called()
+        assert "dry-run" in result
+        assert "2" in result
 
     @patch("netbox_ssl.scripts.endpoint_monitor.poll_endpoint")
     def test_tenant_filter_applied(self, mock_poll):
