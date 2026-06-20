@@ -150,6 +150,46 @@ class TestMonitoredEndpointBulkImportColumns:
         assert ep is not None, "Endpoint was not created even without a matching tenant"
         assert ep.tenant is None
 
+    def test_bulk_import_assigns_device(self, client, django_user_model):
+        """A CSV row with 'assigned_device' sets the GenericFK assigned_object on the endpoint."""
+        from dcim.models import Device, DeviceRole, DeviceType, Manufacturer, Site
+        from django.contrib.contenttypes.models import ContentType
+
+        user = django_user_model.objects.create_user("bulk_device", password="x", is_superuser=True)
+        client.force_login(user)
+
+        # Build required DCIM FK chain.
+        site = Site.objects.create(name="BulkSite", slug="bulk-site")
+        manufacturer = Manufacturer.objects.create(name="BulkMfg", slug="bulk-mfg")
+        device_type = DeviceType.objects.create(
+            manufacturer=manufacturer,
+            model="BulkModel",
+            slug="bulk-model",
+        )
+        device_role = DeviceRole.objects.create(name="BulkRole", slug="bulk-role", color="ffffff")
+        device = Device.objects.create(
+            name="BulkDevice",
+            site=site,
+            device_type=device_type,
+            role=device_role,
+        )
+
+        csv_data = f"url,assigned_device\nhttps://device-assign.example.com,{device.name}"
+        resp = client.post(
+            "/plugins/ssl/monitored-endpoints/import/",
+            data={"csv_text": csv_data},
+        )
+        assert resp.status_code == 200
+
+        from netbox_ssl.models import MonitoredEndpoint
+
+        ep = MonitoredEndpoint.objects.filter(url="https://device-assign.example.com:443").first()
+        assert ep is not None, "Endpoint was not created"
+        assert ep.assigned_object is not None, "assigned_object was not set"
+        expected_ct = ContentType.objects.get_for_model(Device)
+        assert ep.assigned_object_type == expected_ct, "Wrong ContentType on assigned_object_type"
+        assert ep.assigned_object_id == device.pk, "Wrong pk on assigned_object_id"
+
 
 @pytest.mark.django_db
 class TestMonitoredEndpointHttpsEnforcement:

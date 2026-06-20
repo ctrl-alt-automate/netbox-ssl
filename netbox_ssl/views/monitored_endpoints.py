@@ -115,6 +115,7 @@ class MonitoredEndpointImportView(LoginRequiredMixin, View):
                 row.assigned_device,
                 row.assigned_vm,
                 row.assigned_service,
+                request.user,
             )
             # Rows are already HTTPS-validated by url_bulk_parser (_normalize_url enforces
             # HTTPS-only), so update_or_create (which bypasses Model.clean()) is safe here.
@@ -185,12 +186,16 @@ class MonitoredEndpointImportView(LoginRequiredMixin, View):
         device_ref: str,
         vm_ref: str,
         service_ref: str,
+        user,
     ) -> tuple:
         """Resolve device/VM/service reference strings to (ContentType, pk) or (None, None).
 
         Priority: service > device > VM (mirrors MonitoredEndpointForm.save()).
         Reference format: name or numeric ID.  Returns (None, None) when no ref given
         or no matching object found — callers should skip setting assigned_object fields.
+
+        Lookups are restricted to objects the requesting user has 'view' permission for,
+        preventing information disclosure via name/ID enumeration (v0.7.5 security rule).
         """
         from dcim.models import Device
         from ipam.models import Service
@@ -204,17 +209,17 @@ class MonitoredEndpointImportView(LoginRequiredMixin, View):
                 return qs.filter(pk=int(ref)).first()
             return qs.filter(name=ref).first()
 
-        service = _lookup(Service.objects.all(), service_ref)
+        service = _lookup(Service.objects.restrict(user, "view"), service_ref)
         if service:
             ct = ContentType.objects.get_for_model(Service)
             return ct, service.pk
 
-        device = _lookup(Device.objects.all(), device_ref)
+        device = _lookup(Device.objects.restrict(user, "view"), device_ref)
         if device:
             ct = ContentType.objects.get_for_model(Device)
             return ct, device.pk
 
-        vm = _lookup(VirtualMachine.objects.all(), vm_ref)
+        vm = _lookup(VirtualMachine.objects.restrict(user, "view"), vm_ref)
         if vm:
             ct = ContentType.objects.get_for_model(VirtualMachine)
             return ct, vm.pk
