@@ -14,6 +14,8 @@ references are resolved against the requesting user's accessible objects.
 
 from __future__ import annotations
 
+import logging
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -29,6 +31,8 @@ from ..utils.tls_scraper import TLSScrapeError
 from ..utils.url_bulk_parser import parse as url_parse
 from ..utils.url_cert_import import scrape_and_import
 from ..utils.url_validation import URLValidationError
+
+logger = logging.getLogger(__name__)
 
 
 def _plugin_setting(name: str, default=None):
@@ -176,20 +180,23 @@ class UrlImportView(LoginRequiredMixin, View):
             return {"url": label, "status": "error", "detail": str(exc)}
 
         # #149: keep a MonitoredEndpoint for every imported/matched URL.
-        from ..models import MonitoredEndpoint
+        try:
+            from ..models import MonitoredEndpoint
 
-        MonitoredEndpoint.objects.update_or_create(
-            url=row["url"],
-            defaults={
-                "name": row.get("sni") or row["host"],
-                "sni": row.get("sni") or "",
-                "certificate": outcome.certificate,
-                "tenant": tenant,
-                "last_seen": timezone.now(),
-                "last_checked": timezone.now(),
-                "status": MonitoredEndpointStatusChoices.STATUS_OK,
-            },
-        )
+            MonitoredEndpoint.objects.update_or_create(
+                url=row["url"],
+                defaults={
+                    "name": row.get("sni") or row["host"],
+                    "sni": row.get("sni") or "",
+                    "certificate": outcome.certificate,
+                    "tenant": tenant,
+                    "last_seen": timezone.now(),
+                    "last_checked": timezone.now(),
+                    "status": MonitoredEndpointStatusChoices.STATUS_OK,
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("MonitoredEndpoint upsert failed for %s: %s", row["url"], exc)
 
         if not outcome.created:
             return {
