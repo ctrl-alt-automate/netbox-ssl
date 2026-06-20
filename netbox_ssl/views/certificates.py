@@ -77,14 +77,18 @@ class CertificateView(generic.ObjectView):
         assignments = instance.assignments.all()
         # Add lifecycle events for timeline tab
         lifecycle_events = instance.lifecycle_events.all()[:50]
-        # Add monitored endpoints (reverse tab, #149)
-        monitored_endpoints = instance.monitored_endpoints.restrict(request.user, "view")
+        # Add monitored endpoints (reverse tab, #149) — materialized once to avoid
+        # 3 DB hits (restrict + count + template for/if); select_related avoids
+        # per-row cert queries in the tab.
+        monitored_endpoints = list(
+            instance.monitored_endpoints.restrict(request.user, "view").select_related("certificate")
+        )
         return {
             "assignments": assignments,
             "assignments_count": assignments.count(),
             "lifecycle_events": lifecycle_events,
             "monitored_endpoints": monitored_endpoints,
-            "monitored_endpoints_count": monitored_endpoints.count(),
+            "monitored_endpoints_count": len(monitored_endpoints),
         }
 
 

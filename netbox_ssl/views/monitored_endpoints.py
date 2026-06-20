@@ -29,7 +29,10 @@ class MonitoredEndpointListView(generic.ObjectListView):
 class MonitoredEndpointView(generic.ObjectView):
     """Display a single Monitored Endpoint."""
 
-    queryset = MonitoredEndpoint.objects.select_related("certificate", "tenant").prefetch_related("tags")
+    queryset = MonitoredEndpoint.objects.select_related("certificate", "tenant").prefetch_related(
+        "tags",
+        "cert_history__certificate",
+    )
 
 class MonitoredEndpointEditView(generic.ObjectEditView):
     """Create or edit a Monitored Endpoint."""
