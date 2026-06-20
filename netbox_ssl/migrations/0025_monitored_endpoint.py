@@ -10,6 +10,8 @@ this plugin (see 0013_external_source_framework.py for reference).
 """
 
 import django.db.models.deletion
+import taggit.managers
+import utilities.json
 from django.db import migrations, models
 
 
@@ -37,7 +39,7 @@ class Migration(migrations.Migration):
                 ("last_updated", models.DateTimeField(auto_now=True, null=True)),
                 (
                     "custom_field_data",
-                    models.JSONField(blank=True, default=dict, encoder=None),
+                    models.JSONField(blank=True, default=dict, encoder=utilities.json.CustomFieldJSONEncoder),
                 ),
                 (
                     "name",
@@ -114,7 +116,7 @@ class Migration(migrations.Migration):
                         to="tenancy.tenant",
                     ),
                 ),
-                ("tags", models.ManyToManyField(blank=True, to="extras.tag")),
+                ("tags", taggit.managers.TaggableManager(through="extras.TaggedItem", to="extras.Tag")),
             ],
             options={
                 "ordering": ["name"],
