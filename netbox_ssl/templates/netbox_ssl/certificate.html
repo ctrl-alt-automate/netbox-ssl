@@ -447,9 +447,9 @@
             <tr>
               <td><a href="{{ endpoint.get_absolute_url }}">{{ endpoint.name }}</a></td>
               <td>
-                <a href="{{ endpoint.url }}" target="_blank" rel="noopener noreferrer">
-                  {{ endpoint.url }}
-                </a>
+                {% if endpoint.url|slice:':8'|lower == 'https://' or endpoint.url|slice:':7'|lower == 'http://' %}
+                  <a href="{{ endpoint.url }}" target="_blank" rel="noopener noreferrer">{{ endpoint.url }}</a>
+                {% else %}{{ endpoint.url }}{% endif %}
               </td>
               <td>{% badge endpoint.get_status_display %}</td>
               <td>{{ endpoint.days_remaining|default:"—" }}</td>
