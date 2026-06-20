@@ -3,6 +3,7 @@ from .certificate_authorities import CertificateAuthorityTable
 from .certificates import CertificateTable
 from .csr import CertificateSigningRequestTable
 from .external_sources import ExternalSourceTable
+from .monitored_endpoints import MonitoredEndpointTable
 
 __all__ = [
     "CertificateTable",
@@ -10,4 +11,5 @@ __all__ = [
     "CertificateAuthorityTable",
     "CertificateSigningRequestTable",
     "ExternalSourceTable",
+    "MonitoredEndpointTable",
 ]

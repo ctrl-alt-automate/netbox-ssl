@@ -105,6 +105,19 @@ menu = PluginMenu(
                         ),
                     ),
                 ),
+                PluginMenuItem(
+                    link="plugins:netbox_ssl:monitoredendpoint_list",
+                    link_text="Monitored Endpoints",
+                    permissions=["netbox_ssl.view_monitoredendpoint"],
+                    buttons=(
+                        PluginMenuButton(
+                            link="plugins:netbox_ssl:monitoredendpoint_add",
+                            title="Add",
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["netbox_ssl.add_monitoredendpoint"],
+                        ),
+                    ),
+                ),
             ),
         ),
         (

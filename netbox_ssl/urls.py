@@ -231,6 +231,48 @@ urlpatterns = [
         name="externalsource_changelog",
         kwargs={"model": models.ExternalSource},
     ),
+    # MonitoredEndpoint URLs
+    path(
+        "monitored-endpoints/",
+        views.MonitoredEndpointListView.as_view(),
+        name="monitoredendpoint_list",
+    ),
+    path(
+        "monitored-endpoints/add/",
+        views.MonitoredEndpointEditView.as_view(),
+        name="monitoredendpoint_add",
+    ),
+    path(
+        "monitored-endpoints/import/",
+        views.MonitoredEndpointImportView.as_view(),
+        name="monitoredendpoint_import",
+    ),
+    path(
+        "monitored-endpoints/delete/",
+        views.MonitoredEndpointBulkDeleteView.as_view(),
+        name="monitoredendpoint_bulk_delete",
+    ),
+    path(
+        "monitored-endpoints/<int:pk>/",
+        views.MonitoredEndpointView.as_view(),
+        name="monitoredendpoint",
+    ),
+    path(
+        "monitored-endpoints/<int:pk>/edit/",
+        views.MonitoredEndpointEditView.as_view(),
+        name="monitoredendpoint_edit",
+    ),
+    path(
+        "monitored-endpoints/<int:pk>/delete/",
+        views.MonitoredEndpointDeleteView.as_view(),
+        name="monitoredendpoint_delete",
+    ),
+    path(
+        "monitored-endpoints/<int:pk>/changelog/",
+        ObjectChangeLogView.as_view(),
+        name="monitoredendpoint_changelog",
+        kwargs={"model": models.MonitoredEndpoint},
+    ),
     # CertificateAssignment URLs
     path(
         "assignments/",

@@ -4,6 +4,7 @@ from .certificates import CertificateFilterSet
 from .compliance import ComplianceCheckFilterSet, CompliancePolicyFilterSet
 from .csr import CertificateSigningRequestFilterSet
 from .external_sources import ExternalSourceFilterSet
+from .monitored_endpoints import MonitoredEndpointFilterSet
 
 __all__ = [
     "CertificateFilterSet",
@@ -13,4 +14,5 @@ __all__ = [
     "CompliancePolicyFilterSet",
     "ComplianceCheckFilterSet",
     "ExternalSourceFilterSet",
+    "MonitoredEndpointFilterSet",
 ]

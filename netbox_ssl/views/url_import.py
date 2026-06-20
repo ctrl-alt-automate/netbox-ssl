@@ -19,12 +19,15 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 
+from ..models import MonitoredEndpointStatusChoices
 from ..utils import CertificateParseError
 from ..utils.tls_scraper import TLSScrapeError
 from ..utils.url_bulk_parser import parse as url_parse
+from ..utils.url_cert_import import scrape_and_import
 from ..utils.url_validation import URLValidationError
 
 
@@ -151,8 +154,6 @@ class UrlImportView(LoginRequiredMixin, View):
 
     def _process_row(self, request, row, allowlist, user_tenants, default_tenant):
         """Validate → scrape → parse → import a single row; return an outcome dict."""
-        from ..utils.url_cert_import import scrape_and_import
-
         label = row["url"]
         tenant = self._resolve_tenant(row.get("tenant"), user_tenants) or default_tenant
         try:
@@ -173,6 +174,22 @@ class UrlImportView(LoginRequiredMixin, View):
             return {"url": label, "status": "error", "detail": str(exc)}
         except Exception as exc:  # noqa: BLE001 - surface per-row, don't abort the batch
             return {"url": label, "status": "error", "detail": str(exc)}
+
+        # #149: keep a MonitoredEndpoint for every imported/matched URL.
+        from ..models import MonitoredEndpoint
+
+        MonitoredEndpoint.objects.update_or_create(
+            url=row["url"],
+            defaults={
+                "name": row.get("sni") or row["host"],
+                "sni": row.get("sni") or "",
+                "certificate": outcome.certificate,
+                "tenant": tenant,
+                "last_seen": timezone.now(),
+                "last_checked": timezone.now(),
+                "status": MonitoredEndpointStatusChoices.STATUS_OK,
+            },
+        )
 
         if not outcome.created:
             return {
