@@ -2,12 +2,17 @@
 
 import datetime
 import uuid
+from typing import TYPE_CHECKING
 
 import pytest
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+if TYPE_CHECKING:
+    from netbox_ssl.models import Certificate
 
-def _make_cert(serial=None):
+
+def _make_cert(serial: str | None = None) -> "Certificate":
     from netbox_ssl.models import Certificate
 
     uid = uuid.uuid4()
@@ -49,16 +54,15 @@ class TestMonitoredEndpoint:
         assert ep.certificate is None
 
     def test_rotation_history_unique_constraint(self):
-        from django.db import IntegrityError
-
         from netbox_ssl.models import MonitoredEndpoint, MonitoredEndpointCertificate
 
         cert = _make_cert()
         ep = MonitoredEndpoint.objects.create(name="x", url="https://x.example.com")
         now = timezone.now()
         MonitoredEndpointCertificate.objects.create(endpoint=ep, certificate=cert, first_seen=now, last_seen=now)
-        with pytest.raises(IntegrityError):
-            MonitoredEndpointCertificate.objects.create(endpoint=ep, certificate=cert, first_seen=now, last_seen=now)
+        with pytest.raises(IntegrityError):  # noqa: SIM117
+            with transaction.atomic():
+                MonitoredEndpointCertificate.objects.create(endpoint=ep, certificate=cert, first_seen=now, last_seen=now)
 
     def test_which_sites_share_a_certificate(self):
         from netbox_ssl.models import MonitoredEndpoint
