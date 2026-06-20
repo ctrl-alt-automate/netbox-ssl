@@ -93,6 +93,21 @@ class TestScrapeAndImport:
         assert outcome.created is True
         assert outcome.certificate.discovered_via_url == ""
 
+    @patch("netbox_ssl.utils.url_cert_import.validate_https_url")
+    @patch("netbox_ssl.utils.url_cert_import.socket.getaddrinfo", side_effect=OSError("Name or service not known"))
+    def test_dns_failure_raises_tls_scrape_error(self, _gai, _val):
+        """DNS OSError from getaddrinfo must surface as TLSScrapeError (not bare OSError)."""
+        from netbox_ssl.utils.tls_scraper import TLSScrapeError
+        from netbox_ssl.utils.url_cert_import import scrape_and_import
+
+        with pytest.raises(TLSScrapeError, match="DNS failed"):
+            scrape_and_import(
+                "https://no-such-host.example.com",
+                "no-such-host.example.com",
+                443,
+                allowlist=[],
+            )
+
 
 @pytest.mark.unit
 @pytest.mark.django_db
@@ -109,7 +124,8 @@ class TestProcessRowParity:
         """_process_row returns {'status': 'imported', 'url': ..., 'detail': CN, 'pk': id}."""
         from netbox_ssl.views.url_import import UrlImportView
 
-        mock_scrape.return_value = _pem()
+        cn = "import-shape.example.com"
+        mock_scrape.return_value = _pem(cn=cn)
         view = UrlImportView()
         row = {
             "url": "https://c.example.com",
@@ -122,7 +138,7 @@ class TestProcessRowParity:
         result = view._process_row(None, row, [], [], None)
         assert result["status"] == "imported"
         assert result["url"] == "https://c.example.com"
-        assert "detail" in result
+        assert result["detail"] == cn
         assert "pk" in result
 
     @patch("netbox_ssl.utils.url_cert_import.validate_https_url")
@@ -135,7 +151,8 @@ class TestProcessRowParity:
         """Second call with same cert returns {'status': 'matched', 'pk': ...}."""
         from netbox_ssl.views.url_import import UrlImportView
 
-        pem = _pem()
+        pem_cn = "matched-shape.example.com"
+        pem = _pem(cn=pem_cn)
         mock_scrape.return_value = pem
         view = UrlImportView()
         row = {
@@ -150,7 +167,7 @@ class TestProcessRowParity:
         result = view._process_row(None, row, [], [], None)
         assert result["status"] == "matched"
         assert "pk" in result
-        assert "detail" in result
+        assert result["detail"] == pem_cn
 
     @patch("netbox_ssl.utils.url_cert_import.validate_https_url")
     @patch(

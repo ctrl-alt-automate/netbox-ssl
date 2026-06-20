@@ -43,7 +43,10 @@ def scrape_and_import(
     Does NOT swallow — callers map exceptions to their own outcome shapes.
     """
     validate_https_url(url, cidr_allowlist=allowlist)
-    resolved_ip = socket.getaddrinfo(host, port)[0][4][0]
+    try:
+        resolved_ip = socket.getaddrinfo(host, port)[0][4][0]
+    except OSError as exc:
+        raise TLSScrapeError(f"DNS failed for {host}:{port}: {exc}") from exc
     pem = scrape_tls_certificate(resolved_ip, host, port, sni=sni, verify_chain=verify_chain)
     parsed = CertificateParser.parse(pem)
 
@@ -58,23 +61,25 @@ def scrape_and_import(
         return ImportOutcome(certificate=existing, created=False)
 
     with transaction.atomic():
-        cert = Certificate.objects.create(
-            common_name=parsed.common_name,
-            serial_number=parsed.serial_number,
-            fingerprint_sha256=parsed.fingerprint_sha256,
-            issuer=parsed.issuer,
-            issuing_ca=detect_issuing_ca(parsed.issuer),
-            valid_from=parsed.valid_from,
-            valid_to=parsed.valid_to,
-            sans=parsed.sans or [],
-            key_size=parsed.key_size,
-            algorithm=parsed.algorithm,
-            status=CertificateStatusChoices.STATUS_ACTIVE,
-            pem_content=parsed.pem_content,
-            issuer_chain=parsed.issuer_chain,
-            tenant=tenant,
-            discovered_via_url=url if set_discovered_url else "",
-            last_seen_at=timezone.now(),
-        )
+        create_kwargs = {
+            "common_name": parsed.common_name,
+            "serial_number": parsed.serial_number,
+            "fingerprint_sha256": parsed.fingerprint_sha256,
+            "issuer": parsed.issuer,
+            "issuing_ca": detect_issuing_ca(parsed.issuer),
+            "valid_from": parsed.valid_from,
+            "valid_to": parsed.valid_to,
+            "sans": parsed.sans or [],
+            "key_size": parsed.key_size,
+            "algorithm": parsed.algorithm,
+            "status": CertificateStatusChoices.STATUS_ACTIVE,
+            "pem_content": parsed.pem_content,
+            "issuer_chain": parsed.issuer_chain,
+            "tenant": tenant,
+            "last_seen_at": timezone.now(),
+        }
+        if set_discovered_url:
+            create_kwargs["discovered_via_url"] = url
+        cert = Certificate.objects.create(**create_kwargs)
         cert.auto_detect_acme(save=True)
     return ImportOutcome(certificate=cert, created=True)
