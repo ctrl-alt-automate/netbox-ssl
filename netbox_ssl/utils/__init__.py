@@ -19,6 +19,7 @@ from .events import (
 )
 from .export import CertificateExporter, ExportFormatChoices
 from .parser import CertificateParseError, CertificateParser, PrivateKeyDetectedError
+from .url_cert_import import ImportOutcome, scrape_and_import
 
 __all__ = [
     "CertificateAnalytics",
@@ -44,4 +45,6 @@ __all__ = [
     "EVENT_CERTIFICATE_REVOKED",
     "build_certificate_event_payload",
     "fire_certificate_event",
+    "ImportOutcome",
+    "scrape_and_import",
 ]
