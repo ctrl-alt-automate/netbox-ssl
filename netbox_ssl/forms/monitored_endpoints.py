@@ -107,6 +107,13 @@ class MonitoredEndpointForm(NetBoxModelForm):
             elif model_name == "virtualmachine":
                 self.fields["virtual_machine"].initial = obj
 
+    def clean_url(self):
+        """Reject non-HTTPS URLs at form validation time (XSS / javascript: URI defence)."""
+        url = self.cleaned_data.get("url", "")
+        if not url.lower().startswith("https://"):
+            raise forms.ValidationError(_("Only HTTPS URLs are allowed (must start with https://)."))
+        return url
+
     def save(self, commit=True):
         """Save the endpoint, resolving the GenericFK from device/vm/service fields."""
         instance = super().save(commit=False)

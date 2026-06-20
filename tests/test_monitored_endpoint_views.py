@@ -66,6 +66,82 @@ class TestMonitoredEndpointViews:
 
 
 @pytest.mark.django_db
+class TestMonitoredEndpointImportViewPermission:
+    """Security fix: bulk-import POST must be gated on add_monitoredendpoint."""
+
+    def test_import_post_denied_without_perm(self, client, django_user_model):
+        """Non-superuser without add_monitoredendpoint cannot create via import POST."""
+        user = django_user_model.objects.create_user("noperm", password="x", is_superuser=False)
+        client.force_login(user)
+        resp = client.post(
+            "/plugins/ssl/monitored-endpoints/import/",
+            data={"csv_text": "url\nhttps://blocked.example.com"},
+        )
+        # Must redirect (not 200/create)
+        assert resp.status_code == 302
+
+        from netbox_ssl.models import MonitoredEndpoint
+
+        assert not MonitoredEndpoint.objects.filter(url__contains="blocked.example.com").exists()
+
+
+@pytest.mark.django_db
+class TestMonitoredEndpointHttpsEnforcement:
+    """Security fix: javascript: and http: URLs must be rejected at form and model level."""
+
+    def test_form_rejects_javascript_uri(self):
+        """MonitoredEndpointForm.clean_url must raise on javascript: URI."""
+        from netbox_ssl.forms import MonitoredEndpointForm
+
+        form = MonitoredEndpointForm(data={"name": "evil", "url": "javascript:alert(1)"})
+        assert not form.is_valid()
+        assert "url" in form.errors
+
+    def test_form_rejects_http_url(self):
+        """MonitoredEndpointForm.clean_url must raise on plain http:// URL."""
+        from netbox_ssl.forms import MonitoredEndpointForm
+
+        form = MonitoredEndpointForm(data={"name": "plain", "url": "http://example.com"})
+        assert not form.is_valid()
+        assert "url" in form.errors
+
+    def test_form_accepts_https_url(self):
+        """MonitoredEndpointForm.clean_url must accept a valid https:// URL."""
+        from netbox_ssl.forms import MonitoredEndpointForm
+
+        form = MonitoredEndpointForm(data={"name": "ok", "url": "https://secure.example.com"})
+        # The url field itself should not error; other fields (tags etc.) may be absent but url is fine
+        assert "url" not in form.errors
+
+    def test_model_clean_rejects_javascript_uri(self):
+        """MonitoredEndpoint.clean() must raise ValidationError on javascript: URI."""
+        from django.core.exceptions import ValidationError
+
+        from netbox_ssl.models import MonitoredEndpoint
+
+        ep = MonitoredEndpoint(name="evil", url="javascript:alert(1)")
+        with pytest.raises(ValidationError):
+            ep.clean()
+
+    def test_model_clean_rejects_http_url(self):
+        """MonitoredEndpoint.clean() must raise ValidationError on http:// URL."""
+        from django.core.exceptions import ValidationError
+
+        from netbox_ssl.models import MonitoredEndpoint
+
+        ep = MonitoredEndpoint(name="plain", url="http://example.com")
+        with pytest.raises(ValidationError):
+            ep.clean()
+
+    def test_model_clean_accepts_https_url(self):
+        """MonitoredEndpoint.clean() must not raise on a valid https:// URL."""
+        from netbox_ssl.models import MonitoredEndpoint
+
+        ep = MonitoredEndpoint(name="ok", url="https://secure.example.com")
+        ep.clean()  # Should not raise
+
+
+@pytest.mark.django_db
 class TestAutoCreateHook:
     """Test the #149 auto-create hook in url_import._process_row."""
 

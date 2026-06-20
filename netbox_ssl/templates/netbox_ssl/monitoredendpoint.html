@@ -24,7 +24,9 @@
           <tr>
             <th scope="row">URL</th>
             <td>
-              <a href="{{ object.url }}" target="_blank" rel="noopener noreferrer">{{ object.url }}</a>
+              {% if object.url|slice:':8'|lower == 'https://' or object.url|slice:':7'|lower == 'http://' %}
+                <a href="{{ object.url }}" target="_blank" rel="noopener noreferrer">{{ object.url }}</a>
+              {% else %}{{ object.url }}{% endif %}
             </td>
           </tr>
           <tr>

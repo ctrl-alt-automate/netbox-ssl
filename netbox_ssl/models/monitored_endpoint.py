@@ -1,6 +1,7 @@
 """Models for website-centric certificate monitoring (#149)."""
 
 from django.contrib.contenttypes.fields import GenericForeignKey
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
 from netbox.models import NetBoxModel
@@ -61,6 +62,12 @@ class MonitoredEndpoint(NetBoxModel):
 
     def __str__(self) -> str:
         return self.name
+
+    def clean(self) -> None:
+        """Enforce HTTPS-only at the model level (defence in depth)."""
+        super().clean()
+        if self.url and not self.url.lower().startswith("https://"):
+            raise ValidationError({"url": "Only HTTPS URLs are allowed (must start with https://)."})
 
     def get_absolute_url(self) -> str:
         return reverse("plugins:netbox_ssl:monitoredendpoint", args=[self.pk])

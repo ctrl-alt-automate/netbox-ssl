@@ -4,7 +4,7 @@ Views for MonitoredEndpoint model.
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 from netbox.views import generic
@@ -67,6 +67,10 @@ class MonitoredEndpointImportView(LoginRequiredMixin, View):
         return render(request, self.template_name, {"form": form, "step": "input"})
 
     def post(self, request):
+        if not request.user.has_perm("netbox_ssl.add_monitoredendpoint"):
+            messages.error(request, _("You do not have permission to create monitored endpoints."))
+            return redirect("plugins:netbox_ssl:monitoredendpoint_list")
+
         form = MonitoredEndpointImportForm(request.POST, request.FILES)
         if not form.is_valid():
             return render(request, self.template_name, {"form": form, "step": "input"})
