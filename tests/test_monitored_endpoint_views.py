@@ -88,6 +88,70 @@ class TestMonitoredEndpointImportViewPermission:
 
 
 @pytest.mark.django_db
+class TestMonitoredEndpointBulkImportColumns:
+    """Fix #149 review: bulk-import must honor the columns it advertises."""
+
+    def test_bulk_import_applies_tenant(self, client, django_user_model):
+        """A CSV row with a 'tenant' column creates an endpoint with that tenant set."""
+        from tenancy.models import Tenant
+
+        user = django_user_model.objects.create_user("bulk_tenant", password="x", is_superuser=True)
+        client.force_login(user)
+
+        tenant = Tenant.objects.create(name="BulkTenant", slug="bulk-tenant")
+
+        csv_data = "url,tenant\nhttps://tenant-test.example.com,BulkTenant"
+        resp = client.post(
+            "/plugins/ssl/monitored-endpoints/import/",
+            data={"csv_text": csv_data},
+        )
+        assert resp.status_code == 200
+
+        from netbox_ssl.models import MonitoredEndpoint
+
+        ep = MonitoredEndpoint.objects.filter(url="https://tenant-test.example.com:443").first()
+        assert ep is not None, "Endpoint was not created"
+        assert ep.tenant_id == tenant.pk, f"Expected tenant {tenant.pk}, got {ep.tenant_id}"
+
+    def test_bulk_import_name_derived_from_host(self, client, django_user_model):
+        """Endpoint name should be derived from host (not a CSV column) in bulk import."""
+        user = django_user_model.objects.create_user("bulk_name", password="x", is_superuser=True)
+        client.force_login(user)
+
+        csv_data = "url\nhttps://nametest.example.com"
+        resp = client.post(
+            "/plugins/ssl/monitored-endpoints/import/",
+            data={"csv_text": csv_data},
+        )
+        assert resp.status_code == 200
+
+        from netbox_ssl.models import MonitoredEndpoint
+
+        ep = MonitoredEndpoint.objects.filter(url="https://nametest.example.com:443").first()
+        assert ep is not None, "Endpoint was not created"
+        # Name must be derived from SNI or host, not from a 'name' CSV column
+        assert ep.name == "nametest.example.com"
+
+    def test_bulk_import_unknown_tenant_skips_gracefully(self, client, django_user_model):
+        """A CSV row with an unknown tenant still creates the endpoint without a tenant."""
+        user = django_user_model.objects.create_user("bulk_notenant", password="x", is_superuser=True)
+        client.force_login(user)
+
+        csv_data = "url,tenant\nhttps://notenant.example.com,NonExistentTenant"
+        resp = client.post(
+            "/plugins/ssl/monitored-endpoints/import/",
+            data={"csv_text": csv_data},
+        )
+        assert resp.status_code == 200
+
+        from netbox_ssl.models import MonitoredEndpoint
+
+        ep = MonitoredEndpoint.objects.filter(url="https://notenant.example.com:443").first()
+        assert ep is not None, "Endpoint was not created even without a matching tenant"
+        assert ep.tenant is None
+
+
+@pytest.mark.django_db
 class TestMonitoredEndpointHttpsEnforcement:
     """Security fix: javascript: and http: URLs must be rejected at form and model level."""
 

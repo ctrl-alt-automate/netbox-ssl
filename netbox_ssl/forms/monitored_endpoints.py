@@ -174,13 +174,14 @@ class MonitoredEndpointImportForm(forms.Form):
             attrs={
                 "rows": 20,
                 "class": "font-monospace",
-                "placeholder": "url,name,sni\nhttps://host1.example.com,,\nhttps://host2.example.com,,",
+                "placeholder": "url,sni,tenant,assigned_device,assigned_vm,assigned_service\nhttps://host1.example.com,,,,,\nhttps://host2.example.com,,,,,",
             }
         ),
         required=False,
         help_text=_(
             "Paste CSV rows with a required 'url' column. "
-            "Optional columns: name, sni, tenant, assigned_device, assigned_vm, assigned_service."
+            "Optional columns: sni, tenant, assigned_device, assigned_vm, assigned_service. "
+            "The endpoint name is derived from the SNI or hostname."
         ),
     )
     csv_file = forms.FileField(

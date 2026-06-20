@@ -4,6 +4,7 @@ Views for MonitoredEndpoint model.
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.contenttypes.models import ContentType
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
@@ -33,6 +34,7 @@ class MonitoredEndpointView(generic.ObjectView):
         "tags",
         "cert_history__certificate",
     )
+
 
 class MonitoredEndpointEditView(generic.ObjectEditView):
     """Create or edit a Monitored Endpoint."""
@@ -98,21 +100,37 @@ class MonitoredEndpointImportView(LoginRequiredMixin, View):
                 {"form": form, "step": "input", "errors": result.errors},
             )
 
+        from tenancy.models import Tenant
+
+        user_tenants = Tenant.objects.restrict(request.user, "view")
+
         created_count = 0
         updated_count = 0
         outcomes = []
 
         for row in result.valid_rows:
             name = row.sni or row.host
+            tenant = self._resolve_tenant(row.tenant, user_tenants)
+            assigned_object_type, assigned_object_id = self._resolve_assignment(
+                row.assigned_device,
+                row.assigned_vm,
+                row.assigned_service,
+            )
             # Rows are already HTTPS-validated by url_bulk_parser (_normalize_url enforces
             # HTTPS-only), so update_or_create (which bypasses Model.clean()) is safe here.
+            defaults = {
+                "name": name,
+                "sni": row.sni or "",
+                "status": MonitoredEndpointStatusChoices.STATUS_PENDING,
+            }
+            if tenant is not None:
+                defaults["tenant"] = tenant
+            if assigned_object_type is not None:
+                defaults["assigned_object_type"] = assigned_object_type
+                defaults["assigned_object_id"] = assigned_object_id
             _ep, created = MonitoredEndpoint.objects.update_or_create(
                 url=row.url,
-                defaults={
-                    "name": name,
-                    "sni": row.sni or "",
-                    "status": MonitoredEndpointStatusChoices.STATUS_PENDING,
-                },
+                defaults=defaults,
             )
             if created:
                 created_count += 1
@@ -149,3 +167,56 @@ class MonitoredEndpointImportView(LoginRequiredMixin, View):
                 "errors": result.errors,
             },
         )
+
+    @staticmethod
+    def _resolve_tenant(ref, user_tenants):
+        """Resolve a tenant name/slug/ID string against the user's accessible tenants."""
+        ref = (ref or "").strip()
+        if not ref:
+            return None
+        if ref.isdigit():
+            tenant = user_tenants.filter(pk=int(ref)).first()
+            if tenant:
+                return tenant
+        return user_tenants.filter(name=ref).first() or user_tenants.filter(slug=ref).first()
+
+    @staticmethod
+    def _resolve_assignment(
+        device_ref: str,
+        vm_ref: str,
+        service_ref: str,
+    ) -> tuple:
+        """Resolve device/VM/service reference strings to (ContentType, pk) or (None, None).
+
+        Priority: service > device > VM (mirrors MonitoredEndpointForm.save()).
+        Reference format: name or numeric ID.  Returns (None, None) when no ref given
+        or no matching object found — callers should skip setting assigned_object fields.
+        """
+        from dcim.models import Device
+        from ipam.models import Service
+        from virtualization.models import VirtualMachine
+
+        def _lookup(qs, ref):
+            ref = (ref or "").strip()
+            if not ref:
+                return None
+            if ref.isdigit():
+                return qs.filter(pk=int(ref)).first()
+            return qs.filter(name=ref).first()
+
+        service = _lookup(Service.objects.all(), service_ref)
+        if service:
+            ct = ContentType.objects.get_for_model(Service)
+            return ct, service.pk
+
+        device = _lookup(Device.objects.all(), device_ref)
+        if device:
+            ct = ContentType.objects.get_for_model(Device)
+            return ct, device.pk
+
+        vm = _lookup(VirtualMachine.objects.all(), vm_ref)
+        if vm:
+            ct = ContentType.objects.get_for_model(VirtualMachine)
+            return ct, vm.pk
+
+        return None, None

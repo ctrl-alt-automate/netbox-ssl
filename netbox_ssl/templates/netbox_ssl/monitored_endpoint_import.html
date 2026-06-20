@@ -69,8 +69,9 @@
         <div class="card-body">
           <p class="text-muted">
             {% trans "Required column:" %} <code>url</code>.
-            {% trans "Optional:" %} <code>name</code>, <code>sni</code>, <code>tenant</code>,
+            {% trans "Optional:" %} <code>sni</code>, <code>tenant</code>,
             <code>assigned_device</code>, <code>assigned_vm</code>, <code>assigned_service</code>.
+            {% trans "The endpoint name is derived from the SNI or hostname." %}
           </p>
           <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
