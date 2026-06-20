@@ -80,4 +80,47 @@
     </div>
   </div>
 </div>
+
+{# Rotation History tab #}
+<div class="row mb-3">
+  <div class="col col-12">
+    <ul class="nav nav-tabs" role="tablist">
+      <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-rotation-history" type="button" role="tab">
+          Rotation History
+        </button>
+      </li>
+    </ul>
+    <div class="tab-content border border-top-0 rounded-bottom">
+      <div class="tab-pane fade show active p-3" id="tab-rotation-history" role="tabpanel">
+        {% with history=object.cert_history.all %}
+        {% if history %}
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Certificate</th>
+              <th>First Seen</th>
+              <th>Last Seen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in history %}
+            <tr>
+              <td>
+                <a href="{{ entry.certificate.get_absolute_url }}">{{ entry.certificate }}</a>
+              </td>
+              <td>{{ entry.first_seen|date:"Y-m-d H:i" }}</td>
+              <td>{{ entry.last_seen|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted mb-0">No rotation history recorded yet.</p>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock content %}

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Website-centric certificate monitoring** ([#149](https://github.com/ctrl-alt-automate/netbox-ssl/issues/149)):
+  a new **Monitored Endpoints** feature tracks the certificate each website/URL
+  presents over time. A scheduled "Monitored Endpoint Poll" script re-scrapes
+  each endpoint (reusing the URL-import TLS scraper + security model), links the
+  certificate it finds, records rotation history, and fires NetBox events on
+  unreachable / rotated / untrusted endpoints. Endpoints can be added manually,
+  bulk-imported from CSV, or auto-created from the URL import flow. A certificate's
+  detail page now lists every website presenting it. One additive migration.
+
 ## [1.2.2] - 2026-06-05
 
 **Patch release** — the bundled NetBox Scripts (expiry scan, expiry
