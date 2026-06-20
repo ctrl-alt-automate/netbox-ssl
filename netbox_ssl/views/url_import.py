@@ -183,6 +183,9 @@ class UrlImportView(LoginRequiredMixin, View):
         try:
             from ..models import MonitoredEndpoint
 
+            # url is already HTTPS-validated by validate_https_url() inside scrape_and_import
+            # (which ran before this success path), so update_or_create (which bypasses
+            # Model.clean()) is safe here.
             MonitoredEndpoint.objects.update_or_create(
                 url=row["url"],
                 defaults={

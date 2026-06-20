@@ -31,10 +31,6 @@ class MonitoredEndpointView(generic.ObjectView):
 
     queryset = MonitoredEndpoint.objects.select_related("certificate", "tenant").prefetch_related("tags")
 
-    def get_extra_context(self, request, instance):
-        return {}
-
-
 class MonitoredEndpointEditView(generic.ObjectEditView):
     """Create or edit a Monitored Endpoint."""
 
@@ -105,6 +101,8 @@ class MonitoredEndpointImportView(LoginRequiredMixin, View):
 
         for row in result.valid_rows:
             name = row.sni or row.host
+            # Rows are already HTTPS-validated by url_bulk_parser (_normalize_url enforces
+            # HTTPS-only), so update_or_create (which bypasses Model.clean()) is safe here.
             _ep, created = MonitoredEndpoint.objects.update_or_create(
                 url=row.url,
                 defaults={
