@@ -16,7 +16,9 @@ repos:
       - id: check-added-large-files
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.4
+    # Keep in lock-step with the CI lint job (.github/workflows/ci.yml) and the
+    # pyproject floor, so `pre-commit run` locally and CI agree on formatting.
+    rev: v0.15.18
     hooks:
       - id: ruff
         args: [--fix]

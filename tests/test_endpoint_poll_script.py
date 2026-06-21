@@ -15,9 +15,7 @@ class TestMonitoredEndpointPollScript:
     def _ep(self):
         from netbox_ssl.models import MonitoredEndpoint
 
-        return MonitoredEndpoint.objects.create(
-            name=f"e{uuid.uuid4().hex[:6]}", url="https://e.example.com"
-        )
+        return MonitoredEndpoint.objects.create(name=f"e{uuid.uuid4().hex[:6]}", url="https://e.example.com")
 
     @patch("netbox_ssl.scripts.endpoint_monitor.poll_endpoint")
     def test_polls_all_endpoints(self, mock_poll):
@@ -26,9 +24,7 @@ class TestMonitoredEndpointPollScript:
         from netbox_ssl.utils.endpoint_monitor import PollResult
 
         _ep1, _ep2 = self._ep(), self._ep()
-        mock_poll.side_effect = lambda ep, **kw: PollResult(
-            ep, MonitoredEndpointStatusChoices.STATUS_OK, False, ()
-        )
+        mock_poll.side_effect = lambda ep, **kw: PollResult(ep, MonitoredEndpointStatusChoices.STATUS_OK, False, ())
         script = MonitoredEndpointPoll()
         script.run({"tenant": None, "dry_run": False}, commit=True)
         assert mock_poll.call_count == 2
@@ -57,12 +53,8 @@ class TestMonitoredEndpointPollScript:
         ep_with = MonitoredEndpoint.objects.create(
             name=f"e{uuid.uuid4().hex[:6]}", url="https://a.example.com", tenant=tenant
         )
-        _ep_without = MonitoredEndpoint.objects.create(
-            name=f"e{uuid.uuid4().hex[:6]}", url="https://b.example.com"
-        )
-        mock_poll.side_effect = lambda ep, **kw: PollResult(
-            ep, MonitoredEndpointStatusChoices.STATUS_OK, False, ()
-        )
+        _ep_without = MonitoredEndpoint.objects.create(name=f"e{uuid.uuid4().hex[:6]}", url="https://b.example.com")
+        mock_poll.side_effect = lambda ep, **kw: PollResult(ep, MonitoredEndpointStatusChoices.STATUS_OK, False, ())
         MonitoredEndpointPoll().run({"tenant": tenant, "dry_run": False}, commit=True)
         assert mock_poll.call_count == 1
         assert mock_poll.call_args[0][0] == ep_with
@@ -75,9 +67,7 @@ class TestMonitoredEndpointPollScript:
         from netbox_ssl.utils.endpoint_monitor import PollResult
 
         self._ep()
-        mock_poll.side_effect = lambda ep, **kw: PollResult(
-            ep, MonitoredEndpointStatusChoices.STATUS_OK, False, ()
-        )
+        mock_poll.side_effect = lambda ep, **kw: PollResult(ep, MonitoredEndpointStatusChoices.STATUS_OK, False, ())
         result = MonitoredEndpointPoll().run({"tenant": None, "dry_run": False}, commit=True)
         assert isinstance(result, str)
         assert len(result) > 0

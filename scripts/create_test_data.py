@@ -13,13 +13,12 @@ Or via nbshell:
     >>> exec(open('/opt/netbox/netbox/netbox_ssl/scripts/create_test_data.py').read())
 """
 
-from django.contrib.contenttypes.models import ContentType
-
 # Import NetBox models
-from dcim.models import Site, DeviceRole, DeviceType, Manufacturer, Device
-from virtualization.models import Cluster, ClusterType, VirtualMachine
+from dcim.models import Device, DeviceRole, DeviceType, Manufacturer, Site
+from django.contrib.contenttypes.models import ContentType
 from ipam.models import Service
 from tenancy.models import Tenant
+from virtualization.models import Cluster, ClusterType, VirtualMachine
 
 print("=" * 60)
 print("Creating test data for NetBox SSL Plugin")

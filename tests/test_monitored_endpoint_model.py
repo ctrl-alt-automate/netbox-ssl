@@ -37,9 +37,7 @@ class TestMonitoredEndpoint:
         from netbox_ssl.models import MonitoredEndpoint, MonitoredEndpointStatusChoices
 
         cert = _make_cert()
-        ep = MonitoredEndpoint.objects.create(
-            name="HR portal", url="https://hr.example.com:443", certificate=cert
-        )
+        ep = MonitoredEndpoint.objects.create(name="HR portal", url="https://hr.example.com:443", certificate=cert)
         assert ep.status == MonitoredEndpointStatusChoices.STATUS_PENDING
         assert ep.certificate == cert
         assert ep.days_remaining == cert.days_remaining
@@ -62,7 +60,9 @@ class TestMonitoredEndpoint:
         MonitoredEndpointCertificate.objects.create(endpoint=ep, certificate=cert, first_seen=now, last_seen=now)
         with pytest.raises(IntegrityError):  # noqa: SIM117
             with transaction.atomic():
-                MonitoredEndpointCertificate.objects.create(endpoint=ep, certificate=cert, first_seen=now, last_seen=now)
+                MonitoredEndpointCertificate.objects.create(
+                    endpoint=ep, certificate=cert, first_seen=now, last_seen=now
+                )
 
     def test_which_sites_share_a_certificate(self):
         from netbox_ssl.models import MonitoredEndpoint

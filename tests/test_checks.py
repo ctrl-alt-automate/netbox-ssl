@@ -87,7 +87,7 @@ if not _NETBOX_AVAILABLE:
         security="security",
         database="database",
     )
-    _checks_mod.register = lambda *a, **kw: (lambda f: f)
+    _checks_mod.register = lambda *a, **kw: lambda f: f
     # Force-set (not setdefault) to ensure our stub classes are used,
     # even if another test file created a bare MagicMock earlier.
     sys.modules["django.core.checks"] = _checks_mod

@@ -22,7 +22,11 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install tools
-        run: pip install ruff bandit
+        # Pinned to match .pre-commit-config.yaml + pyproject so a local
+        # `pre-commit run` and this lane agree. CI previously installed ruff
+        # UNPINNED and floated to a newer version than the contributor's local
+        # ruff, so `ruff format --check` could pass locally yet red-bar here.
+        run: pip install 'ruff==0.15.18' 'bandit==1.9.4'
 
       - name: Run ruff check
         run: ruff check netbox_ssl/
@@ -99,6 +103,17 @@ jobs:
         run: |
           pip install pytest pytest-randomly cryptography django requests boto3 \
                       'moto[acm]>=5.0,<6.0' jsonpath-ng pyyaml
+
+      - name: Assert the whole test suite collects (host lane)
+        run: |
+          # Every test file must import/collect cleanly under -p no:django (no
+          # real NetBox) on each Python version. A utils module that imports
+          # netbox_ssl.models at module scope, or a test importing an optional
+          # dep at module top, crashes collection HERE in seconds — instead of
+          # slipping into the slow in-container matrix (the #148/#149 host-lane
+          # collection crashes) or hiding behind a silent module-level skip.
+          # --collect-only imports every file but runs no test.
+          python -m pytest tests/ -p no:django --collect-only -q
 
       - name: Run unit tests
         run: |
@@ -356,6 +371,7 @@ jobs:
           docker compose exec -T netbox /opt/netbox/venv/bin/python -m pytest \
             /tmp/plugin_tests/test_api_schema.py /tmp/plugin_tests/test_comments_field.py \
             /tmp/plugin_tests/test_field_parity.py /tmp/plugin_tests/test_security_invariants.py \
+            /tmp/plugin_tests/test_netboxmodel_completeness.py \
             -o addopts='' -p no:cacheprovider --junitxml=/tmp/reg.xml -q
           docker cp "$NB":/tmp/reg.xml reg.xml
           python3 -m pip install --quiet defusedxml 2>/dev/null || true

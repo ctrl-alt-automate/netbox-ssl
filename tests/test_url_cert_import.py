@@ -40,9 +40,7 @@ class TestScrapeAndImport:
 
         mock_scrape.return_value = _pem()
         before = Certificate.objects.count()
-        outcome = scrape_and_import(
-            "https://a.example.com", "a.example.com", 443, allowlist=[]
-        )
+        outcome = scrape_and_import("https://a.example.com", "a.example.com", 443, allowlist=[])
         assert outcome.created is True
         assert Certificate.objects.count() == before + 1
         assert outcome.certificate.discovered_via_url == "https://a.example.com"
@@ -60,13 +58,9 @@ class TestScrapeAndImport:
 
         pem = _pem()
         mock_scrape.return_value = pem
-        first = scrape_and_import(
-            "https://a.example.com", "a.example.com", 443, allowlist=[]
-        )
+        first = scrape_and_import("https://a.example.com", "a.example.com", 443, allowlist=[])
         before = Certificate.objects.count()
-        second = scrape_and_import(
-            "https://a.example.com", "a.example.com", 443, allowlist=[]
-        )
+        second = scrape_and_import("https://a.example.com", "a.example.com", 443, allowlist=[])
         assert second.created is False
         assert second.certificate.pk == first.certificate.pk
         assert Certificate.objects.count() == before

@@ -27,6 +27,7 @@ Dynamic IDs:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import sys
 from pathlib import Path
@@ -58,6 +59,7 @@ def resolve_ids(base_url: str, token: str | None) -> dict[str, int | None]:
         2. NetBox REST API lookup by name (needs NETBOX_TOKEN)
         3. fallback to PK=1
     """
+
     def _pk_from_env(key: str) -> int | None:
         """Parse a positive integer PK from an env var, tolerating empty or
         non-numeric values (which fall through to the API/default resolution)."""
@@ -176,10 +178,8 @@ def capture_page(page, base_url: str, url_path: str, output_path: Path, wait_ms:
                 }"""
             )
             page.wait_for_timeout(7000)
-            try:
+            with contextlib.suppress(Exception):
                 page.wait_for_load_state("networkidle", timeout=5000)
-            except Exception:
-                pass
 
         page.screenshot(path=str(output_path), full_page=False)
         return True
