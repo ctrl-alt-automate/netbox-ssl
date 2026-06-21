@@ -19,9 +19,10 @@ Usage:
 """
 
 import argparse
+import importlib.util
+import os
 import subprocess
 import sys
-import os
 from pathlib import Path
 
 
@@ -120,14 +121,11 @@ def run_browser_tests():
     print_header("Running Browser Tests (Playwright)")
 
     # Check if Playwright is available
-    try:
-        import playwright
-
-        print_success("Playwright is installed")
-    except ImportError:
+    if importlib.util.find_spec("playwright") is None:
         print_warning("Playwright not installed, skipping browser tests")
         print_info("Install with: pip install playwright && playwright install")
         return True  # Don't fail if not installed
+    print_success("Playwright is installed")
 
     cmd = [
         "python",

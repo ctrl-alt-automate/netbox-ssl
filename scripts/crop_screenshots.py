@@ -14,7 +14,6 @@ The script will:
 """
 
 import sys
-import os
 from pathlib import Path
 
 try:
@@ -25,8 +24,8 @@ except ImportError:
 
 # Crop settings based on typical Chrome on macOS
 CHROME_TOP_CROP = 110  # Tabs + address bar + toolbar
-BANNER_HEIGHT = 35     # "Foutopsporing" banner height
-BOTTOM_CROP = 0        # Usually no bottom crop needed
+BANNER_HEIGHT = 35  # "Foutopsporing" banner height
+BOTTOM_CROP = 0  # Usually no bottom crop needed
 
 # Screenshot mapping (in order they were taken)
 SCREENSHOT_NAMES = [
@@ -92,12 +91,12 @@ def main():
     print(f"Output: {wiki_images}")
     print()
 
-    for i, (screenshot, name) in enumerate(zip(screenshots, SCREENSHOT_NAMES)):
+    for i, (screenshot, name) in enumerate(zip(screenshots, SCREENSHOT_NAMES, strict=False)):
         print(f"Processing: {screenshot.name} -> {name}")
         has_banner = i in HAS_BANNER
 
         if has_banner:
-            print(f"  (removing debug banner)")
+            print("  (removing debug banner)")
 
         for output_dir in [docs_images, wiki_images]:
             output_path = output_dir / name

@@ -11,6 +11,7 @@ from tenancy.api.serializers import TenantSerializer
 from ...models import (
     ComplianceCheck,
     CompliancePolicy,
+    ComplianceTrendSnapshot,
 )
 
 
@@ -107,6 +108,41 @@ class ComplianceCheckSerializer(NetBoxModelSerializer):
             "common_name": obj.certificate.common_name,
             "serial_number": obj.certificate.serial_number,
         }
+
+
+class ComplianceTrendSnapshotSerializer(NetBoxModelSerializer):
+    """Serializer for ComplianceTrendSnapshot.
+
+    Required because ComplianceTrendSnapshot is a NetBoxModel: saving it in a
+    request context calls serialize_for_event → get_serializer_for_model, which
+    raises SerializerNotFound on NetBox 4.4 without a registered serializer.
+    """
+
+    url = serializers.HyperlinkedIdentityField(
+        view_name="plugins-api:netbox_ssl-api:compliancetrendsnapshot-detail",
+    )
+    tenant = TenantSerializer(nested=True, required=False, allow_null=True)
+
+    class Meta:
+        model = ComplianceTrendSnapshot
+        fields = [
+            "id",
+            "url",
+            "display",
+            "tenant",
+            "snapshot_date",
+            "total_certificates",
+            "total_checks",
+            "passed_checks",
+            "failed_checks",
+            "compliance_score",
+            "details",
+            "tags",
+            "custom_fields",
+            "created",
+            "last_updated",
+        ]
+        brief_fields = ["id", "url", "display", "snapshot_date", "compliance_score"]
 
 
 class ComplianceRunSerializer(serializers.Serializer):

@@ -218,7 +218,7 @@ class NetBoxSmokeTest:
 
     def run(self) -> bool:
         """Run all smoke tests."""
-        print(f"\n🧪 NetBox SSL Plugin Smoke Test")
+        print("\n🧪 NetBox SSL Plugin Smoke Test")
         print("=" * 50)
 
         if not self.login():

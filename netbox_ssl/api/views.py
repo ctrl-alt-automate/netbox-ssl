@@ -33,6 +33,7 @@ from ..models import (
     CertificateStatusChoices,
     ComplianceCheck,
     CompliancePolicy,
+    ComplianceTrendSnapshot,
     ExternalSource,
     MonitoredEndpoint,
 )
@@ -54,6 +55,7 @@ from .serializers import (
     ComplianceCheckSerializer,
     CompliancePolicySerializer,
     ComplianceRunSerializer,
+    ComplianceTrendSnapshotSerializer,
     CSRImportSerializer,
     ExternalSourceSerializer,
     ExternalSourceSyncLogSerializer,
@@ -1370,6 +1372,17 @@ class ComplianceCheckViewSet(NetBoxModelViewSet):
     ).prefetch_related("tags")
     serializer_class = ComplianceCheckSerializer
     filterset_class = ComplianceCheckFilterSet
+
+
+class ComplianceTrendSnapshotViewSet(NetBoxModelViewSet):
+    """API viewset for ComplianceTrendSnapshot.
+
+    Registered so NetBox can resolve a serializer for the model's change-log
+    events (every NetBoxModel needs one — see ComplianceTrendSnapshotSerializer).
+    """
+
+    queryset = ComplianceTrendSnapshot.objects.select_related("tenant").prefetch_related("tags")
+    serializer_class = ComplianceTrendSnapshotSerializer
 
 
 class ExternalSourceViewSet(NetBoxModelViewSet):
