@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already assigned are silently skipped; the result reports how many were
   assigned and how many were skipped. No database migration.
 
+### Fixed
+
+- **Expiry notification emails sent from the wrong address** ([#147](https://github.com/ctrl-alt-automate/netbox-ssl/issues/147)):
+  the expiry report used Django's `DEFAULT_FROM_EMAIL` (which defaults to
+  `webmaster@localhost`) as the From address. NetBox maps the operator's
+  `EMAIL_FROM` configuration onto `SERVER_EMAIL`, not `DEFAULT_FROM_EMAIL`, so
+  the configured sender was ignored. The notification now sends from
+  `SERVER_EMAIL`, falling back to `DEFAULT_FROM_EMAIL` only when `SERVER_EMAIL`
+  is unset so an empty From header is never produced.
+
 ## [1.2.2] - 2026-06-05
 
 **Patch release** — the bundled NetBox Scripts (expiry scan, expiry
