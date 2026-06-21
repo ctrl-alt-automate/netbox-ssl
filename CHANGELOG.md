@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Assign one certificate to many objects** ([#148](https://github.com/ctrl-alt-automate/netbox-ssl/issues/148)):
+  a wildcard or shared certificate can now be assigned to multiple Devices,
+  Virtual Machines, and Services in a single action — via an "Assign to objects"
+  button on the certificate detail page, or the new
+  `POST /api/plugins/ssl/certificates/{id}/assign-targets` REST action. Targets
+  already assigned are silently skipped; the result reports how many were
+  assigned and how many were skipped. No database migration.
+
 ### Fixed
 
 - **Expiry notification emails sent from the wrong address** ([#147](https://github.com/ctrl-alt-automate/netbox-ssl/issues/147)):

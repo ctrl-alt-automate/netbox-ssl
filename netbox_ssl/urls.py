@@ -79,6 +79,11 @@ urlpatterns = [
         name="certificate_contacts",
         kwargs={"model": models.Certificate},
     ),
+    path(
+        "certificates/<int:pk>/assign-targets/",
+        views.CertificateAssignTargetsView.as_view(),
+        name="certificate_assign_targets",
+    ),
     # Analytics / Insights URLs
     path(
         "analytics/",

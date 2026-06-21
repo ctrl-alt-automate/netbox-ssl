@@ -255,3 +255,19 @@ class BulkAssignSerializer(serializers.Serializer):
         default=True,
         help_text="Whether this is the primary certificate for the object.",
     )
+
+
+class AssignTargetSerializer(serializers.Serializer):
+    """A single assignment target (content type + object id)."""
+
+    object_type = serializers.CharField(
+        help_text="Content type, one of: dcim.device, dcim.service, virtualization.virtualmachine.",
+    )
+    object_id = serializers.IntegerField(help_text="Primary key of the target object.")
+
+
+class AssignTargetsSerializer(serializers.Serializer):
+    """Assign one certificate to many objects."""
+
+    targets = AssignTargetSerializer(many=True, allow_empty=False)
+    is_primary = serializers.BooleanField(default=False)
