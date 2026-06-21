@@ -42,6 +42,14 @@ from .external_sources import (
     ExternalSourceListView,
     ExternalSourceView,
 )
+from .monitored_endpoints import (
+    MonitoredEndpointBulkDeleteView,
+    MonitoredEndpointDeleteView,
+    MonitoredEndpointEditView,
+    MonitoredEndpointImportView,
+    MonitoredEndpointListView,
+    MonitoredEndpointView,
+)
 from .url_import import (
     UrlImportView,
 )
@@ -87,4 +95,11 @@ __all__ = [
     "ExternalSourceDeleteView",
     "ExternalSourceBulkEditView",
     "ExternalSourceBulkDeleteView",
+    # MonitoredEndpoint views
+    "MonitoredEndpointListView",
+    "MonitoredEndpointView",
+    "MonitoredEndpointEditView",
+    "MonitoredEndpointDeleteView",
+    "MonitoredEndpointBulkDeleteView",
+    "MonitoredEndpointImportView",
 ]

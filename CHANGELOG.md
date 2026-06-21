@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `POST /api/plugins/ssl/certificates/{id}/assign-targets` REST action. Targets
   already assigned are silently skipped; the result reports how many were
   assigned and how many were skipped. No database migration.
+- **Website-centric certificate monitoring** ([#149](https://github.com/ctrl-alt-automate/netbox-ssl/issues/149)):
+  a new **Monitored Endpoints** feature tracks the certificate each website/URL
+  presents over time. A scheduled "Monitored Endpoint Poll" script re-scrapes
+  each endpoint (reusing the URL-import TLS scraper + security model), links the
+  certificate it finds, records rotation history, and fires NetBox events on
+  unreachable / rotated / untrusted endpoints. Endpoints can be added manually,
+  bulk-imported from CSV, or auto-created from the URL import flow. A certificate's
+  detail page now lists every website presenting it. One additive migration.
 
 ### Fixed
 

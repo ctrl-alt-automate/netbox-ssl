@@ -25,6 +25,11 @@ from .external_sources import (
     ExternalSourceFilterForm,
     ExternalSourceForm,
 )
+from .monitored_endpoints import (
+    MonitoredEndpointFilterForm,
+    MonitoredEndpointForm,
+    MonitoredEndpointImportForm,
+)
 from .url_import import UrlImportForm
 
 __all__ = [
@@ -45,5 +50,8 @@ __all__ = [
     "ExternalSourceForm",
     "ExternalSourceFilterForm",
     "ExternalSourceBulkEditForm",
+    "MonitoredEndpointForm",
+    "MonitoredEndpointFilterForm",
+    "MonitoredEndpointImportForm",
     "UrlImportForm",
 ]

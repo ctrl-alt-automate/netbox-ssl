@@ -23,6 +23,7 @@ from ..filtersets import (
     ComplianceCheckFilterSet,
     CompliancePolicyFilterSet,
     ExternalSourceFilterSet,
+    MonitoredEndpointFilterSet,
 )
 from ..models import (
     Certificate,
@@ -33,6 +34,7 @@ from ..models import (
     ComplianceCheck,
     CompliancePolicy,
     ExternalSource,
+    MonitoredEndpoint,
 )
 from ..utils import CertificateExporter, ComplianceChecker, ExportFormatChoices
 from ..utils.assignments import AssignmentError, assign_certificate_to_targets
@@ -55,6 +57,7 @@ from .serializers import (
     CSRImportSerializer,
     ExternalSourceSerializer,
     ExternalSourceSyncLogSerializer,
+    MonitoredEndpointSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -1495,3 +1498,15 @@ class ExternalSourceViewSet(NetBoxModelViewSet):
                 {"success": False, "message": "Sync failed due to an internal error."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class MonitoredEndpointViewSet(NetBoxModelViewSet):
+    """API viewset for the MonitoredEndpoint model.
+
+    Required by NetBox's change-logging/event machinery (every NetBoxModel needs
+    a discoverable serializer); also exposes read/write access to endpoints.
+    """
+
+    queryset = MonitoredEndpoint.objects.select_related("certificate", "tenant").prefetch_related("tags")
+    serializer_class = MonitoredEndpointSerializer
+    filterset_class = MonitoredEndpointFilterSet

@@ -1,0 +1,110 @@
+{% extends 'base/layout.html' %}
+{% load i18n %}
+{% load helpers %}
+
+{% block title %}{% trans "Import Monitored Endpoints" %}{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col col-md-12">
+    <h2>{% trans "Import Monitored Endpoints" %}</h2>
+
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {% if step == 'result' %}
+      <div class="card">
+        <h5 class="card-header">{% trans "Import Results" %}</h5>
+        <div class="card-body">
+          <p>
+            {% trans "Created" %}: <strong>{{ created }}</strong> &nbsp;
+            {% trans "Updated" %}: <strong>{{ updated }}</strong>
+          </p>
+          {% if outcomes %}
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>{% trans "URL" %}</th>
+                <th>{% trans "Action" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for outcome in outcomes %}
+              <tr>
+                <td>{{ outcome.url }}</td>
+                <td>
+                  {% if outcome.action == 'created' %}
+                    <span class="badge text-bg-success">{% trans "Created" %}</span>
+                  {% else %}
+                    <span class="badge text-bg-info">{% trans "Updated" %}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% endif %}
+          {% if errors %}
+          <h6 class="text-danger mt-3">{% trans "Errors" %}</h6>
+          <ul>
+            {% for err in errors %}
+              <li>Row {{ err.row }}: {{ err.message }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+      </div>
+      <a href="{% url 'plugins:netbox_ssl:monitoredendpoint_list' %}" class="btn btn-primary mt-3">
+        {% trans "View Monitored Endpoints" %}
+      </a>
+    {% else %}
+      <div class="card">
+        <h5 class="card-header">{% trans "CSV Data" %}</h5>
+        <div class="card-body">
+          <p class="text-muted">
+            {% trans "Required column:" %} <code>url</code>.
+            {% trans "Optional:" %} <code>sni</code>, <code>tenant</code>,
+            <code>assigned_device</code>, <code>assigned_vm</code>, <code>assigned_service</code>.
+            {% trans "The endpoint name is derived from the SNI or hostname." %}
+          </p>
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {% for field in form %}
+              <div class="mb-3">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}
+                  <div class="form-text text-muted">{{ field.help_text }}</div>
+                {% endif %}
+                {% for error in field.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+            {% endfor %}
+            {% if errors %}
+            <div class="alert alert-warning">
+              <strong>{% trans "Parse errors:" %}</strong>
+              <ul class="mb-0">
+                {% for err in errors %}
+                  <li>Row {{ err.row }}: {{ err.message }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">{% trans "Import" %}</button>
+            <a href="{% url 'plugins:netbox_ssl:monitoredendpoint_list' %}" class="btn btn-outline-secondary ms-2">
+              {% trans "Cancel" %}
+            </a>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock content %}

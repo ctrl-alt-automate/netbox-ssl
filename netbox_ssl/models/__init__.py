@@ -30,6 +30,11 @@ from .external_source import (
     SyncStatusChoices,
 )
 from .lifecycle import CertificateLifecycleEvent, LifecycleEventTypeChoices
+from .monitored_endpoint import (
+    MonitoredEndpoint,
+    MonitoredEndpointCertificate,
+    MonitoredEndpointStatusChoices,
+)
 
 __all__ = [
     "Certificate",
@@ -58,4 +63,7 @@ __all__ = [
     "ExternalSourceTypeChoices",
     "AuthMethodChoices",
     "SyncStatusChoices",
+    "MonitoredEndpoint",
+    "MonitoredEndpointCertificate",
+    "MonitoredEndpointStatusChoices",
 ]
