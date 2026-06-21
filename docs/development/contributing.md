@@ -153,6 +153,20 @@ days. For urgent security issues, see [SECURITY.md](https://github.com/ctrl-alt-
 
 ## Release process (for maintainers)
 
+Before cutting, run the **pre-cut rehearsal** and fix anything it flags:
+
+```bash
+python scripts/release_preflight.py X.Y.Z
+```
+
+It inspects files only (no container, no network) and asserts the
+release-critical invariants that have each broken a past release: version sync
+(`pyproject.toml` ↔ `netbox_ssl/__init__.py`), a dated `CHANGELOG` section for
+the target version, the NetBox support matrix (PluginConfig `min`/`max_version`
+↔ README badge + table ↔ `COMPATIBILITY.md`), the publish-gate poll budget
+(#141/#142), and the gh-pages serialization guard (#110). Exit code is non-zero
+if any check fails.
+
 1. Create `release/vX.Y.Z` branch from `dev`
 2. Bump version in `pyproject.toml` and `netbox_ssl/__init__.py`
 3. Add CHANGELOG `[X.Y.Z]` section with Added/Changed/Deprecated/Security
