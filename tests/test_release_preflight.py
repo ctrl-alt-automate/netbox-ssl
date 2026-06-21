@@ -17,12 +17,23 @@ import pytest
 pytestmark = pytest.mark.unit
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
+_PREFLIGHT_PATH = _REPO_ROOT / "scripts" / "release_preflight.py"
+
+# These tests need a full repo checkout (the script under scripts/ plus the
+# real release files). The in-container integration run copies only tests/ to
+# /tmp/plugin_tests/, so scripts/ is absent there — skip the whole module
+# rather than crash collection. The host unit lane runs from the repo root and
+# exercises them in full.
+if not _PREFLIGHT_PATH.exists():
+    pytest.skip(
+        "scripts/release_preflight.py not found — needs a full repo checkout",
+        allow_module_level=True,
+    )
 
 
 def _load_preflight():
     """Load scripts/release_preflight.py by path (it lives outside any package)."""
-    path = _REPO_ROOT / "scripts" / "release_preflight.py"
-    spec = importlib.util.spec_from_file_location("release_preflight", path)
+    spec = importlib.util.spec_from_file_location("release_preflight", _PREFLIGHT_PATH)
     module = importlib.util.module_from_spec(spec)
     # Register before exec: Python 3.12's @dataclass resolves cls.__module__ via
     # sys.modules, which raises AttributeError if the module isn't registered.
