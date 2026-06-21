@@ -13,8 +13,6 @@ from dataclasses import dataclass
 from django.contrib.contenttypes.models import ContentType
 from django.db import DatabaseError, IntegrityError, transaction
 
-from ..models import CertificateAssignment
-
 logger = logging.getLogger("netbox_ssl.assignments")
 
 # Content-type model names that may receive a certificate assignment.
@@ -46,6 +44,11 @@ def assign_certificate_to_targets(
     error. The entire batch is atomic: if any target fails validation or a
     database error occurs, the ENTIRE batch is rolled back.
     """
+    # Imported lazily: ``netbox_ssl.models`` pulls in the full model stack, which
+    # is not importable in the host-only unit lane (``-p no:django``). Keeping this
+    # out of module scope keeps ``netbox_ssl.utils`` importable there.
+    from ..models import CertificateAssignment
+
     if not targets:
         raise AssignmentError("No assignment targets provided.")
 

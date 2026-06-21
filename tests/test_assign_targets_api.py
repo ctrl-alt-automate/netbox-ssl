@@ -10,7 +10,10 @@ provided via pytest.ini).  No live HTTP server or NETBOX_TOKEN required.
 import uuid
 
 import pytest
-from rest_framework.test import APIClient
+
+# DRF ships with NetBox (the container test lane), not the host-only unit lane
+# (-p no:django). Skip this whole module there instead of crashing collection.
+APIClient = pytest.importorskip("rest_framework.test").APIClient
 
 
 def _make_fp() -> str:
