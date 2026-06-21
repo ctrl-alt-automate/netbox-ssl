@@ -38,6 +38,4 @@ class MonitoredEndpointFilterSet(NetBoxModelFilterSet):
         """Full-text search across name and url fields."""
         if not value.strip():
             return queryset
-        return queryset.filter(
-            Q(name__icontains=value) | Q(url__icontains=value)
-        )
+        return queryset.filter(Q(name__icontains=value) | Q(url__icontains=value))

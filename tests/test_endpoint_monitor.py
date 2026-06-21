@@ -9,7 +9,13 @@ import pytest
 # ---------------------------------------------------------------------------
 # Guard: only run these tests inside the Docker container where NetBox lives.
 # ---------------------------------------------------------------------------
-if importlib.util.find_spec("netbox") is None:
+try:
+    _netbox_available = importlib.util.find_spec("netbox") is not None
+except (ValueError, ModuleNotFoundError):
+    # The host-only unit lane mocks ``netbox`` in sys.modules, so find_spec hits
+    # a Mock ``__spec__`` and raises ValueError — treat that as "not available".
+    _netbox_available = False
+if not _netbox_available:
     pytest.skip("NetBox not available – skipping endpoint monitor tests", allow_module_level=True)
 
 from unittest.mock import patch

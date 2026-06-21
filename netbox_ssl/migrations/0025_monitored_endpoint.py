@@ -87,9 +87,7 @@ class Migration(migrations.Migration):
                     "assigned_object_type",
                     models.ForeignKey(
                         blank=True,
-                        limit_choices_to={
-                            "model__in": ["service", "device", "virtualmachine"]
-                        },
+                        limit_choices_to={"model__in": ["service", "device", "virtualmachine"]},
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
                         to="contenttypes.contenttype",

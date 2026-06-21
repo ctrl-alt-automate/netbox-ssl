@@ -9,15 +9,18 @@ from __future__ import annotations
 
 import socket
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from django.db import transaction
 from django.utils import timezone
 
-from ..models import Certificate, CertificateStatusChoices
 from .ca_detector import detect_issuing_ca
 from .parser import CertificateParseError, CertificateParser  # noqa: F401 (re-exported for callers)
 from .tls_scraper import TLSScrapeError, scrape_tls_certificate  # noqa: F401 (re-exported for callers)
 from .url_validation import URLValidationError, validate_https_url  # noqa: F401 (re-exported for callers)
+
+if TYPE_CHECKING:
+    from ..models import Certificate
 
 
 @dataclass(frozen=True)
@@ -42,6 +45,10 @@ def scrape_and_import(
     Raises URLValidationError / TLSScrapeError / CertificateParseError.
     Does NOT swallow — callers map exceptions to their own outcome shapes.
     """
+    # Imported lazily so ``netbox_ssl.utils`` stays importable in the host-only
+    # unit lane (``-p no:django``); ``netbox_ssl.models`` pulls in the full stack.
+    from ..models import Certificate, CertificateStatusChoices
+
     validate_https_url(url, cidr_allowlist=allowlist)
     try:
         resolved_ip = socket.getaddrinfo(host, port)[0][4][0]
@@ -50,9 +57,7 @@ def scrape_and_import(
     pem = scrape_tls_certificate(resolved_ip, host, port, sni=sni, verify_chain=verify_chain)
     parsed = CertificateParser.parse(pem)
 
-    existing = Certificate.objects.filter(
-        serial_number=parsed.serial_number, issuer=parsed.issuer
-    ).first()
+    existing = Certificate.objects.filter(serial_number=parsed.serial_number, issuer=parsed.issuer).first()
     if existing:
         existing.last_seen_at = timezone.now()
         if set_discovered_url and not existing.discovered_via_url:

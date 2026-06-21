@@ -101,13 +101,9 @@ def poll_endpoint(endpoint: MonitoredEndpoint, *, allowlist: list[str]) -> PollR
         endpoint.last_seen = now
         endpoint.last_error = ""
         endpoint.status = (
-            MonitoredEndpointStatusChoices.STATUS_UNTRUSTED
-            if untrusted
-            else MonitoredEndpointStatusChoices.STATUS_OK
+            MonitoredEndpointStatusChoices.STATUS_UNTRUSTED if untrusted else MonitoredEndpointStatusChoices.STATUS_OK
         )
-        endpoint.save(
-            update_fields=["certificate", "last_checked", "last_seen", "last_error", "status"]
-        )
+        endpoint.save(update_fields=["certificate", "last_checked", "last_seen", "last_error", "status"])
 
         hist, created = MonitoredEndpointCertificate.objects.get_or_create(
             endpoint=endpoint,

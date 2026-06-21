@@ -23,7 +23,6 @@ def _pem(cn: str | None = None) -> str:
     return CertFactory.create(cn=cn or f"{uuid.uuid4().hex[:8]}.example.com")
 
 
-@pytest.mark.unit
 @pytest.mark.django_db
 class TestScrapeAndImport:
     """Core create / dedup behaviour of scrape_and_import."""
@@ -109,7 +108,6 @@ class TestScrapeAndImport:
             )
 
 
-@pytest.mark.unit
 @pytest.mark.django_db
 class TestProcessRowParity:
     """#106 parity: _process_row must return the documented outcome dict shapes."""

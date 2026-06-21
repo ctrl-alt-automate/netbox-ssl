@@ -45,9 +45,7 @@ class MonitoredEndpoint(NetBoxModel):
     )
     assigned_object_id = models.PositiveBigIntegerField(null=True, blank=True)
     assigned_object = GenericForeignKey(ct_field="assigned_object_type", fk_field="assigned_object_id")
-    tenant = models.ForeignKey(
-        to="tenancy.Tenant", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
-    )
+    tenant = models.ForeignKey(to="tenancy.Tenant", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
     status = models.CharField(
         max_length=20,
         choices=MonitoredEndpointStatusChoices,
@@ -80,9 +78,7 @@ class MonitoredEndpoint(NetBoxModel):
 class MonitoredEndpointCertificate(models.Model):
     """Rotation history: which certificate an endpoint presented, and when."""
 
-    endpoint = models.ForeignKey(
-        to=MonitoredEndpoint, on_delete=models.CASCADE, related_name="cert_history"
-    )
+    endpoint = models.ForeignKey(to=MonitoredEndpoint, on_delete=models.CASCADE, related_name="cert_history")
     certificate = models.ForeignKey(to="netbox_ssl.Certificate", on_delete=models.CASCADE)
     first_seen = models.DateTimeField()
     last_seen = models.DateTimeField()
