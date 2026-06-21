@@ -133,11 +133,62 @@ The automated checks on PR are:
 - Ruff (lint + format)
 - Unit tests on Python 3.10, 3.11, 3.12
 - Package check (wheel inclusion)
-- Integration tests on NetBox 4.4 and 4.5
+- Integration tests on NetBox 4.4, 4.5, and 4.6
 - MkDocs strict build (on docs-touching PRs)
 - Gemini code review (automatic, informational)
 
 All must pass before merge.
+
+## Definition of Done
+
+The PR template carries a conditional "Definition of Done" checklist. Each item
+guards a bug class that reached a release because the **lenient local NetBox
+version hid it** — NetBox 4.5/4.6 tolerate things that 4.4 rejects hard, and a
+local run never trips them. Tick the blocks that apply to your change.
+
+### Added or changed a model
+
+Every concrete `NetBoxModel` needs a **registered REST serializer** (plus a
+viewset and a `router.register(...)` line). On save in a request context,
+NetBox's change-logging calls `serialize_for_event → get_serializer_for_model`;
+a model with no serializer raises `SerializerNotFound` — a hard 500 on NetBox
+4.4 (#149). "Skip the API as YAGNI" is never valid for a `NetBoxModel`. The
+`test_netboxmodel_completeness` gate enforces this and the next item, on every
+NetBox version in the matrix.
+
+Run `makemigrations --check` and confirm the new migration carries
+`custom_field_data` + `tags` whenever the model inherits `NetBoxModel`. A
+migration frozen at `models.Model` (before the mixin was added) lacks those
+columns and 500s at runtime (#118, recurred in v1.0.1).
+
+### Added or changed an API serializer or filterset
+
+Run `manage.py spectacular --validate` against NetBox 4.6 and confirm a
+warning-free schema. Feeding a `ChoiceSet.CHOICES` 3-tuple to a
+`MultipleChoiceFilter` (instead of the `ChoiceSet` class) crashes `/api/schema/`
+with a 500 (#111).
+
+### Added a test file
+
+Confirm it collects under the host lane: `pytest tests/ -p no:django
+--collect-only`. A `utils` module imported at test-module scope that pulls in
+`netbox_ssl.models`, or an optional dependency imported at the top of a test,
+crashes collection there (#148, #149). And never let a test file `skip` at
+module level on an import error — that silently hides the very failure the test
+exists to catch (#143).
+
+### Added or changed a NetBox Script
+
+Pass `ObjectVar(model=...)` the model **class**, not a dotted string — NetBox
+calls `model.objects.all()`, so a string raises `AttributeError` at import and
+the script never registers (#143). Make sure the script is reachable from the
+`SCRIPTS_ROOT` wrapper; plugin-bundled scripts are not auto-discovered.
+
+### Changed user-facing copy or support metadata
+
+Keep the NetBox support matrix identical across `README.md`, `COMPATIBILITY.md`,
+and the `pyproject.toml` classifiers. A stale matrix has shipped more than once
+(caught in pre-flight at v1.2.0).
 
 ## Review SLA
 
@@ -159,7 +210,7 @@ days. For urgent security issues, see [SECURITY.md](https://github.com/ctrl-alt-
 4. Update COMPATIBILITY.md if NetBox support matrix changes
 5. Open PR `release/vX.Y.Z → dev`, admin-merge after CI + Gemini review
 6. Open PR `dev → main`, admin-merge after CI
-7. Tag `vX.Y.Z` on `main` (signed annotated: `git tag -s vX.Y.Z`)
+7. Tag `vX.Y.Z` on `main` (annotated: `git tag -a vX.Y.Z`)
 8. Push tag → triggers `publish.yml` (PyPI) and `docs.yml` (GH Pages)
 9. Close the milestone's issues with link to the release
 
