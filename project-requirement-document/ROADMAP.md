@@ -25,6 +25,7 @@
 |------|--------|
 | 2026-04-17 | Initial roadmap post-v1.0 GA. |
 | 2026-04-21 | Post-v1.0.1 review. Promoted **AWS ACM** and **Azure Key Vault** read-only adapters from Later (§5.4, §5.5) to Next (now §4.1, §4.2). Demoted **DigiCert CertCentral Adapter** from Next (§4.2) to Later (§5.5), narrowed scope to a GenericRESTAdapter preset + how-to guide because a reliable first-party adapter requires a live DigiCert account the maintainer does not hold. Renumbered §4.1 Vault → §4.3 (scope unchanged), §4.3 Performance Scaling Pass → §4.4 (scope unchanged). Added §8.2 for `auth_credentials_reference` deprecation (landing with multi-credential auth pattern in v1.1.0). |
+| 2026-06-21 | Demoted **Azure Key Vault** read-only adapter ([#101](https://github.com/ctrl-alt-automate/netbox-ssl/issues/101)) from Next (§4.2) back to Later (now §5.8) — deprioritized, no active work planned for the next release (the blocking multi-credential auth dependency #99 shipped in v1.1.0, but the adapter itself is pushed further out). Renumbered §4.3 Vault → §4.2, §4.4 Performance Scaling Pass → §4.3. Closed **OpenSSL 4.0.0 impact analysis** ([#90](https://github.com/ctrl-alt-automate/netbox-ssl/issues/90)) as not planned. (Website-Centric Monitoring #149 landed in v1.3 — tracked in CHANGELOG, not a roadmap bucket.) |
 
 ---
 
@@ -75,24 +76,7 @@ alongside `LemurAdapter` and `GenericRESTAdapter`.
 `secret_access_key` at minimum, which the single-string credential
 reference cannot currently express.
 
-### 4.2 Azure Key Vault Read-Only Adapter
-
-**Goal.** Add a first-party External Source adapter for Azure Key
-Vault. Reads certificate metadata (`cer` bytes only), never private
-key material.
-
-**Scope boundary.** Read-only. Uses the Azure SDK to call only the
-`certificates` API — explicitly never `get_key`, `get_secret`,
-`backup_certificate`, or any export path that would touch private-key
-material. The adapter duplicates the plugin-level `_PROHIBITED_MAPPING_KEYS`
-guard with an adapter-level assertion.
-
-**Reference issue.** [#101](https://github.com/ctrl-alt-automate/netbox-ssl/issues/101).
-**Blocking dependency.** [#99](https://github.com/ctrl-alt-automate/netbox-ssl/issues/99)
-(RFC: Multi-credential auth pattern) — Azure needs `tenant_id` +
-`client_id` + `client_secret` at minimum, or a Managed Identity path.
-
-### 4.3 Vault Read-Only Integration
+### 4.2 Vault Read-Only Integration
 
 **Goal.** Resolve `private_key_location` breadcrumbs against a HashiCorp
 Vault instance to confirm the key is where the operator says it is,
@@ -105,7 +89,7 @@ the PEM parser's private-key rejection.
 
 **Reference issue.** To be filed.
 
-### 4.4 Performance Scaling Pass (> 10 000 Certificates)
+### 4.3 Performance Scaling Pass (> 10 000 Certificates)
 
 **Goal.** Validate and tune plugin behaviour at 10 000 and 50 000
 certificates. Profile slow queries, tune index usage, add benchmark
@@ -176,6 +160,28 @@ as the canonical reference.
 
 Different expiry thresholds and notification channels for different
 parts of the organisation. Currently thresholds are global.
+
+### 5.8 Azure Key Vault Read-Only Adapter
+
+A first-party External Source adapter for Azure Key Vault, reading
+certificate metadata (`cer` bytes only), never private-key material.
+Promoted to Next (ex-§4.2) on 2026-04-21; **demoted back to Later on
+2026-06-21** — deprioritized, with no active work planned for the next
+release. The blocking multi-credential auth dependency
+([#99](https://github.com/ctrl-alt-automate/netbox-ssl/issues/99))
+already shipped in v1.1.0, so the blocker is gone; the adapter is simply
+pushed further out.
+
+**Scope boundary.** Read-only. Uses the Azure SDK to call only the
+`certificates` API — explicitly never `get_key`, `get_secret`,
+`backup_certificate`, or any export path that would touch private-key
+material.
+
+**Reference issue.** [#101](https://github.com/ctrl-alt-automate/netbox-ssl/issues/101).
+
+**Promotion path back to Next.** Re-promote when an adapter feature is
+prioritized for a release — it slots in alongside the shipped AWS ACM
+and Lemur adapters with no remaining dependency.
 
 ---
 
