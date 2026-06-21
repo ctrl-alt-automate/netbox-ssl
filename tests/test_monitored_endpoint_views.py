@@ -557,3 +557,18 @@ class TestEndpointDetailRotationHistoryTab:
         assert resp.status_code == 200
         assert uid_a.encode() in resp.content
         assert uid_b.encode() in resp.content
+
+
+@pytest.mark.django_db
+class TestMonitoredEndpointApiSerializer:
+    """Regression for #152: NetBox serializes a model for events on save
+    (``serialize_for_event`` → ``get_serializer_for_model``). A missing
+    serializer raises ``SerializerNotFound`` on NetBox 4.4, breaking any save in
+    a request context. Guard that a serializer is registered."""
+
+    def test_serializer_is_discoverable(self):
+        from utilities.api import get_serializer_for_model
+
+        from netbox_ssl.models import MonitoredEndpoint
+
+        assert get_serializer_for_model(MonitoredEndpoint) is not None

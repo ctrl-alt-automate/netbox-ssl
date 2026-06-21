@@ -15,6 +15,7 @@ from .compliance import (
 )
 from .csr import CertificateSigningRequestSerializer, CSRImportSerializer
 from .external_sources import ExternalSourceSerializer, ExternalSourceSyncLogSerializer
+from .monitored_endpoints import MonitoredEndpointSerializer
 
 __all__ = [
     "CertificateSerializer",
@@ -32,4 +33,5 @@ __all__ = [
     "ComplianceReportSerializer",
     "ExternalSourceSerializer",
     "ExternalSourceSyncLogSerializer",
+    "MonitoredEndpointSerializer",
 ]
