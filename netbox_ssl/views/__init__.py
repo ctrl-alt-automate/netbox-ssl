@@ -4,6 +4,7 @@ from .assignments import (
     CertificateAssignmentEditView,
     CertificateAssignmentListView,
     CertificateAssignmentView,
+    CertificateAssignTargetsView,
 )
 from .certificate_authorities import (
     CertificateAuthorityBulkDeleteView,
@@ -86,6 +87,7 @@ __all__ = [
     "CertificateAssignmentEditView",
     "CertificateAssignmentDeleteView",
     "CertificateAssignmentBulkDeleteView",
+    "CertificateAssignTargetsView",
     # External Source views
     "ExternalSourceListView",
     "ExternalSourceView",

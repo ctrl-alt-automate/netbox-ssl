@@ -12,7 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext_lazy as _
 from ipam.models import Service
 from netbox.forms import NetBoxModelFilterSetForm, NetBoxModelForm
-from utilities.forms.fields import ContentTypeChoiceField, DynamicModelChoiceField
+from utilities.forms.fields import ContentTypeChoiceField, DynamicModelChoiceField, DynamicModelMultipleChoiceField
 from utilities.forms.rendering import FieldSet
 from virtualization.models import VirtualMachine
 
@@ -248,3 +248,25 @@ class CertificateAssignmentFilterForm(NetBoxModelFilterSetForm):
             ]
         ),
     )
+
+
+class CertificateBulkAssignForm(forms.Form):
+    """Assign one certificate to many Devices, VMs, and/or Services at once."""
+
+    devices = DynamicModelMultipleChoiceField(queryset=Device.objects.all(), required=False, label=_("Devices"))
+    virtual_machines = DynamicModelMultipleChoiceField(
+        queryset=VirtualMachine.objects.all(), required=False, label=_("Virtual Machines")
+    )
+    services = DynamicModelMultipleChoiceField(queryset=Service.objects.all(), required=False, label=_("Services"))
+    is_primary = forms.BooleanField(
+        required=False,
+        initial=False,
+        label=_("Mark as primary"),
+        help_text=_("Mark this certificate as the primary certificate on each selected object."),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not (cleaned_data.get("devices") or cleaned_data.get("virtual_machines") or cleaned_data.get("services")):
+            raise forms.ValidationError(_("Select at least one Device, Virtual Machine, or Service."))
+        return cleaned_data

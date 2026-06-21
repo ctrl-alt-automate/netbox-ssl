@@ -66,7 +66,10 @@ def send_expiry_report(
     text_body = render_to_string("netbox_ssl/email/expiry_report.txt", context)
     html_body = render_to_string("netbox_ssl/email/expiry_report.html", context)
 
-    from_email = settings.DEFAULT_FROM_EMAIL
+    # NetBox maps the operator's EMAIL_FROM config onto Django's SERVER_EMAIL,
+    # not DEFAULT_FROM_EMAIL (see #147). Prefer it, but fall back so an unset
+    # SERVER_EMAIL never produces an empty From header.
+    from_email = getattr(settings, "SERVER_EMAIL", None) or settings.DEFAULT_FROM_EMAIL
 
     try:
         msg = EmailMultiAlternatives(subject, text_body, from_email, recipients)

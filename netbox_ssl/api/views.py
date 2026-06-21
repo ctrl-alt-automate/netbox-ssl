@@ -37,10 +37,12 @@ from ..models import (
     MonitoredEndpoint,
 )
 from ..utils import CertificateExporter, ComplianceChecker, ExportFormatChoices
+from ..utils.assignments import AssignmentError, assign_certificate_to_targets
 from ..utils.bulk_parser import parse as bulk_parse
 from ..utils.events import fire_certificate_event
 from ..utils.parser import CertificateParseError, CertificateParser, PrivateKeyDetectedError
 from .serializers import (
+    AssignTargetsSerializer,
     BulkAssignSerializer,
     BulkComplianceRunSerializer,
     BulkStatusUpdateSerializer,
@@ -1081,6 +1083,74 @@ class CertificateViewSet(NetBoxModelViewSet):
                 "not_found_ids": not_found_ids,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["post"], url_path="assign-targets")
+    def assign_targets(self, request, pk=None):
+        """Assign this certificate to multiple objects (Devices, VMs, Services).
+
+        Example payload:
+        {
+            "targets": [
+                {"object_type": "dcim.device", "object_id": 42},
+                {"object_type": "dcim.service", "object_id": 7}
+            ],
+            "is_primary": false
+        }
+        Duplicate assignments are silently skipped.
+        """
+        denied = _check_bulk_perm(request, "netbox_ssl.add_certificateassignment")
+        if denied:
+            return denied
+
+        # Fetch and authorise the certificate BEFORE the batch-cap check so that
+        # callers who cannot see this certificate always get 404, never 400.
+        certificate = Certificate.objects.restrict(request.user, "view").filter(pk=pk).first()
+        if certificate is None:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = AssignTargetsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        targets_data = serializer.validated_data["targets"]
+        is_primary = serializer.validated_data["is_primary"]
+
+        plugin_settings = settings.PLUGINS_CONFIG.get("netbox_ssl", {})
+        max_batch_size = plugin_settings.get("bulk_assign_max_batch_size", 100)
+        if len(targets_data) > max_batch_size:
+            return Response(
+                {"detail": f"Batch size exceeds maximum of {max_batch_size} targets."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        allowed_types = {"dcim.device", "dcim.service", "virtualization.virtualmachine"}
+        resolved: list[tuple[ContentType, int]] = []
+        for target in targets_data:
+            object_type = target["object_type"]
+            if object_type not in allowed_types:
+                raise serializers.ValidationError(
+                    {"targets": f"Invalid object_type '{object_type}'. Must be one of: {sorted(allowed_types)}"}
+                )
+            app_label, model = object_type.split(".")
+            try:
+                content_type = ContentType.objects.get(app_label=app_label, model=model)
+            except ContentType.DoesNotExist as exc:
+                raise serializers.ValidationError(
+                    {"targets": f"Could not resolve content type '{object_type}'."}
+                ) from exc
+            resolved.append((content_type, target["object_id"]))
+
+        try:
+            result = assign_certificate_to_targets(certificate, resolved, is_primary=is_primary)
+        except AssignmentError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {
+                "assigned": result.created,
+                "skipped": result.skipped,
+                "detail": f"Assigned {result.created}, skipped {result.skipped} already assigned.",
+            },
+            status=status.HTTP_200_OK,
         )
 
     @action(detail=False, methods=["post"], url_path="import-file")

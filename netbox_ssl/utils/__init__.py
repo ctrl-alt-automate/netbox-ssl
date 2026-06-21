@@ -1,4 +1,5 @@
 from .analytics import CertificateAnalytics
+from .assignments import AssignmentError, AssignResult, assign_certificate_to_targets
 from .ca_detector import detect_issuing_ca, get_or_create_ca_from_issuer
 from .chain_validator import (
     ChainValidationError,
@@ -27,6 +28,9 @@ from .parser import CertificateParseError, CertificateParser, PrivateKeyDetected
 from .url_cert_import import ImportOutcome, scrape_and_import
 
 __all__ = [
+    "AssignmentError",
+    "AssignResult",
+    "assign_certificate_to_targets",
     "CertificateAnalytics",
     "CertificateParser",
     "CertificateParseError",

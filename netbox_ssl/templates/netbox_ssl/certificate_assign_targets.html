@@ -1,0 +1,43 @@
+{% extends 'generic/object_edit.html' %}
+{% load form_helpers %}
+{% load i18n %}
+
+{% block title %}Assign {{ object }} to objects{% endblock %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'plugins:netbox_ssl:certificate_list' %}">Certificates</a>
+  </li>
+  <li class="breadcrumb-item">
+    <a href="{{ object.get_absolute_url }}">{{ object }}</a>
+  </li>
+  <li class="breadcrumb-item active" aria-current="page">Assign to objects</li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+<div class="row">
+  <div class="col col-md-8">
+    <div class="card">
+      <h5 class="card-header">
+        <i class="mdi mdi-link-plus"></i> Assign certificate to objects
+      </h5>
+      <div class="card-body">
+        <p class="text-muted">
+          Assign <strong>{{ object }}</strong> to one or more Devices, Virtual
+          Machines, or Services. Objects already assigned are silently skipped.
+        </p>
+        <form action="" method="post" class="form">
+          {% csrf_token %}
+          {% render_form form %}
+          <div class="d-flex justify-content-end gap-2 mt-3">
+            <a href="{{ object.get_absolute_url }}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+              <i class="mdi mdi-link-plus"></i> Assign
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

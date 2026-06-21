@@ -1,6 +1,7 @@
 from .assignments import (
     CertificateAssignmentFilterForm,
     CertificateAssignmentForm,
+    CertificateBulkAssignForm,
 )
 from .certificate_authorities import (
     CertificateAuthorityBulkEditForm,
@@ -38,6 +39,7 @@ __all__ = [
     "CertificateImportForm",
     "CertificateAssignmentForm",
     "CertificateAssignmentFilterForm",
+    "CertificateBulkAssignForm",
     "CertificateAuthorityForm",
     "CertificateAuthorityFilterForm",
     "CertificateAuthorityBulkEditForm",
