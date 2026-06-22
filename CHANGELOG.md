@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-22
+
 ### Added
 
 - **Assign one certificate to many objects** ([#148](https://github.com/ctrl-alt-automate/netbox-ssl/issues/148)):
@@ -24,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unreachable / rotated / untrusted endpoints. Endpoints can be added manually,
   bulk-imported from CSV, or auto-created from the URL import flow. A certificate's
   detail page now lists every website presenting it. One additive migration.
+- **`compliance-trends` REST endpoint** ([#154](https://github.com/ctrl-alt-automate/netbox-ssl/pull/154)):
+  compliance trend snapshots (the 90-day compliance history) are now exposed
+  read-only at `GET /api/plugins/ssl/compliance-trends/`. This also registers the
+  serializer NetBox needs to change-log `ComplianceTrendSnapshot` on save —
+  previously a missing serializer raised `SerializerNotFound`, a hard 500 on
+  NetBox 4.4.
 
 ### Fixed
 

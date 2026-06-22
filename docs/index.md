@@ -4,7 +4,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/netbox-ssl)](https://pypi.org/project/netbox-ssl/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![NetBox](https://img.shields.io/badge/NetBox-4.4%20%7C%204.5-blue.svg)](https://github.com/netbox-community/netbox)
+[![NetBox](https://img.shields.io/badge/NetBox-4.4%20%7C%204.5%20%7C%204.6-blue.svg)](https://github.com/netbox-community/netbox)
 [![Status](https://img.shields.io/badge/Status-Stable-brightgreen.svg)](#)
 
 ---
