@@ -252,9 +252,9 @@ Add the widget to your NetBox dashboard to see:
 
 | NetBox Version | Plugin Version | Status |
 |:--------------:|:--------------:|:------:|
-| 4.6.x          | 1.1.x - 1.2.x  | ✅ Primary |
-| 4.5.x          | 1.1.x - 1.2.x  | ✅ Supported |
-| 4.4.x          | 1.1.x - 1.2.x  | ✅ Supported |
+| 4.6.x          | 1.1.x - 1.3.x  | ✅ Primary |
+| 4.5.x          | 1.1.x - 1.3.x  | ✅ Supported |
+| 4.4.x          | 1.1.x - 1.3.x  | ✅ Supported |
 | 4.3.x and older| —              | ❌ Unsupported |
 
 ## 📚 Documentation

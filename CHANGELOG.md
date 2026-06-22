@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-22
+
 ### Added
 
 - **Assign one certificate to many objects** ([#148](https://github.com/ctrl-alt-automate/netbox-ssl/issues/148)):
