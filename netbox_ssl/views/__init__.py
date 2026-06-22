@@ -4,6 +4,7 @@ from .assignments import (
     CertificateAssignmentEditView,
     CertificateAssignmentListView,
     CertificateAssignmentView,
+    CertificateAssignTargetsView,
 )
 from .certificate_authorities import (
     CertificateAuthorityBulkDeleteView,
@@ -40,6 +41,14 @@ from .external_sources import (
     ExternalSourceEditView,
     ExternalSourceListView,
     ExternalSourceView,
+)
+from .monitored_endpoints import (
+    MonitoredEndpointBulkDeleteView,
+    MonitoredEndpointDeleteView,
+    MonitoredEndpointEditView,
+    MonitoredEndpointImportView,
+    MonitoredEndpointListView,
+    MonitoredEndpointView,
 )
 from .url_import import (
     UrlImportView,
@@ -78,6 +87,7 @@ __all__ = [
     "CertificateAssignmentEditView",
     "CertificateAssignmentDeleteView",
     "CertificateAssignmentBulkDeleteView",
+    "CertificateAssignTargetsView",
     # External Source views
     "ExternalSourceListView",
     "ExternalSourceView",
@@ -85,4 +95,11 @@ __all__ = [
     "ExternalSourceDeleteView",
     "ExternalSourceBulkEditView",
     "ExternalSourceBulkDeleteView",
+    # MonitoredEndpoint views
+    "MonitoredEndpointListView",
+    "MonitoredEndpointView",
+    "MonitoredEndpointEditView",
+    "MonitoredEndpointDeleteView",
+    "MonitoredEndpointBulkDeleteView",
+    "MonitoredEndpointImportView",
 ]

@@ -1,6 +1,7 @@
 from .assignments import (
     CertificateAssignmentFilterForm,
     CertificateAssignmentForm,
+    CertificateBulkAssignForm,
 )
 from .certificate_authorities import (
     CertificateAuthorityBulkEditForm,
@@ -24,6 +25,11 @@ from .external_sources import (
     ExternalSourceFilterForm,
     ExternalSourceForm,
 )
+from .monitored_endpoints import (
+    MonitoredEndpointFilterForm,
+    MonitoredEndpointForm,
+    MonitoredEndpointImportForm,
+)
 from .url_import import UrlImportForm
 
 __all__ = [
@@ -33,6 +39,7 @@ __all__ = [
     "CertificateImportForm",
     "CertificateAssignmentForm",
     "CertificateAssignmentFilterForm",
+    "CertificateBulkAssignForm",
     "CertificateAuthorityForm",
     "CertificateAuthorityFilterForm",
     "CertificateAuthorityBulkEditForm",
@@ -43,5 +50,8 @@ __all__ = [
     "ExternalSourceForm",
     "ExternalSourceFilterForm",
     "ExternalSourceBulkEditForm",
+    "MonitoredEndpointForm",
+    "MonitoredEndpointFilterForm",
+    "MonitoredEndpointImportForm",
     "UrlImportForm",
 ]

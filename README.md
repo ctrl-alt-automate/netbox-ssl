@@ -9,7 +9,7 @@
   <a href="https://pypi.org/project/netbox-ssl/"><img src="https://img.shields.io/pypi/pyversions/netbox-ssl" alt="Python"></a>
   <a href="https://github.com/ctrl-alt-automate/netbox-ssl/actions/workflows/ci.yml"><img src="https://github.com/ctrl-alt-automate/netbox-ssl/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
-  <a href="https://github.com/netbox-community/netbox"><img src="https://img.shields.io/badge/NetBox-4.4%20%7C%204.5-blue.svg" alt="NetBox"></a>
+  <a href="https://github.com/netbox-community/netbox"><img src="https://img.shields.io/badge/NetBox-4.4%20%7C%204.5%20%7C%204.6-blue.svg" alt="NetBox"></a>
   <img src="https://img.shields.io/badge/Status-Stable-brightgreen.svg" alt="Stable">
 </p>
 
@@ -252,9 +252,9 @@ Add the widget to your NetBox dashboard to see:
 
 | NetBox Version | Plugin Version | Status |
 |:--------------:|:--------------:|:------:|
-| 4.6.x          | 1.1.x - 1.2.x  | ✅ Primary |
-| 4.5.x          | 1.1.x - 1.2.x  | ✅ Supported |
-| 4.4.x          | 1.1.x - 1.2.x  | ✅ Supported |
+| 4.6.x          | 1.1.x - 1.3.x  | ✅ Primary |
+| 4.5.x          | 1.1.x - 1.3.x  | ✅ Supported |
+| 4.4.x          | 1.1.x - 1.3.x  | ✅ Supported |
 | 4.3.x and older| —              | ❌ Unsupported |
 
 ## 📚 Documentation

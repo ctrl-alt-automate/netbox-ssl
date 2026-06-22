@@ -142,3 +142,44 @@ def fire_certificate_event(
     )
 
     return payload
+
+
+# ---------------------------------------------------------------------------
+# Endpoint event constants
+# ---------------------------------------------------------------------------
+
+EVENT_ENDPOINT_UNREACHABLE = "endpoint_unreachable"
+EVENT_ENDPOINT_CERT_ROTATED = "endpoint_cert_rotated"
+EVENT_ENDPOINT_UNTRUSTED_CERT = "endpoint_untrusted_cert"
+
+
+def build_endpoint_event_payload(endpoint: Any, event_type: str, extra: dict | None = None) -> dict:
+    """Build a standardized event payload for a monitored-endpoint event."""
+    cert = endpoint.certificate
+    payload = {
+        "event_type": event_type,
+        "endpoint_id": endpoint.pk,
+        "name": endpoint.name,
+        "url": endpoint.url,
+        "status": endpoint.status,
+        "certificate_id": cert.pk if cert else None,
+        "common_name": cert.common_name if cert else None,
+        "days_remaining": cert.days_remaining if cert else None,
+        "tenant": endpoint.tenant.name if endpoint.tenant else None,
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+    }
+    if extra:
+        payload.update(extra)
+    return payload
+
+
+def fire_endpoint_event(endpoint: Any, event_type: str, extra: dict | None = None) -> dict:
+    """Fire a monitored-endpoint event by touching last_updated (same mechanism as certs)."""
+    payload = build_endpoint_event_payload(endpoint, event_type, extra=extra)
+    try:
+        from django.utils import timezone as dj_timezone
+
+        type(endpoint).objects.filter(pk=endpoint.pk).update(last_updated=dj_timezone.now())
+    except Exception as e:
+        logger.warning("Could not update last_updated for endpoint %s: %s", endpoint.pk, e)
+    return payload

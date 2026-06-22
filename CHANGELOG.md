@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.3.0] - 2026-06-22
+
+### Added
+
+- **Assign one certificate to many objects** ([#148](https://github.com/ctrl-alt-automate/netbox-ssl/issues/148)):
+  a wildcard or shared certificate can now be assigned to multiple Devices,
+  Virtual Machines, and Services in a single action — via an "Assign to objects"
+  button on the certificate detail page, or the new
+  `POST /api/plugins/ssl/certificates/{id}/assign-targets` REST action. Targets
+  already assigned are silently skipped; the result reports how many were
+  assigned and how many were skipped. No database migration.
+- **Website-centric certificate monitoring** ([#149](https://github.com/ctrl-alt-automate/netbox-ssl/issues/149)):
+  a new **Monitored Endpoints** feature tracks the certificate each website/URL
+  presents over time. A scheduled "Monitored Endpoint Poll" script re-scrapes
+  each endpoint (reusing the URL-import TLS scraper + security model), links the
+  certificate it finds, records rotation history, and fires NetBox events on
+  unreachable / rotated / untrusted endpoints. Endpoints can be added manually,
+  bulk-imported from CSV, or auto-created from the URL import flow. A certificate's
+  detail page now lists every website presenting it. One additive migration.
+- **`compliance-trends` REST endpoint** ([#154](https://github.com/ctrl-alt-automate/netbox-ssl/pull/154)):
+  compliance trend snapshots (the 90-day compliance history) are now exposed
+  read-only at `GET /api/plugins/ssl/compliance-trends/`. This also registers the
+  serializer NetBox needs to change-log `ComplianceTrendSnapshot` on save —
+  previously a missing serializer raised `SerializerNotFound`, a hard 500 on
+  NetBox 4.4.
+
+### Fixed
+
+- **Expiry notification emails sent from the wrong address** ([#147](https://github.com/ctrl-alt-automate/netbox-ssl/issues/147)):
+  the expiry report used Django's `DEFAULT_FROM_EMAIL` (which defaults to
+  `webmaster@localhost`) as the From address. NetBox maps the operator's
+  `EMAIL_FROM` configuration onto `SERVER_EMAIL`, not `DEFAULT_FROM_EMAIL`, so
+  the configured sender was ignored. The notification now sends from
+  `SERVER_EMAIL`, falling back to `DEFAULT_FROM_EMAIL` only when `SERVER_EMAIL`
+  is unset so an empty From header is never produced.
+
 ## [1.2.2] - 2026-06-05
 
 **Patch release** — the bundled NetBox Scripts (expiry scan, expiry

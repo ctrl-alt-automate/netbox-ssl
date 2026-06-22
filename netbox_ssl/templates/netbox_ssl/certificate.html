@@ -288,7 +288,7 @@
 {% if object.status == 'active' or object.status == 'expired' %}
 {% if perms.netbox_ssl.renew_certificate or perms.netbox_ssl.import_certificate or perms.netbox_ssl.add_certificate %}
 <div class="row mb-3">
-  <div class="col col-12">
+  <div class="col col-12 d-flex gap-2 flex-wrap">
     <a href="{% url 'plugins:netbox_ssl:certificate_import' %}?renew_from={{ object.pk }}"
        class="btn btn-warning">
       <i class="mdi mdi-swap-horizontal"></i> Renew This Certificate
@@ -298,8 +298,19 @@
 {% endif %}
 {% endif %}
 
+{% if perms.netbox_ssl.add_certificateassignment %}
+<div class="row mb-3">
+  <div class="col col-12 d-flex gap-2 flex-wrap">
+    <a href="{% url 'plugins:netbox_ssl:certificate_assign_targets' pk=object.pk %}"
+       class="btn btn-primary">
+      <i class="mdi mdi-link-plus"></i> Assign to objects
+    </a>
+  </div>
+</div>
+{% endif %}
+
 {# Tabbed secondary sections #}
-{% if object.sans or assignments or object.replaced_by or object.replaces.exists or lifecycle_events %}
+{% if object.sans or assignments or object.replaced_by or object.replaces.exists or lifecycle_events or monitored_endpoints %}
 <div class="row mb-3">
   <div class="col col-12">
     <ul class="nav nav-tabs" role="tablist">
@@ -329,6 +340,13 @@
           Lifecycle <span class="badge text-bg-secondary">{{ lifecycle_events|length }}</span>
         </button>
       </li>
+      {% if monitored_endpoints %}
+      <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-monitored-endpoints" type="button" role="tab">
+          Monitored Endpoints <span class="badge text-bg-secondary">{{ monitored_endpoints_count }}</span>
+        </button>
+      </li>
+      {% endif %}
     </ul>
     <div class="tab-content border border-top-0 rounded-bottom">
       {% if object.sans %}
@@ -424,6 +442,34 @@
         <p class="text-muted mb-0">No lifecycle events recorded.</p>
         {% endif %}
       </div>
+      {% if monitored_endpoints %}
+      <div class="tab-pane fade p-3" id="tab-monitored-endpoints" role="tabpanel">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>URL</th>
+              <th>Status</th>
+              <th>Days Remaining</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for endpoint in monitored_endpoints %}
+            <tr>
+              <td><a href="{{ endpoint.get_absolute_url }}">{{ endpoint.name }}</a></td>
+              <td>
+                {% if endpoint.url|slice:':8'|lower == 'https://' or endpoint.url|slice:':7'|lower == 'http://' %}
+                  <a href="{{ endpoint.url }}" target="_blank" rel="noopener noreferrer">{{ endpoint.url }}</a>
+                {% else %}{{ endpoint.url }}{% endif %}
+              </td>
+              <td>{% badge endpoint.get_status_display %}</td>
+              <td>{{ endpoint.days_remaining|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>

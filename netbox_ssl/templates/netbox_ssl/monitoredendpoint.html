@@ -1,0 +1,126 @@
+{% extends 'generic/object.html' %}
+{% load helpers %}
+{% load plugins %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  {{ block.super }}
+  <li class="breadcrumb-item">
+    <a href="{% url 'plugins:netbox_ssl:monitoredendpoint_list' %}">Monitored Endpoints</a>
+  </li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col col-md-6">
+    <div class="card">
+      <h5 class="card-header">Endpoint Details</h5>
+      <div class="card-body">
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Name</th>
+            <td>{{ object.name }}</td>
+          </tr>
+          <tr>
+            <th scope="row">URL</th>
+            <td>
+              {% if object.url|slice:':8'|lower == 'https://' or object.url|slice:':7'|lower == 'http://' %}
+                <a href="{{ object.url }}" target="_blank" rel="noopener noreferrer">{{ object.url }}</a>
+              {% else %}{{ object.url }}{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">SNI</th>
+            <td>{{ object.sni|default:"—" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Status</th>
+            <td>{% badge object.get_status_display %}</td>
+          </tr>
+          <tr>
+            <th scope="row">Certificate</th>
+            <td>
+              {% if object.certificate %}
+                <a href="{{ object.certificate.get_absolute_url }}">{{ object.certificate }}</a>
+              {% else %}
+                <span class="text-muted">None</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Days Remaining</th>
+            <td>{{ object.days_remaining|default:"—" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Tenant</th>
+            <td>
+              {% if object.tenant %}
+                <a href="{{ object.tenant.get_absolute_url }}">{{ object.tenant }}</a>
+              {% else %}
+                <span class="text-muted">None</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Last Checked</th>
+            <td>{{ object.last_checked|date:"Y-m-d H:i:s"|default:"Never" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Last Seen</th>
+            <td>{{ object.last_seen|date:"Y-m-d H:i:s"|default:"Never" }}</td>
+          </tr>
+          {% if object.last_error %}
+          <tr>
+            <th scope="row">Last Error</th>
+            <td class="text-danger">{{ object.last_error }}</td>
+          </tr>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Rotation History tab #}
+<div class="row mb-3">
+  <div class="col col-12">
+    <ul class="nav nav-tabs" role="tablist">
+      <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-rotation-history" type="button" role="tab">
+          Rotation History
+        </button>
+      </li>
+    </ul>
+    <div class="tab-content border border-top-0 rounded-bottom">
+      <div class="tab-pane fade show active p-3" id="tab-rotation-history" role="tabpanel">
+        {% with history=object.cert_history.all %}
+        {% if history %}
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Certificate</th>
+              <th>First Seen</th>
+              <th>Last Seen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in history %}
+            <tr>
+              <td>
+                <a href="{{ entry.certificate.get_absolute_url }}">{{ entry.certificate }}</a>
+              </td>
+              <td>{{ entry.first_seen|date:"Y-m-d H:i" }}</td>
+              <td>{{ entry.last_seen|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted mb-0">No rotation history recorded yet.</p>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

@@ -14,23 +14,25 @@ references are resolved against the requesting user's accessible objects.
 
 from __future__ import annotations
 
-import socket
+import logging
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db import transaction
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 
-from ..models import Certificate, CertificateStatusChoices
-from ..utils import CertificateParseError, CertificateParser, detect_issuing_ca
-from ..utils.tls_scraper import TLSScrapeError, scrape_tls_certificate
+from ..models import MonitoredEndpointStatusChoices
+from ..utils import CertificateParseError
+from ..utils.tls_scraper import TLSScrapeError
 from ..utils.url_bulk_parser import parse as url_parse
-from ..utils.url_validation import URLValidationError, validate_https_url
+from ..utils.url_cert_import import scrape_and_import
+from ..utils.url_validation import URLValidationError
+
+logger = logging.getLogger(__name__)
 
 
 def _plugin_setting(name: str, default=None):
@@ -157,74 +159,62 @@ class UrlImportView(LoginRequiredMixin, View):
     def _process_row(self, request, row, allowlist, user_tenants, default_tenant):
         """Validate → scrape → parse → import a single row; return an outcome dict."""
         label = row["url"]
-
-        # 1. SSRF validation (resolves DNS and checks every resolved IP).
+        tenant = self._resolve_tenant(row.get("tenant"), user_tenants) or default_tenant
         try:
-            validate_https_url(row["url"], cidr_allowlist=allowlist)
-        except URLValidationError as exc:
-            return {"url": label, "status": "blocked", "detail": str(exc)}
-
-        # 2. Resolve to a concrete IP and connect to THAT ip (DNS-rebinding defense).
-        try:
-            resolved_ip = socket.getaddrinfo(row["host"], row["port"])[0][4][0]
-        except OSError as exc:
-            return {"url": label, "status": "unreachable", "detail": f"DNS failed: {exc}"}
-
-        # 3. Scrape the presented chain.
-        try:
-            pem = scrape_tls_certificate(
-                resolved_ip,
+            outcome = scrape_and_import(
+                row["url"],
                 row["host"],
                 row["port"],
                 sni=row["sni"],
                 verify_chain=row["verify_chain"],
+                allowlist=allowlist,
+                tenant=tenant,
             )
+        except URLValidationError as exc:
+            return {"url": label, "status": "blocked", "detail": str(exc)}
         except TLSScrapeError as exc:
             return {"url": label, "status": "unreachable", "detail": str(exc)}
-
-        # 4. Parse.
-        try:
-            parsed = CertificateParser.parse(pem)
         except CertificateParseError as exc:
             return {"url": label, "status": "error", "detail": str(exc)}
-
-        # 5. Dedup on serial+issuer (same as Smart Paste / bulk import).
-        existing = Certificate.objects.filter(serial_number=parsed.serial_number, issuer=parsed.issuer).first()
-        if existing:
-            existing.last_seen_at = timezone.now()
-            if not existing.discovered_via_url:
-                existing.discovered_via_url = row["url"]
-            existing.save(update_fields=["last_seen_at", "discovered_via_url"])
-            return {"url": label, "status": "matched", "detail": parsed.common_name, "pk": existing.pk}
-
-        # 6. Create.
-        tenant = self._resolve_tenant(row.get("tenant"), user_tenants) or default_tenant
-        try:
-            with transaction.atomic():
-                cert = Certificate.objects.create(
-                    common_name=parsed.common_name,
-                    serial_number=parsed.serial_number,
-                    fingerprint_sha256=parsed.fingerprint_sha256,
-                    issuer=parsed.issuer,
-                    issuing_ca=detect_issuing_ca(parsed.issuer),
-                    valid_from=parsed.valid_from,
-                    valid_to=parsed.valid_to,
-                    sans=parsed.sans or [],
-                    key_size=parsed.key_size,
-                    algorithm=parsed.algorithm,
-                    status=CertificateStatusChoices.STATUS_ACTIVE,
-                    pem_content=parsed.pem_content,
-                    issuer_chain=parsed.issuer_chain,
-                    tenant=tenant,
-                    discovered_via_url=row["url"],
-                    last_seen_at=timezone.now(),
-                )
-                cert.auto_detect_acme(save=True)
         except Exception as exc:  # noqa: BLE001 - surface per-row, don't abort the batch
             return {"url": label, "status": "error", "detail": str(exc)}
 
+        # #149: keep a MonitoredEndpoint for every imported/matched URL.
+        try:
+            from ..models import MonitoredEndpoint
+
+            # url is already HTTPS-validated by validate_https_url() inside scrape_and_import
+            # (which ran before this success path), so update_or_create (which bypasses
+            # Model.clean()) is safe here.
+            MonitoredEndpoint.objects.update_or_create(
+                url=row["url"],
+                defaults={
+                    "name": row.get("sni") or row["host"],
+                    "sni": row.get("sni") or "",
+                    "certificate": outcome.certificate,
+                    "tenant": tenant,
+                    "last_seen": timezone.now(),
+                    "last_checked": timezone.now(),
+                    "status": MonitoredEndpointStatusChoices.STATUS_OK,
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("MonitoredEndpoint upsert failed for %s: %s", row["url"], exc)
+
+        if not outcome.created:
+            return {
+                "url": label,
+                "status": "matched",
+                "detail": outcome.certificate.common_name,
+                "pk": outcome.certificate.pk,
+            }
         status = "imported" if row["verify_chain"] else "imported_untrusted"
-        return {"url": label, "status": status, "detail": parsed.common_name, "pk": cert.pk}
+        return {
+            "url": label,
+            "status": status,
+            "detail": outcome.certificate.common_name,
+            "pk": outcome.certificate.pk,
+        }
 
     @staticmethod
     def _resolve_tenant(ref, user_tenants):

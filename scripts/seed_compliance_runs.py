@@ -66,6 +66,8 @@ for weeks_ago in range(1, 14):
 
 print(f"  Back-filled snapshots: {backfilled}")
 print("Done.")
-print(f"Summary: {ComplianceCheck.objects.count()} checks, "
-      f"{ComplianceTrendSnapshot.objects.count()} trend snapshots, "
-      f"{CompliancePolicy.objects.count()} policies.")
+print(
+    f"Summary: {ComplianceCheck.objects.count()} checks, "
+    f"{ComplianceTrendSnapshot.objects.count()} trend snapshots, "
+    f"{CompliancePolicy.objects.count()} policies."
+)
