@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Certificate type: server, client or mTLS** ([#168](https://github.com/ctrl-alt-automate/netbox-ssl/issues/168)):
+  a new `certificate_type` field records a certificate's role in the TLS
+  handshake, so client and mutual-TLS certificates are no longer indistinguishable
+  from server certificates in the inventory. The value is **derived from the
+  X.509 Extended Key Usage extension on import** — `serverAuth` alone gives
+  `server`, `clientAuth` alone gives `client`, both give `mtls`, and a
+  certificate with no EKU extension defaults to `server` — and can be overridden
+  by an operator. Exposed on the detail page, the list table, the filters, the
+  REST API and GraphQL. Additive migration 0027; existing certificates take the
+  `server` default, matching how the plugin has treated them until now.
+
 - **NetBox 4.7 support**: `max_version` raised to `4.7.99` and a NetBox 4.7 lane
   added to the CI integration matrix, which now covers 4.4, 4.5, 4.6 and 4.7.
   NetBox 4.7 (released 2026-09-02) carries a large set of breaking changes —

@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 
 class CertFactory:
@@ -37,6 +37,7 @@ class CertFactory:
         key_size: int = 2048,
         issuer_cn: str = "Test CA",
         issuer_o: str = "Test Organization",
+        extended_key_usage: list[str] | None = None,
     ) -> str:
         """Generate a self-signed certificate and return PEM string.
 
@@ -48,6 +49,8 @@ class CertFactory:
             key_size: RSA key size in bits.
             issuer_cn: Common Name for the issuer.
             issuer_o: Organization for the issuer.
+            extended_key_usage: EKU purposes to add, any of "server" and
+                "client". None omits the extension entirely.
 
         Returns:
             PEM-encoded certificate as a string.
@@ -92,7 +95,7 @@ class CertFactory:
         san_names = [x509.DNSName(name) for name in sans]
 
         # Build certificate
-        cert = (
+        builder = (
             x509.CertificateBuilder()
             .subject_name(subject)
             .issuer_name(issuer)
@@ -102,8 +105,19 @@ class CertFactory:
             .not_valid_after(not_after)
             .add_extension(x509.SubjectAlternativeName(san_names), critical=False)
             .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
-            .sign(key, hashes.SHA256())
         )
+
+        if extended_key_usage is not None:
+            oids = {
+                "server": ExtendedKeyUsageOID.SERVER_AUTH,
+                "client": ExtendedKeyUsageOID.CLIENT_AUTH,
+            }
+            builder = builder.add_extension(
+                x509.ExtendedKeyUsage([oids[purpose] for purpose in extended_key_usage]),
+                critical=False,
+            )
+
+        cert = builder.sign(key, hashes.SHA256())
 
         return cert.public_bytes(serialization.Encoding.PEM).decode("ascii")
 

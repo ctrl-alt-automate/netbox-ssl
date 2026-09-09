@@ -37,6 +37,9 @@ class CertificateTable(NetBoxTable):
         orderable=False,
     )
     algorithm = columns.ChoiceFieldColumn()
+    certificate_type = columns.ChoiceFieldColumn(
+        verbose_name="Type",
+    )
     key_size = tables.Column(
         verbose_name="Key Size",
     )
@@ -74,6 +77,7 @@ class CertificateTable(NetBoxTable):
             "valid_to",
             "days_remaining",
             "algorithm",
+            "certificate_type",
             "key_size",
             "tenant",
             "assignment_count",
@@ -89,6 +93,7 @@ class CertificateTable(NetBoxTable):
             "valid_to",
             "days_remaining",
             "algorithm",
+            "certificate_type",
             "tenant",
         )
 
