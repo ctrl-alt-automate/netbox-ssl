@@ -16,14 +16,14 @@ All API requests require authentication via NetBox API tokens.
 
 ```bash
 curl -H "Authorization: Token YOUR_API_TOKEN" \
-     http://localhost:8000/api/plugins/netbox-ssl/certificates/
+     http://localhost:8000/api/plugins/ssl/certificates/
 ```
 
 ---
 
 ## REST API
 
-Base URL: `/api/plugins/netbox-ssl/`
+Base URL: `/api/plugins/ssl/`
 
 ### Certificates
 
@@ -134,19 +134,19 @@ Base URL: `/api/plugins/netbox-ssl/`
 ```bash
 # List active certificates
 curl -H "Authorization: Token $TOKEN" \
-     "http://localhost:8000/api/plugins/netbox-ssl/certificates/?status=active"
+     "http://localhost:8000/api/plugins/ssl/certificates/?status=active"
 
 # Certificates expiring in next 30 days
 curl -H "Authorization: Token $TOKEN" \
-     "http://localhost:8000/api/plugins/netbox-ssl/certificates/?valid_to__lt=$(date -d '+30 days' +%Y-%m-%d)"
+     "http://localhost:8000/api/plugins/ssl/certificates/?valid_to__lt=$(date -d '+30 days' +%Y-%m-%d)"
 
 # Filter by tenant
 curl -H "Authorization: Token $TOKEN" \
-     "http://localhost:8000/api/plugins/netbox-ssl/certificates/?tenant_id=1"
+     "http://localhost:8000/api/plugins/ssl/certificates/?tenant_id=1"
 
 # Search by common name
 curl -H "Authorization: Token $TOKEN" \
-     "http://localhost:8000/api/plugins/netbox-ssl/certificates/?common_name__ic=example"
+     "http://localhost:8000/api/plugins/ssl/certificates/?common_name__ic=example"
 ```
 
 ---
@@ -171,7 +171,7 @@ curl -X POST \
        "status": "active",
        "sans": ["api.example.com", "*.api.example.com"]
      }' \
-     http://localhost:8000/api/plugins/netbox-ssl/certificates/
+     http://localhost:8000/api/plugins/ssl/certificates/
 ```
 
 ### Create an Assignment
@@ -187,7 +187,7 @@ curl -X POST \
        "is_primary": true,
        "notes": "Production HTTPS endpoint"
      }' \
-     http://localhost:8000/api/plugins/netbox-ssl/assignments/
+     http://localhost:8000/api/plugins/ssl/assignments/
 ```
 
 ### Import a CSR
@@ -202,7 +202,7 @@ curl -X POST \
        "target_ca": "DigiCert",
        "tenant": 1
      }' \
-     http://localhost:8000/api/plugins/netbox-ssl/csrs/import/
+     http://localhost:8000/api/plugins/ssl/csrs/import/
 ```
 
 ---
@@ -213,7 +213,7 @@ Import multiple certificates in a single request for efficient migrations and au
 
 ### Endpoint
 
-`POST /api/plugins/netbox-ssl/certificates/bulk-import/`
+`POST /api/plugins/ssl/certificates/bulk-import/`
 
 ### Features
 
@@ -266,7 +266,7 @@ curl -X POST \
          "private_key_location": "Vault: /secret/prod/web2"
        }
      ]' \
-     http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-import/
+     http://localhost:8000/api/plugins/ssl/certificates/bulk-import/
 ```
 
 ### Success Response (201 Created)
@@ -333,7 +333,7 @@ for cert_file in cert_files:
 
 # Bulk import (batch of 100 max)
 response = requests.post(
-    "http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-import/",
+    "http://localhost:8000/api/plugins/ssl/certificates/bulk-import/",
     headers={"Authorization": "Token YOUR_TOKEN"},
     json=certificates[:100]
 )
@@ -353,7 +353,7 @@ Import certificate metadata from CSV or JSON content via the API. Unlike `bulk-i
 
 ### Endpoint
 
-`POST /api/plugins/netbox-ssl/certificates/bulk-data-import/`
+`POST /api/plugins/ssl/certificates/bulk-data-import/`
 
 ### Request Format
 
@@ -390,7 +390,7 @@ curl -X POST \
        "content": "[{\"common_name\":\"example.com\",\"serial_number\":\"01:23:45:67:89\",\"issuer\":\"CN=DigiCert CA\",\"valid_from\":\"2024-01-01\",\"valid_to\":\"2025-01-01\",\"fingerprint_sha256\":\"AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99\",\"algorithm\":\"rsa\",\"key_size\":2048}]",
        "on_duplicate": "skip"
      }' \
-     http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-data-import/
+     http://localhost:8000/api/plugins/ssl/certificates/bulk-data-import/
 ```
 
 ### Example Request (CSV)
@@ -403,7 +403,7 @@ curl -X POST \
        "format": "csv",
        "content": "common_name,serial_number,issuer,valid_from,valid_to,fingerprint_sha256,algorithm,key_size\nexample.com,01:23:45:67:89,CN=DigiCert CA,2024-01-01,2025-01-01,AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99,rsa,2048"
      }' \
-     http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-data-import/
+     http://localhost:8000/api/plugins/ssl/certificates/bulk-data-import/
 ```
 
 ### Success Response (201 Created)
@@ -448,7 +448,7 @@ from pathlib import Path
 csv_content = Path("certificates.csv").read_text()
 
 response = requests.post(
-    "http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-data-import/",
+    "http://localhost:8000/api/plugins/ssl/certificates/bulk-data-import/",
     headers={"Authorization": "Token YOUR_TOKEN"},
     json={
         "format": "csv",
@@ -472,7 +472,7 @@ Validate certificate chains to ensure they are complete and properly signed.
 
 ### Single Certificate Validation
 
-`POST /api/plugins/netbox-ssl/certificates/{id}/validate-chain/`
+`POST /api/plugins/ssl/certificates/{id}/validate-chain/`
 
 Validates the chain for a specific certificate and updates its chain status fields.
 
@@ -481,7 +481,7 @@ Validates the chain for a specific certificate and updates its chain status fiel
 ```bash
 curl -X POST \
      -H "Authorization: Token $TOKEN" \
-     http://localhost:8000/api/plugins/netbox-ssl/certificates/1/validate-chain/
+     http://localhost:8000/api/plugins/ssl/certificates/1/validate-chain/
 ```
 
 ### Response
@@ -522,7 +522,7 @@ curl -X POST \
 
 ### Bulk Chain Validation
 
-`POST /api/plugins/netbox-ssl/certificates/bulk-validate-chain/`
+`POST /api/plugins/ssl/certificates/bulk-validate-chain/`
 
 Validates chains for multiple certificates in a single request.
 
@@ -541,7 +541,7 @@ Export certificates in multiple formats for integration, reporting, and backup p
 
 ### Bulk Export Endpoint
 
-`GET/POST /api/plugins/netbox-ssl/certificates/export/`
+`GET/POST /api/plugins/ssl/certificates/export/`
 
 #### Parameters
 
@@ -578,7 +578,7 @@ PLUGINS_CONFIG = {
 ```bash
 # Export all active certificates as CSV
 curl -H "Authorization: Token $TOKEN" \
-     "http://localhost:8000/api/plugins/netbox-ssl/certificates/export/?format=csv&status=active"
+     "http://localhost:8000/api/plugins/ssl/certificates/export/?format=csv&status=active"
 ```
 
 Response (file download):
@@ -595,7 +595,7 @@ curl -X POST \
      -H "Authorization: Token $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"format": "json", "ids": [1, 2, 3], "include_pem": true}' \
-     http://localhost:8000/api/plugins/netbox-ssl/certificates/export/
+     http://localhost:8000/api/plugins/ssl/certificates/export/
 ```
 
 Response:
@@ -625,7 +625,7 @@ Response:
 ```bash
 # Export certificates as PEM bundle with chain
 curl -H "Authorization: Token $TOKEN" \
-     "http://localhost:8000/api/plugins/netbox-ssl/certificates/export/?format=pem&include_chain=true"
+     "http://localhost:8000/api/plugins/ssl/certificates/export/?format=pem&include_chain=true"
 ```
 
 Response:
@@ -649,19 +649,19 @@ MIIE...
 ```bash
 # Export only specific fields
 curl -H "Authorization: Token $TOKEN" \
-     "http://localhost:8000/api/plugins/netbox-ssl/certificates/export/?format=json&fields=id&fields=common_name&fields=valid_to&fields=days_remaining"
+     "http://localhost:8000/api/plugins/ssl/certificates/export/?format=json&fields=id&fields=common_name&fields=valid_to&fields=days_remaining"
 ```
 
 ### Single Certificate Export
 
-`GET /api/plugins/netbox-ssl/certificates/{id}/export/`
+`GET /api/plugins/ssl/certificates/{id}/export/`
 
 Export a single certificate with the certificate's common name as the filename.
 
 ```bash
 # Export single certificate as PEM
 curl -H "Authorization: Token $TOKEN" \
-     "http://localhost:8000/api/plugins/netbox-ssl/certificates/1/export/?format=pem"
+     "http://localhost:8000/api/plugins/ssl/certificates/1/export/?format=pem"
 
 # Response headers include:
 # Content-Disposition: attachment; filename="example.com.pem"
@@ -674,7 +674,7 @@ import requests
 
 # Export expiring certificates
 response = requests.get(
-    "http://localhost:8000/api/plugins/netbox-ssl/certificates/export/",
+    "http://localhost:8000/api/plugins/ssl/certificates/export/",
     headers={"Authorization": "Token YOUR_TOKEN"},
     params={
         "format": "json",
@@ -691,7 +691,7 @@ if response.status_code == 200:
 
 # Save PEM bundle to file
 response = requests.get(
-    "http://localhost:8000/api/plugins/netbox-ssl/certificates/export/",
+    "http://localhost:8000/api/plugins/ssl/certificates/export/",
     headers={"Authorization": "Token YOUR_TOKEN"},
     params={"format": "pem", "tenant_id": 1}
 )
@@ -708,7 +708,7 @@ Run compliance checks on certificates against defined policies to ensure they me
 
 ### Single Certificate Compliance Check
 
-`POST /api/plugins/netbox-ssl/certificates/{id}/compliance-check/`
+`POST /api/plugins/ssl/certificates/{id}/compliance-check/`
 
 Run all enabled compliance policies against a single certificate.
 
@@ -720,7 +720,7 @@ Automatically detect if certificates were issued via ACME protocol (Let's Encryp
 
 ### Single Certificate Detection
 
-`POST /api/plugins/netbox-ssl/certificates/{id}/detect-acme/`
+`POST /api/plugins/ssl/certificates/{id}/detect-acme/`
 
 Analyzes a single certificate's issuer and updates `is_acme` and `acme_provider` fields based on known ACME CA patterns.
 
@@ -729,7 +729,7 @@ Analyzes a single certificate's issuer and updates `is_acme` and `acme_provider`
 ```bash
 curl -X POST \
      -H "Authorization: Token $TOKEN" \
-     http://localhost:8000/api/plugins/netbox-ssl/certificates/1/detect-acme/
+     http://localhost:8000/api/plugins/ssl/certificates/1/detect-acme/
 ```
 
 #### Success Response (ACME Detected)
@@ -760,7 +760,7 @@ curl -X POST \
 
 ### Bulk ACME Detection
 
-`POST /api/plugins/netbox-ssl/certificates/bulk-detect-acme/`
+`POST /api/plugins/ssl/certificates/bulk-detect-acme/`
 
 Process multiple certificates for ACME detection in a single request.
 
@@ -779,7 +779,7 @@ curl -X POST \
      -H "Authorization: Token $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"ids": [1, 2, 3, 4, 5]}' \
-     http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-validate-chain/
+     http://localhost:8000/api/plugins/ssl/certificates/bulk-validate-chain/
 ```
 
 ### Response
@@ -825,7 +825,7 @@ curl -X POST \
      -H "Authorization: Token $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{}' \
-     http://localhost:8000/api/plugins/netbox-ssl/certificates/1/compliance-check/
+     http://localhost:8000/api/plugins/ssl/certificates/1/compliance-check/
 ```
 
 #### With Specific Policies
@@ -835,7 +835,7 @@ curl -X POST \
      -H "Authorization: Token $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"policy_ids": [1, 2, 3]}' \
-     http://localhost:8000/api/plugins/netbox-ssl/certificates/1/compliance-check/
+     http://localhost:8000/api/plugins/ssl/certificates/1/compliance-check/
 ```
 
 #### Success Response
@@ -876,7 +876,7 @@ curl -X POST \
      -H "Authorization: Token $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"ids": [1, 2, 3, 4, 5]}' \
-     http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-detect-acme/
+     http://localhost:8000/api/plugins/ssl/certificates/bulk-detect-acme/
 ```
 
 #### Success Response
@@ -925,7 +925,7 @@ curl -X POST \
 
 ### Bulk Compliance Check
 
-`POST /api/plugins/netbox-ssl/certificates/bulk-compliance-check/`
+`POST /api/plugins/ssl/certificates/bulk-compliance-check/`
 
 Run compliance checks on multiple certificates.
 
@@ -939,7 +939,7 @@ curl -X POST \
        "certificate_ids": [1, 2, 3, 4, 5],
        "policy_ids": [1, 2]
      }' \
-     http://localhost:8000/api/plugins/netbox-ssl/certificates/bulk-compliance-check/
+     http://localhost:8000/api/plugins/ssl/certificates/bulk-compliance-check/
 ```
 
 #### Success Response
@@ -975,7 +975,7 @@ curl -X POST \
 
 ### Creating Compliance Policies
 
-`POST /api/plugins/netbox-ssl/compliance-policies/`
+`POST /api/plugins/ssl/compliance-policies/`
 
 #### Policy Examples
 
@@ -992,7 +992,7 @@ curl -X POST \
        "enabled": true,
        "parameters": {"min_bits": 2048}
      }' \
-     http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/
+     http://localhost:8000/api/plugins/ssl/compliance-policies/
 
 # Expiry warning policy
 curl -X POST \
@@ -1006,7 +1006,7 @@ curl -X POST \
        "enabled": true,
        "parameters": {"warning_days": 30}
      }' \
-     http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/
+     http://localhost:8000/api/plugins/ssl/compliance-policies/
 
 # Forbidden algorithm policy
 curl -X POST \
@@ -1020,7 +1020,7 @@ curl -X POST \
        "enabled": true,
        "parameters": {"algorithms": ["dsa"]}
      }' \
-     http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/
+     http://localhost:8000/api/plugins/ssl/compliance-policies/
 
 # Wildcard forbidden policy
 curl -X POST \
@@ -1034,7 +1034,7 @@ curl -X POST \
        "enabled": true,
        "parameters": {}
      }' \
-     http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/
+     http://localhost:8000/api/plugins/ssl/compliance-policies/
 ```
 
 ### Compliance Filters
@@ -1042,15 +1042,15 @@ curl -X POST \
 ```bash
 # List all compliance checks that failed
 curl -H "Authorization: Token $TOKEN" \
-     "http://localhost:8000/api/plugins/netbox-ssl/compliance-checks/?result=fail"
+     "http://localhost:8000/api/plugins/ssl/compliance-checks/?result=fail"
 
 # List critical severity policy violations
 curl -H "Authorization: Token $TOKEN" \
-     "http://localhost:8000/api/plugins/netbox-ssl/compliance-checks/?severity=critical&result=fail"
+     "http://localhost:8000/api/plugins/ssl/compliance-checks/?severity=critical&result=fail"
 
 # List all enabled policies
 curl -H "Authorization: Token $TOKEN" \
-     "http://localhost:8000/api/plugins/netbox-ssl/compliance-policies/?enabled=true"
+     "http://localhost:8000/api/plugins/ssl/compliance-policies/?enabled=true"
 ```
 
 ### Supported ACME Providers
@@ -1074,15 +1074,15 @@ Filter certificates by ACME status:
 ```bash
 # List all ACME certificates
 curl -H "Authorization: Token $TOKEN" \
-     "http://localhost:8000/api/plugins/netbox-ssl/certificates/?is_acme=true"
+     "http://localhost:8000/api/plugins/ssl/certificates/?is_acme=true"
 
 # Filter by ACME provider
 curl -H "Authorization: Token $TOKEN" \
-     "http://localhost:8000/api/plugins/netbox-ssl/certificates/?acme_provider=letsencrypt"
+     "http://localhost:8000/api/plugins/ssl/certificates/?acme_provider=letsencrypt"
 
 # Certificates due for renewal
 curl -H "Authorization: Token $TOKEN" \
-     "http://localhost:8000/api/plugins/netbox-ssl/certificates/?is_acme=true&acme_auto_renewal=true"
+     "http://localhost:8000/api/plugins/ssl/certificates/?is_acme=true&acme_auto_renewal=true"
 ```
 
 ---
