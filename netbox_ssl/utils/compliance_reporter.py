@@ -57,6 +57,11 @@ class ComplianceReporter:
         # Breakdown by severity
         severity_breakdown = list(
             checks_qs.filter(result="fail")
+            # Shadows ComplianceCheck.severity (a @property), which is safe only
+            # because .values() follows: no model instances are hydrated, so
+            # Django never setattr()s onto the property. Do NOT reuse this shape
+            # in a query that returns model instances -- that raises
+            # "property has no setter" and 500s the endpoint (see #167).
             .annotate(severity=F("policy__severity"))
             .values("severity")
             .annotate(count=Count("id"))
