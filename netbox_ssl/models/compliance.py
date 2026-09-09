@@ -140,7 +140,7 @@ class CompliancePolicy(NetBoxModel):
         ordering = ["name"]
         verbose_name_plural = "compliance policies"
         permissions = [
-            ("manage_compliance", "Can run compliance checks and manage policies"),
+            ("manage_compliancepolicy", "Can run compliance checks and manage policies"),
         ]
 
     def __str__(self):

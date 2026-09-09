@@ -133,7 +133,7 @@ The automated checks on PR are:
 - Ruff (lint + format)
 - Unit tests on Python 3.10, 3.11, 3.12
 - Package check (wheel inclusion)
-- Integration tests on NetBox 4.4, 4.5, and 4.6
+- Integration tests on NetBox 4.4, 4.5, 4.6, and 4.7
 - MkDocs strict build (on docs-touching PRs)
 - Gemini code review (automatic, informational)
 

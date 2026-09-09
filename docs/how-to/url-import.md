@@ -16,7 +16,7 @@ private key. For importing certificates you already hold as PEM/CSV, use
 
 ## Prerequisites
 
-- The **Can run URL certificate import** permission (`netbox_ssl.run_urlimport`).
+- The **Can run URL certificate import** permission (`netbox_ssl.urlimport_certificate`).
   Grant it under **Admin → Permissions**; it is off by default, even for users who
   can otherwise add certificates.
 - Network reachability from the NetBox host to each target `host:port`.

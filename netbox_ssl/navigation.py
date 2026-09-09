@@ -36,7 +36,7 @@ menu = PluginMenu(
                 PluginMenuItem(
                     link="plugins:netbox_ssl:certificate_url_import",
                     link_text="Import from URLs (CSV)",
-                    permissions=["netbox_ssl.run_urlimport"],
+                    permissions=["netbox_ssl.urlimport_certificate"],
                 ),
                 PluginMenuItem(
                     link="plugins:netbox_ssl:certificateassignment_list",
