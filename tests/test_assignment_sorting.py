@@ -45,6 +45,20 @@ class TestSortingIsWiredUp:
         assert 'assigned_object_type__model="device"' in model_source
         assert "ContentType.objects.filter(model__in=" not in model_source
 
+    def test_custom_manager_preserves_restrict(self):
+        """Overriding `objects` must not drop NetBox's object-permission filtering.
+
+        NetBox's BaseModel sets ``objects = RestrictedQuerySet.as_manager()``.
+        A custom manager built on a plain ``models.QuerySet`` silently removes
+        ``.restrict(user, action)``, which every view and API endpoint uses to
+        enforce object permissions -- a security regression with no error.
+        """
+        model_source = _read("models/assignments.py")
+        assert "class CertificateAssignmentQuerySet(RestrictedQuerySet):" in model_source, (
+            "the assignment queryset must subclass RestrictedQuerySet, or .restrict() is lost"
+        )
+        assert "class CertificateAssignmentQuerySet(models.QuerySet):" not in model_source
+
     def test_filterset_searches_the_assigned_object(self):
         filterset = _read("filtersets/assignments.py")
         assert "assigned_object_name__icontains" in filterset

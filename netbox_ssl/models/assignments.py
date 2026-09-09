@@ -13,12 +13,20 @@ from django.db import models
 from django.db.models import Case, OuterRef, Subquery, When
 from django.urls import reverse
 from netbox.models import NetBoxModel
+from utilities.querysets import RestrictedQuerySet
 
 logger = logging.getLogger("netbox_ssl.models")
 
 
-class CertificateAssignmentQuerySet(models.QuerySet):
-    """QuerySet adding a sortable/searchable name for the assigned object."""
+class CertificateAssignmentQuerySet(RestrictedQuerySet):
+    """QuerySet adding a sortable/searchable name for the assigned object.
+
+    Subclasses ``RestrictedQuerySet`` rather than ``models.QuerySet``: NetBox's
+    ``BaseModel`` sets ``objects = RestrictedQuerySet.as_manager()``, so
+    overriding the manager with a plain QuerySet would silently drop
+    ``.restrict(user, action)`` -- the mechanism every view and API endpoint
+    relies on to enforce object permissions.
+    """
 
     def with_assigned_object_name(self):
         """Annotate ``assigned_object_name`` with the target's ``name``.
