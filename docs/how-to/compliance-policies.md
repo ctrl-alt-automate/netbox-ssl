@@ -32,7 +32,7 @@ Example: "No RSA keys below 2048 bits"
 
 - **Name:** `RSA min key size 2048`
 - **Policy type:** `Minimum key size`
-- **Severity:** `Error` (Error, Warning, or Info)
+- **Severity:** `Critical` (Critical, Warning, or Info)
 - **Enabled:** ✓
 - **Parameters:** `{"min_bits": 2048}`
 
@@ -54,7 +54,7 @@ Save. The policy is now part of your compliance ruleset.
     curl -X POST "$NETBOX/api/plugins/ssl/compliance-policies/" \\
       -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \\
       -d '{"name": "RSA min key size 2048", "policy_type": "min_key_size",
-           "severity": "error", "enabled": true, "parameters": {"min_bits": 2048}}'
+           "severity": "critical", "enabled": true, "parameters": {"min_bits": 2048}}'
     ```
 
 ## Step 2 — Scope with tags (v0.9+)

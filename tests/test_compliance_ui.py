@@ -112,7 +112,7 @@ class TestCompliancePolicyForm:
             data={
                 "name": "RSA min key size 2048",
                 "policy_type": "min_key_size",
-                "severity": "error",
+                "severity": "critical",
                 "enabled": True,
                 "parameters": '{"min_bits": 2048}',
             }
@@ -143,10 +143,58 @@ class TestCompliancePolicyForm:
             data={
                 "name": "Bad params",
                 "policy_type": "min_key_size",
-                "severity": "error",
+                "severity": "critical",
                 "enabled": True,
                 "parameters": "[2048]",
             }
         )
         assert not form.is_valid()
         assert "parameters" in form.errors
+
+
+@pytest.mark.unit
+class TestDocumentedChoicesExist:
+    """The how-to must only name choice values the ChoiceSets actually define.
+
+    The guide told readers to set a severity of ``Error``; the choices are
+    Critical, Warning and Info, so the documented value was unusable and the
+    API example it showed would have been rejected. Same class of drift as the
+    documented API URLs in #165 -- prose that nothing verifies against the code.
+    """
+
+    def _choice_values(self, class_name: str) -> set[str]:
+        import ast
+
+        tree = ast.parse(_read("models/compliance.py"))
+        for cls in tree.body:
+            if isinstance(cls, ast.ClassDef) and cls.name == class_name:
+                return {
+                    node.value
+                    for stmt in cls.body
+                    if isinstance(stmt, ast.Assign)
+                    for node in ast.walk(stmt)
+                    if isinstance(node, ast.Constant) and isinstance(node.value, str)
+                }
+        raise AssertionError(f"{class_name} not found in models/compliance.py")
+
+    def _how_to(self) -> str:
+        docs = get_plugin_source_dir().parent / "docs" / "how-to" / "compliance-policies.md"
+        if not docs.is_file():
+            pytest.skip("docs/ not available (in-container runs copy only tests/)")
+        return docs.read_text()
+
+    def test_documented_severity_values_exist(self):
+        import re
+
+        valid = self._choice_values("ComplianceSeverityChoices")
+        used = set(re.findall(r'"severity":\s*"([a-z_]+)"', self._how_to()))
+        unknown = sorted(used - valid)
+        assert not unknown, f"how-to names severity values that do not exist: {unknown} (valid: {sorted(valid)})"
+
+    def test_documented_policy_types_exist(self):
+        import re
+
+        valid = self._choice_values("CompliancePolicyTypeChoices")
+        used = set(re.findall(r'"policy_type":\s*"([a-z_]+)"', self._how_to()))
+        unknown = sorted(used - valid)
+        assert not unknown, f"how-to names policy types that do not exist: {unknown}"
