@@ -10,8 +10,8 @@ second:
   - **CHANGELOG** missing a dated ``## [X.Y.Z] - YYYY-MM-DD`` section for the
     release you are about to cut
   - **NetBox support matrix** stale across the PluginConfig ``min_version`` /
-    ``max_version``, the README badge + table, and ``COMPATIBILITY.md``
-    (a stale README badge shipped in v1.2.x)
+    ``max_version``, the README and docs/index.md badges, and
+    ``COMPATIBILITY.md`` (stale badges shipped in v1.2.x and v1.3.0)
   - **publish gate budget** — the ``verify-ci`` poll loop in ``publish.yml`` must
     outlast the integration matrix, or the tag-push Publish run times out before
     CI goes green (#141 / #142)
@@ -88,14 +88,14 @@ def supported_netbox_minors(init_text: str) -> set[str]:
     return {f"{major}.{minor}" for minor in range(lo_minor, hi_minor + 1)}
 
 
-def badge_netbox_minors(readme_text: str) -> set[str]:
-    """Extract the NetBox minors from the README shields.io badge.
+def badge_netbox_minors(text: str) -> set[str]:
+    """Extract the NetBox minors from a shields.io NetBox badge.
 
     The badge label is URL-encoded (``4.4%20%7C%204.5`` = ``4.4 | 4.5``). A
     whole-document version scan would miss a stale badge when the table below it
     is current, so this parser is intentionally badge-specific.
     """
-    match = re.search(r"badge/NetBox-(.+?)-[a-z]+\.svg", readme_text)
+    match = re.search(r"badge/NetBox-(.+?)-[a-z]+\.svg", text)
     if not match:
         return set()
     decoded = urllib.parse.unquote(match.group(1))
@@ -155,13 +155,26 @@ def check_changelog_has_release(target: str, changelog_text: str) -> CheckResult
     return CheckResult("changelog release section", passed, detail)
 
 
-def check_netbox_support_matrix(init_text: str, readme_text: str, compatibility_text: str) -> CheckResult:
+def check_netbox_support_matrix(
+    init_text: str,
+    readme_text: str,
+    compatibility_text: str,
+    docs_index_text: str = "",
+) -> CheckResult:
     expected = supported_netbox_minors(init_text)
     problems: list[str] = []
 
-    badge = badge_netbox_minors(readme_text)
-    if badge != expected:
-        problems.append(f"README badge advertises {sorted(badge)} but PluginConfig supports {sorted(expected)}")
+    # Every page carrying a NetBox badge must advertise the same range. v1.3.0
+    # shipped with a stale badge in docs/index.md because only README was
+    # checked here -- it was caught by hand during the release rehearsal.
+    badged = [("README.md", readme_text)]
+    if docs_index_text:
+        badged.append(("docs/index.md", docs_index_text))
+
+    for label, text in badged:
+        badge = badge_netbox_minors(text)
+        if badge != expected:
+            problems.append(f"{label} badge advertises {sorted(badge)} but PluginConfig supports {sorted(expected)}")
 
     missing_readme = expected - netbox_minors_mentioned(readme_text)
     if missing_readme:
@@ -173,7 +186,8 @@ def check_netbox_support_matrix(init_text: str, readme_text: str, compatibility_
 
     passed = not problems
     if passed:
-        detail = f"NetBox {sorted(expected)} consistent across PluginConfig, README, and COMPATIBILITY.md"
+        sources = "PluginConfig, README" + (", docs/index.md" if docs_index_text else "") + ", and COMPATIBILITY.md"
+        detail = f"NetBox {sorted(expected)} consistent across {sources}"
     else:
         detail = "; ".join(problems)
     return CheckResult("netbox support matrix", passed, detail)
@@ -229,13 +243,14 @@ def run_all_checks(repo_root: Path | str, target_version: str) -> list[CheckResu
     changelog = read("CHANGELOG.md")
     readme = read("README.md")
     compatibility = read("COMPATIBILITY.md")
+    docs_index = read("docs", "index.md")
     publish = read(".github", "workflows", "publish.yml")
     docs = read(".github", "workflows", "docs.yml")
 
     return [
         check_version_consistency(target_version, pyproject, init),
         check_changelog_has_release(target_version, changelog),
-        check_netbox_support_matrix(init, readme, compatibility),
+        check_netbox_support_matrix(init, readme, compatibility, docs_index),
         check_publish_gate_budget(publish),
         check_docs_serialization_guard(docs),
     ]

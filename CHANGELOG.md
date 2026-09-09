@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **NetBox 4.7 support**: `max_version` raised to `4.7.99` and a NetBox 4.7 lane
+  added to the CI integration matrix, which now covers 4.4, 4.5, 4.6 and 4.7.
+  NetBox 4.7 (released 2026-09-02) carries a large set of breaking changes —
+  `ipam.Service.protocol`/`.ports` replaced by `port_mappings`, the `EMAIL_*`
+  settings superseded by `MAILERS`, django-tables2 v3.0 dropping
+  `RelatedLinkColumn` and renaming the `querystring` tag, `registry['models']`
+  removed, django-mptt replaced by `ltree` — **none of which the plugin
+  depends on**; see the audit table in `COMPATIBILITY.md`. NetBox 4.7 enters as
+  **Supported**; 4.6 remains **Primary** until 4.7 has carried a release.
+
+### Changed
+
+- The CI integration matrix no longer enumerates the NetBox versions that use
+  the v2 API token scheme (`== v4.5 || == v4.6`) but excludes the one that does
+  not (`!= v4.4`), so a newly added version is covered by default instead of
+  silently falling into the legacy-token branch.
+- `scripts/release_preflight.py` now validates the NetBox badge in
+  `docs/index.md` as well as the one in `README.md`. v1.3.0 shipped with a stale
+  badge there that only the manual release rehearsal caught, because the
+  preflight checked README alone.
 ### Fixed
 
 - **Monitored endpoints never got polled** ([#163](https://github.com/ctrl-alt-automate/netbox-ssl/issues/163)):

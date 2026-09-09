@@ -6,6 +6,10 @@ This document tracks compatibility between NetBox SSL plugin versions and NetBox
 
 | Plugin Version | NetBox Version | Python Version | Status |
 |:--------------:|:--------------:|:--------------:|:------:|
+| 1.4.x          | 4.7.x          | 3.10 - 3.12   | Supported |
+| 1.4.x          | 4.6.x          | 3.10 - 3.12   | Primary |
+| 1.4.x          | 4.5.x          | 3.10 - 3.12   | Supported |
+| 1.4.x          | 4.4.x          | 3.10 - 3.12   | Supported |
 | 1.3.x          | 4.6.x          | 3.10 - 3.12   | Primary |
 | 1.3.x          | 4.5.x          | 3.10 - 3.12   | Supported |
 | 1.3.x          | 4.4.x          | 3.10 - 3.12   | Supported |
@@ -35,6 +39,24 @@ This document tracks compatibility between NetBox SSL plugin versions and NetBox
 - **Primary**: Actively developed and tested in CI
 - **Supported**: Tested in CI, receives bug fixes
 - **End of Life**: No longer tested or maintained
+
+A newly released NetBox minor enters as **Supported** — covered by the full CI
+integration matrix — and is promoted to **Primary** once it has carried a plugin
+release. NetBox 4.7 was released 2026-09-02 and is Supported as of plugin 1.4.
+
+### NetBox 4.7 notes
+
+NetBox 4.7 carries a large set of breaking changes, none of which the plugin
+depends on:
+
+| 4.7 change | Impact on netbox-ssl |
+|------------|----------------------|
+| `ipam.Service.protocol` / `.ports` replaced by `port_mappings` | None — the plugin references `Service` only as an assignment target and never reads its port fields |
+| `EMAIL_*` settings superseded by `MAILERS`; `get_connection()` with an explicit backend raises `RuntimeError` | None — expiry mail uses `EmailMultiAlternatives(...).send()` with no explicit backend |
+| django-tables2 v3.0 drops `RelatedLinkColumn` and renames the `querystring` tag | None — neither is used |
+| `registry['models']` and `registry['denormalized_fields']` removed | None — the plugin's `registry` is its own adapter dict |
+| django-mptt replaced by `ltree`; `NestedGroupModel` deprecated | None — no hierarchical models |
+| PostgreSQL 15+ and Redis 6+ now required | Infrastructure only; the bundled compose stack already runs PostgreSQL 18 and Valkey 9 |
 
 Each plugin release is tested against all supported NetBox versions via GitHub Actions CI.
 
