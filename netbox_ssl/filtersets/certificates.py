@@ -13,6 +13,7 @@ from ..models import (
     CertificateAlgorithmChoices,
     CertificateAuthority,
     CertificateStatusChoices,
+    CertificateTypeChoices,
     ExternalSource,
 )
 
@@ -39,6 +40,9 @@ class CertificateFilterSet(NetBoxModelFilterSet):
     algorithm = django_filters.MultipleChoiceFilter(
         choices=CertificateAlgorithmChoices,
         label="Algorithm",
+    )
+    certificate_type = django_filters.MultipleChoiceFilter(
+        choices=CertificateTypeChoices,
     )
     key_size = django_filters.NumberFilter(
         label="Key Size",
@@ -138,6 +142,7 @@ class CertificateFilterSet(NetBoxModelFilterSet):
             "issuer",
             "status",
             "algorithm",
+            "certificate_type",
             "key_size",
             "tenant",
         ]

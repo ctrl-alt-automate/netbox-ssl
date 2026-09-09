@@ -10,6 +10,7 @@ from .certificates import (
     Certificate,
     CertificateAlgorithmChoices,
     CertificateStatusChoices,
+    CertificateTypeChoices,
     ChainStatusChoices,
 )
 from .compliance import (
@@ -40,6 +41,7 @@ __all__ = [
     "Certificate",
     "CertificateStatusChoices",
     "CertificateAlgorithmChoices",
+    "CertificateTypeChoices",
     "ChainStatusChoices",
     "ACMEProviderChoices",
     "ACMEChallengeTypeChoices",

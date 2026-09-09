@@ -1231,6 +1231,7 @@ class CertificateViewSet(NetBoxModelViewSet):
                     sans=parsed.sans,
                     key_size=parsed.key_size,
                     algorithm=parsed.algorithm,
+                    certificate_type=parsed.certificate_type,
                     pem_content=parsed.pem_content,
                     issuer_chain=parsed.issuer_chain,
                     status="active",
