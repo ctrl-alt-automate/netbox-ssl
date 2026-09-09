@@ -121,6 +121,29 @@ menu = PluginMenu(
             ),
         ),
         (
+            "Compliance",
+            (
+                PluginMenuItem(
+                    link="plugins:netbox_ssl:compliancepolicy_list",
+                    link_text="Compliance Policies",
+                    permissions=["netbox_ssl.view_compliancepolicy"],
+                    buttons=(
+                        PluginMenuButton(
+                            link="plugins:netbox_ssl:compliancepolicy_add",
+                            title="Add",
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["netbox_ssl.add_compliancepolicy"],
+                        ),
+                    ),
+                ),
+                PluginMenuItem(
+                    link="plugins:netbox_ssl:compliancecheck_list",
+                    link_text="Compliance Checks",
+                    permissions=["netbox_ssl.view_compliancecheck"],
+                ),
+            ),
+        ),
+        (
             "Insights",
             (
                 PluginMenuItem(

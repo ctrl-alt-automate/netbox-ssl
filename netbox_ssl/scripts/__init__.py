@@ -10,6 +10,7 @@ unreachable -- see issue #163. ``tests/test_script_exports.py`` guards this.
 
 from .ari_poll import CertificateARIPoll
 from .auto_archive import CertificateAutoArchive
+from .compliance_check import CertificateComplianceCheck
 from .endpoint_monitor import MonitoredEndpointPoll
 from .expiry_notification import CertificateExpiryNotification
 from .expiry_scan import CertificateExpiryScan
@@ -20,6 +21,7 @@ from .url_scan import CertificateURLScan
 __all__ = [
     "CertificateARIPoll",
     "CertificateAutoArchive",
+    "CertificateComplianceCheck",
     "CertificateExpiryNotification",
     "CertificateExpiryScan",
     "CertificateURLScan",

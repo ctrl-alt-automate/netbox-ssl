@@ -29,6 +29,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removed, django-mptt replaced by `ltree` — **none of which the plugin
   depends on**; see the audit table in `COMPATIBILITY.md`. NetBox 4.7 enters as
   **Supported**; 4.6 remains **Primary** until 4.7 has carried a release.
+- **Compliance Policies and Compliance Checks in the UI** ([#164](https://github.com/ctrl-alt-automate/netbox-ssl/issues/164)):
+  the compliance data model, filtersets and REST API shipped in v0.7, but no
+  forms, tables, views, URLs or menu entries were ever written — so policies
+  could only be created through the API, and both models' `get_absolute_url()`
+  pointed at routes that did not exist (any link to one raised
+  `NoReverseMatch`). Adds a **Compliance** menu section with full CRUD for
+  policies (including a JSON parameters field that documents each policy type's
+  shape and rejects non-object input) and a filterable, read-only results list
+  for checks. A policy's detail page shows the checks it produced and how many
+  certificates currently fail it. No database migration.
+- **`CertificateComplianceCheck` script** ([#164](https://github.com/ctrl-alt-automate/netbox-ssl/issues/164)):
+  the documentation had referenced this script since v0.7, but it was never
+  written — there was no way to evaluate compliance across the fleet on a
+  schedule, only one certificate at a time via the REST API. It evaluates every
+  enabled policy (or a single one), supports tenant filtering and a dry run,
+  skips archived/replaced certificates by default, and upserts one result per
+  certificate/policy pair so re-runs refresh rather than accumulate.
 
 ### Changed
 
@@ -40,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/index.md` as well as the one in `README.md`. v1.3.0 shipped with a stale
   badge there that only the manual release rehearsal caught, because the
   preflight checked README alone.
+
 ### Fixed
 
 - **Monitored endpoints never got polled** ([#163](https://github.com/ctrl-alt-automate/netbox-ssl/issues/163)):
@@ -101,6 +119,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enter for each custom permission. Its absence is why #166 was reported as a
   permission bug: the reporter had ticked `renew_certificate` in a Django role,
   which NetBox never consults.
+- `docs/how-to/compliance-policies.md` corrected: policies live under
+  **Plugins → SSL Certificates → Compliance Policies**, not Admin; the
+  parameters field is documented; the scheduled-run step now notes the
+  `SCRIPTS_ROOT` registration requirement; and a new step covers browsing
+  results. Both v1.4 prerequisites are called out with an API fallback for
+  older releases.
 
 ## [1.3.0] - 2026-06-22
 
