@@ -111,6 +111,7 @@ nav:
       - how-to/acme-auto-renewal.md
       - how-to/compliance-policies.md
       - how-to/external-sources.md
+      - how-to/endpoint-monitoring.md
       - how-to/ari-monitoring.md
       - how-to/aws-acm-sync.md
   - Reference:
