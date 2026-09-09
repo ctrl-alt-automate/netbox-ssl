@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Monitored endpoints never got polled** ([#163](https://github.com/ctrl-alt-automate/netbox-ssl/issues/163)):
+  the `MonitoredEndpointPoll` script shipped in v1.3.0 but was never re-exported
+  from `netbox_ssl.scripts`, so the documented `SCRIPTS_ROOT` wrapper
+  (`from netbox_ssl.scripts import MonitoredEndpointPoll`) failed with
+  `ImportError` and the script could not be registered in NetBox at all. Every
+  monitored endpoint therefore stayed on **Pending** forever, making
+  website-centric monitoring (#149) unusable. The class is now exported, and a
+  new AST guard (`tests/test_script_exports.py`) fails the build if any bundled
+  `Script` subclass is missing from the package's `__all__` or from
+  `docs/reference/scripts.md`.
+- **Renewal reminders quoted stale certificate data** ([#161](https://github.com/ctrl-alt-automate/netbox-ssl/issues/161)):
+  a consequence of #163 — with the poll script unregistrable, a monitored
+  endpoint stayed linked to the certificate it had at creation time, so
+  reminders reported the pre-renewal certificate. Endpoints now follow the live
+  certificate once the poll is scheduled.
+
+### Documentation
+
+- New how-to guide for [website-centric endpoint monitoring](https://ctrl-alt-automate.github.io/netbox-ssl/latest/how-to/endpoint-monitoring/),
+  covering registration, the mandatory `SCRIPTS_ROOT` step, statuses, events,
+  the private-CIDR allowlist, and troubleshooting. The v1.3.0 feature shipped
+  with no how-to documentation at all.
+- `docs/reference/scripts.md` now documents `MonitoredEndpointPoll` and includes
+  it in the wrapper-module example.
+
 ## [1.3.0] - 2026-06-22
 
 ### Added

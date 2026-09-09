@@ -25,6 +25,7 @@ from netbox_ssl.scripts import (
     ExternalSourceSync,
     ScheduledCertificateExport,
     CertificateURLScan,
+    MonitoredEndpointPoll,
 )
 ```
 
@@ -37,6 +38,15 @@ must be readable by the NetBox service user; no restart is required.
     filter field passed a model as a string to `ObjectVar`
     ([#143](https://github.com/ctrl-alt-automate/netbox-ssl/issues/143)). Upgrade
     to **1.2.2+** before registering the scripts.
+
+!!! warning "`MonitoredEndpointPoll` requires v1.3.1 or newer"
+    In v1.3.0 the script module shipped but the class was never re-exported from
+    `netbox_ssl.scripts`, so importing it in the wrapper raised `ImportError` and
+    the whole wrapper failed to load
+    ([#163](https://github.com/ctrl-alt-automate/netbox-ssl/issues/163)). Without
+    it, monitored endpoints stay on **Pending** forever and renewal reminders
+    report stale certificate data
+    ([#161](https://github.com/ctrl-alt-automate/netbox-ssl/issues/161)).
 
 ## Certificate Expiry Notification
 
@@ -90,6 +100,47 @@ You can override the default recipients by entering comma-separated email addres
 > **Prerequisites:** Django's email backend must be configured on the NetBox server. See [Configuration — Email Notifications](./configuration.md#email-notifications).
 
 ---
+
+## Monitored Endpoint Poll
+
+The `MonitoredEndpointPoll` script re-scrapes every **Monitored Endpoint** over a
+TLS handshake and reconciles what it finds with the certificate inventory. This
+is the engine behind website-centric monitoring — without a scheduled run,
+endpoints never leave the **Pending** state.
+
+### Features
+
+- Re-scrapes each endpoint's live certificate over a TLS handshake
+- Links the endpoint to the matching `Certificate`, importing it if it is new
+- Detects certificate rotation and records it in the endpoint's history
+- Marks unreachable endpoints as **Unreachable** and untrusted chains as **Untrusted**
+- Optional tenant filtering and a dry-run mode
+
+### Running the Script
+
+1. Navigate to **Customization > Scripts**
+2. Select **Monitored Endpoint Poll**
+3. Configure options:
+   - **Tenant**: Limit the run to a single tenant (optional)
+   - **Dry run**: Count the endpoints that would be polled without saving anything
+4. Click **Run Script**
+
+### Script Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `tenant` | Tenant | none | Restrict the poll to one tenant |
+| `dry_run` | Boolean | `false` | Log what would happen without writing |
+
+!!! tip "Schedule it"
+    Endpoint data is only as fresh as the last poll. Schedule this script daily
+    (see [Scheduling with NetBox Jobs](#scheduling-with-netbox-jobs)) so renewals
+    are picked up automatically and expiry reminders quote the current
+    certificate.
+
+!!! note "Private addresses are blocked by default"
+    Endpoints resolving to private IP ranges are rejected unless you opt in via
+    `url_import_private_cidr_allowlist` in `PLUGINS_CONFIG`.
 
 ## Scheduling with NetBox Jobs
 
