@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Sort and search assignments by the object they are assigned to** ([#167](https://github.com/ctrl-alt-automate/netbox-ssl/issues/167)):
+  the **Assigned To** column was unsortable and invisible to the search box
+  because `assigned_object` is a GenericForeignKey, which spans three tables and
+  cannot appear in `order_by()` or a filter — making the list unnavigable for a
+  wildcard certificate assigned to dozens of hosts. A new
+  `with_assigned_object_name()` queryset annotation resolves the target's name
+  with a correlated subquery selected by content type, so the column now sorts
+  and the search box matches device, VM and service names, in the UI and via the
+  REST API. No database migration: nothing is denormalised, so the value cannot
+  go stale when an object is renamed.
+
 ### Fixed
 
 - **Monitored endpoints never got polled** ([#163](https://github.com/ctrl-alt-automate/netbox-ssl/issues/163)):
