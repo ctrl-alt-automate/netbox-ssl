@@ -45,7 +45,10 @@ class TestAssignmentTableOrderable:
     The original fix was to mark the column ``orderable=False``.
 
     #167 restored sorting the right way: the column now orders on the
-    ``assigned_object_name`` annotation, a real database expression. The
+    ``_assigned_object_name`` annotation, a real database expression. (The
+    leading underscore keeps it from shadowing the model's own
+    ``assigned_object_name`` property, which Django's row hydration cannot
+    setattr onto.) The
     invariant that actually prevents #86 is therefore not "the column is
     unsortable" but "the GenericForeignKey never reaches order_by()", which is
     what these tests now assert.
@@ -57,8 +60,8 @@ class TestAssignmentTableOrderable:
 
     def test_assigned_object_column_does_not_sort_on_the_gfk(self):
         """The column must sort on the annotation, never on the GFK accessor."""
-        assert 'order_by="assigned_object_name"' in self.source, (
-            "the Assigned To column must order on the assigned_object_name annotation"
+        assert 'order_by="_assigned_object_name"' in self.source, (
+            "the Assigned To column must order on the _assigned_object_name annotation"
         )
         assert 'order_by="assigned_object"' not in self.source, (
             "ordering on the GenericForeignKey itself is what raised FieldError in #86"
