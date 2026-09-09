@@ -16,6 +16,12 @@ _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
+# tests/ on sys.path so cert_factory imports as a top-level module, matching the
+# convention in the other test modules -- a relative import here would load the
+# tests package and trip Django's settings check in the host lane.
+if str(Path(__file__).parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).parent))
+
 # Mock netbox.plugins if not available (skip in Docker with real NetBox)
 try:
     _spec = importlib.util.find_spec("netbox")
@@ -28,6 +34,8 @@ if not _NETBOX_AVAILABLE and "netbox" not in sys.modules:
 
     sys.modules["netbox"] = MagicMock()
     sys.modules["netbox.plugins"] = MagicMock()
+
+from cert_factory import CertFactory  # noqa: E402
 
 from netbox_ssl.utils.parser import (
     CertificateParseError,
@@ -284,3 +292,37 @@ class TestEdgeCases:
         MIIEvgIBADANtest
         -----end private key-----"""
         assert CertificateParser.contains_private_key(lower_case_key) is True
+
+
+@pytest.mark.unit
+class TestCertificateTypeDetection:
+    """Derive the TLS role from Extended Key Usage (#168).
+
+    A certificate that advertises both serverAuth and clientAuth is usable for
+    mutual TLS; one that advertises only clientAuth is a client certificate.
+    Detecting this on import means operators inherit the right value rather than
+    having to classify every certificate by hand.
+    """
+
+    def test_server_auth_only_is_a_server_certificate(self):
+        pem = CertFactory.create(cn="server.example.com", extended_key_usage=["server"])
+        assert CertificateParser.parse(pem).certificate_type == "server"
+
+    def test_client_auth_only_is_a_client_certificate(self):
+        pem = CertFactory.create(cn="client.example.com", extended_key_usage=["client"])
+        assert CertificateParser.parse(pem).certificate_type == "client"
+
+    def test_both_usages_is_mtls(self):
+        pem = CertFactory.create(cn="mtls.example.com", extended_key_usage=["server", "client"])
+        assert CertificateParser.parse(pem).certificate_type == "mtls"
+
+    def test_absent_extension_defaults_to_server(self):
+        """An unconstrained certificate is deployed as a server certificate."""
+        pem = CertFactory.create(cn="plain.example.com", extended_key_usage=None)
+        assert CertificateParser.parse(pem).certificate_type == "server"
+
+    def test_unrelated_usage_does_not_become_a_client_certificate(self):
+        """Only clientAuth marks a client certificate, not any non-server EKU."""
+        pem = CertFactory.create(cn="server.example.com", extended_key_usage=["server"])
+        parsed = CertificateParser.parse(pem)
+        assert parsed.certificate_type != "client"

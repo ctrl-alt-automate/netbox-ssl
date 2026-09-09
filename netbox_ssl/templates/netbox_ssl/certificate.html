@@ -100,6 +100,10 @@
             <td>{% badge object.get_algorithm_display %}</td>
           </tr>
           <tr>
+            <th scope="row">Type</th>
+            <td>{% badge object.get_certificate_type_display %}</td>
+          </tr>
+          <tr>
             <th scope="row">Key Size</th>
             <td>{{ object.key_size|default:"N/A" }} bits</td>
           </tr>

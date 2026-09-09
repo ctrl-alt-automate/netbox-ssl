@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Certificate type: server, client or mTLS** ([#168](https://github.com/ctrl-alt-automate/netbox-ssl/issues/168)):
+  a new `certificate_type` field records a certificate's role in the TLS
+  handshake, so client and mutual-TLS certificates are no longer indistinguishable
+  from server certificates in the inventory. The value is **derived from the
+  X.509 Extended Key Usage extension on import** — `serverAuth` alone gives
+  `server`, `clientAuth` alone gives `client`, both give `mtls`, and a
+  certificate with no EKU extension defaults to `server` — and can be overridden
+  by an operator. Exposed on the detail page, the list table, the filters, the
+  REST API and GraphQL. Additive migration 0027; existing certificates take the
+  `server` default, matching how the plugin has treated them until now.
 - **NetBox 4.7 support**: `max_version` raised to `4.7.99` and a NetBox 4.7 lane
   added to the CI integration matrix, which now covers 4.4, 4.5, 4.6 and 4.7.
   NetBox 4.7 (released 2026-09-02) carries a large set of breaking changes —
@@ -18,6 +28,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removed, django-mptt replaced by `ltree` — **none of which the plugin
   depends on**; see the audit table in `COMPATIBILITY.md`. NetBox 4.7 enters as
   **Supported**; 4.6 remains **Primary** until 4.7 has carried a release.
+- **Compliance Policies and Compliance Checks in the UI** ([#164](https://github.com/ctrl-alt-automate/netbox-ssl/issues/164)):
+  the compliance data model, filtersets and REST API shipped in v0.7, but no
+  forms, tables, views, URLs or menu entries were ever written — so policies
+  could only be created through the API, and both models' `get_absolute_url()`
+  pointed at routes that did not exist (any link to one raised
+  `NoReverseMatch`). Adds a **Compliance** menu section with full CRUD for
+  policies (including a JSON parameters field that documents each policy type's
+  shape and rejects non-object input) and a filterable, read-only results list
+  for checks. A policy's detail page shows the checks it produced and how many
+  certificates currently fail it. No database migration.
+- **`CertificateComplianceCheck` script** ([#164](https://github.com/ctrl-alt-automate/netbox-ssl/issues/164)):
+  the documentation had referenced this script since v0.7, but it was never
+  written — there was no way to evaluate compliance across the fleet on a
+  schedule, only one certificate at a time via the REST API. It evaluates every
+  enabled policy (or a single one), supports tenant filtering and a dry run,
+  skips archived/replaced certificates by default, and upserts one result per
+  certificate/policy pair so re-runs refresh rather than accumulate.
 - **Sort and search assignments by the object they are assigned to** ([#167](https://github.com/ctrl-alt-automate/netbox-ssl/issues/167)):
   the **Assigned To** column was unsortable and invisible to the search box
   because `assigned_object` is a GenericForeignKey, which spans three tables and
@@ -101,6 +128,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enter for each custom permission. Its absence is why #166 was reported as a
   permission bug: the reporter had ticked `renew_certificate` in a Django role,
   which NetBox never consults.
+- `docs/how-to/compliance-policies.md` corrected: policies live under
+  **Plugins → SSL Certificates → Compliance Policies**, not Admin; the
+  parameters field is documented; the scheduled-run step now notes the
+  `SCRIPTS_ROOT` registration requirement; and a new step covers browsing
+  results. Both v1.4 prerequisites are called out with an API fallback for
+  older releases.
 
 ## [1.3.0] - 2026-06-22
 

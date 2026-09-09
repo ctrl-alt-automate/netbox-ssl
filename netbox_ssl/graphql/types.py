@@ -126,6 +126,7 @@ class ExternalSourceType(NetBoxObjectType):
         "valid_from",
         "valid_to",
         "algorithm",
+        "certificate_type",
         "key_size",
         "status",
         "sans",
@@ -162,6 +163,7 @@ class CertificateType(NetBoxObjectType):
     sans: list[str]
     key_size: int | None
     algorithm: str
+    certificate_type: str
     status: str
     archive_pinned: bool
     archived_at: str | None
@@ -244,6 +246,7 @@ class CertificateAssignmentType(NetBoxObjectType):
         "sans",
         "key_size",
         "algorithm",
+        "certificate_type",
         "status",
         "tenant",
         "tags",

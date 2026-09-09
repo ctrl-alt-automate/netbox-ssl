@@ -58,6 +58,25 @@ class ChainStatusChoices(ChoiceSet):
     ]
 
 
+class CertificateTypeChoices(ChoiceSet):
+    """What role a certificate plays in a TLS handshake.
+
+    Derived from the X.509 Extended Key Usage extension on import: a
+    certificate carrying both serverAuth and clientAuth is usable for mutual
+    TLS. Operators can override the detected value.
+    """
+
+    TYPE_SERVER = "server"
+    TYPE_CLIENT = "client"
+    TYPE_MTLS = "mtls"
+
+    CHOICES = [
+        (TYPE_SERVER, "Server", "blue"),
+        (TYPE_CLIENT, "Client", "purple"),
+        (TYPE_MTLS, "mTLS", "green"),
+    ]
+
+
 class CertificateAlgorithmChoices(ChoiceSet):
     """Key algorithm choices."""
 
@@ -196,6 +215,13 @@ class Certificate(ContactsMixin, NetBoxModel):
         null=True,
         blank=True,
         help_text="Key size in bits (e.g., 2048, 4096)",
+    )
+    certificate_type = models.CharField(
+        max_length=20,
+        choices=CertificateTypeChoices,
+        default=CertificateTypeChoices.TYPE_SERVER,
+        db_index=True,
+        help_text="Role in the TLS handshake; detected from Extended Key Usage on import",
     )
     algorithm = models.CharField(
         max_length=20,

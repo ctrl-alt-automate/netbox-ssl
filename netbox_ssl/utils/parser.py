@@ -14,7 +14,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
 from cryptography.hazmat.primitives.serialization import pkcs7 as x509_pkcs7
-from cryptography.x509.oid import ExtensionOID, NameOID
+from cryptography.x509.oid import ExtendedKeyUsageOID, ExtensionOID, NameOID
 from django.utils import timezone
 
 
@@ -45,6 +45,7 @@ class ParsedCertificate:
     algorithm: str
     pem_content: str
     issuer_chain: str = ""
+    certificate_type: str = "server"
 
 
 class CertificateParser:
@@ -149,7 +150,36 @@ class CertificateParser:
             algorithm=algorithm,
             pem_content=pem_content,
             issuer_chain=chain,
+            certificate_type=cls._extract_certificate_type(cert),
         )
+
+    @staticmethod
+    def _extract_certificate_type(cert) -> str:
+        """Derive the TLS role from the Extended Key Usage extension.
+
+        serverAuth alone -> "server"; clientAuth alone -> "client"; both ->
+        "mtls". A certificate with no EKU extension is unconstrained and in
+        practice deployed as a server certificate, which is also the model
+        default, so that is what an absent extension maps to.
+
+        Returns plain strings rather than importing the model's ChoiceSet: the
+        parser is deliberately free of Django imports so it can be unit-tested
+        without NetBox.
+        """
+        try:
+            eku = cert.extensions.get_extension_for_oid(ExtensionOID.EXTENDED_KEY_USAGE).value
+        except x509.ExtensionNotFound:
+            return "server"
+
+        usages = set(eku)
+        server = ExtendedKeyUsageOID.SERVER_AUTH in usages
+        client = ExtendedKeyUsageOID.CLIENT_AUTH in usages
+
+        if server and client:
+            return "mtls"
+        if client:
+            return "client"
+        return "server"
 
     @classmethod
     def detect_format(cls, raw_data: bytes) -> str:
