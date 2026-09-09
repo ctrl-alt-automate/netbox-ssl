@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Documented API URLs returned 404** ([#165](https://github.com/ctrl-alt-automate/netbox-ssl/issues/165)):
+  the documentation addressed the plugin as `/api/plugins/netbox-ssl/`, but
+  NetBox mounts a plugin under its `PluginConfig.base_url` — which is `ssl`, not
+  the distribution name. All 54 affected examples across the API reference,
+  bulk-import and compliance how-tos, and the troubleshooting guide now use
+  `/api/plugins/ssl/`. A new guard (`tests/test_docs_urls.py`) parses `base_url`
+  out of the plugin config and fails the build if the docs and the code disagree.
+
 ## [1.3.0] - 2026-06-22
 
 ### Added

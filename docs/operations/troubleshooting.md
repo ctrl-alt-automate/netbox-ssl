@@ -86,7 +86,7 @@ pip install --upgrade netbox-ssl
 
 **Solution:** Check certificate ACME status and ensure PEM content is stored:
 ```
-GET /api/plugins/netbox-ssl/certificates/?is_acme=true&has_ari=false
+GET /api/plugins/ssl/certificates/?is_acme=true&has_ari=false
 ```
 
 ### Docker: Plugin not found
