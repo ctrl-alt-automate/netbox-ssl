@@ -38,7 +38,7 @@ This document describes the security measures implemented in NetBox SSL and serv
 | LoginRequiredMixin on custom views | Implemented | All non-model views require authentication |
 | `.restrict()` on all querysets | Implemented | Enforces NetBox ObjectPermission constraints |
 | `has_perm()` on all POST endpoints | Implemented | Every `@action` has explicit permission check |
-| Custom permissions | Implemented | `import_certificate`, `renew_certificate`, `bulk_operations`, `manage_compliance` |
+| Custom permissions | Implemented | `import_certificate`, `renew_certificate`, `bulk_certificate`, `manage_compliancepolicy` |
 | Credential protection | Implemented | `write_only=True` on serializers, omitted from GraphQL |
 
 ### Data Protection

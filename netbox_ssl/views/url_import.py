@@ -48,7 +48,7 @@ class UrlImportView(LoginRequiredMixin, View):
     SESSION_KEY = "url_import_rows"
 
     def dispatch(self, request, *args, **kwargs):
-        if not request.user.has_perm("netbox_ssl.run_urlimport"):
+        if not request.user.has_perm("netbox_ssl.urlimport_certificate"):
             messages.error(request, _("You do not have permission to run URL certificate import."))
             return redirect(reverse("plugins:netbox_ssl:certificate_list"))
         return super().dispatch(request, *args, **kwargs)

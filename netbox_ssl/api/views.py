@@ -76,8 +76,8 @@ def _has_import_perm(user) -> bool:
 
 
 def _check_bulk_perm(request, extra_perm: str) -> Response | None:
-    """Check bulk_operations permission plus an extra permission. Returns 403 Response or None."""
-    if not request.user.has_perm("netbox_ssl.bulk_operations"):
+    """Check bulk_certificate permission plus an extra permission. Returns 403 Response or None."""
+    if not request.user.has_perm("netbox_ssl.bulk_certificate"):
         return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
     # Use backward-compatible check for import permission
     if extra_perm == "netbox_ssl.import_certificate":
@@ -557,7 +557,7 @@ class CertificateViewSet(NetBoxModelViewSet):
             "policy_ids": [1, 2, 3]
         }
         """
-        if not request.user.has_perm("netbox_ssl.manage_compliance"):
+        if not request.user.has_perm("netbox_ssl.manage_compliancepolicy"):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
         certificate = self.get_object()
         serializer = ComplianceRunSerializer(data=request.data)
@@ -744,7 +744,7 @@ class CertificateViewSet(NetBoxModelViewSet):
             "policy_ids": [1, 2]  // optional
         }
         """
-        denied = _check_bulk_perm(request, "netbox_ssl.manage_compliance")
+        denied = _check_bulk_perm(request, "netbox_ssl.manage_compliancepolicy")
         if denied:
             return denied
         serializer = BulkComplianceRunSerializer(data=request.data)
