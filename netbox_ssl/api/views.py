@@ -1311,7 +1311,7 @@ class CertificateAssignmentViewSet(NetBoxModelViewSet):
     filterset_class = CertificateAssignmentFilterSet
 
     def get_queryset(self):
-        """Expose `assigned_object_name` so the API can order and filter on it (#167)."""
+        """Expose `_assigned_object_name` so the API can order and filter on it (#167)."""
         return super().get_queryset().with_assigned_object_name()
 
 
