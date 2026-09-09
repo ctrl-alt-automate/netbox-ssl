@@ -62,7 +62,7 @@ You'll see per-policy pass/fail immediately.
 
 ### On-demand, bulk
 
-`POST /api/plugins/netbox-ssl/certificates/compliance-check/` with a list of
+`POST /api/plugins/ssl/certificates/compliance-check/` with a list of
 certificate IDs. Returns per-cert per-policy results.
 
 ### Scheduled
@@ -88,7 +88,7 @@ Two export formats supported:
 - **CSV** — machine-readable, good for feeding into BI tools
 - **JSON** — preserves full structure including per-policy details
 
-`GET /api/plugins/netbox-ssl/certificates/compliance-report/?format=csv` returns
+`GET /api/plugins/ssl/certificates/compliance-report/?format=csv` returns
 the CSV export with the fields allowlisted by the exporter.
 
 ## Troubleshooting
