@@ -59,7 +59,7 @@ def admin_client(django_user_model):
 
 @pytest.fixture
 def limited_client(django_user_model):
-    """Authenticated client whose user has NO bulk_operations / add_certificateassignment."""
+    """Authenticated client whose user has NO bulk_certificate / add_certificateassignment."""
     user = django_user_model.objects.create(username=f"limited-{uuid.uuid4().hex[:6]}")
     client = APIClient()
     client.force_authenticate(user=user)
@@ -137,7 +137,7 @@ class TestAssignTargetsAPI:
     # NetBox uses its own ObjectPermission system (users.models.ObjectPermission)
     # rather than standard Django auth.Permission objects for has_perm() checks.
     # Adding standard Permission rows to user.user_permissions has no effect —
-    # user.has_perm("netbox_ssl.bulk_operations") returns False regardless.
+    # user.has_perm("netbox_ssl.bulk_certificate") returns False regardless.
     # Setting up ObjectPermission rows correctly requires additional NetBox-specific
     # infrastructure (Token, ObjectPermission.objects.create + .users.add) that is
     # beyond the scope of a unit test and was attempted twice without success.
