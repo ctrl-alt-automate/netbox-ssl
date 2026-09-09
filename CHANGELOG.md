@@ -19,7 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by an operator. Exposed on the detail page, the list table, the filters, the
   REST API and GraphQL. Additive migration 0027; existing certificates take the
   `server` default, matching how the plugin has treated them until now.
-
 - **NetBox 4.7 support**: `max_version` raised to `4.7.99` and a NetBox 4.7 lane
   added to the CI integration matrix, which now covers 4.4, 4.5, 4.6 and 4.7.
   NetBox 4.7 (released 2026-09-02) carries a large set of breaking changes —
@@ -46,6 +45,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enabled policy (or a single one), supports tenant filtering and a dry run,
   skips archived/replaced certificates by default, and upserts one result per
   certificate/policy pair so re-runs refresh rather than accumulate.
+- **Sort and search assignments by the object they are assigned to** ([#167](https://github.com/ctrl-alt-automate/netbox-ssl/issues/167)):
+  the **Assigned To** column was unsortable and invisible to the search box
+  because `assigned_object` is a GenericForeignKey, which spans three tables and
+  cannot appear in `order_by()` or a filter — making the list unnavigable for a
+  wildcard certificate assigned to dozens of hosts. A new
+  `with_assigned_object_name()` queryset annotation resolves the target's name
+  with a correlated subquery selected by content type, so the column now sorts
+  and the search box matches device, VM and service names, in the UI and via the
+  REST API. No database migration: nothing is denormalised, so the value cannot
+  go stale when an object is renamed.
 
 ### Changed
 

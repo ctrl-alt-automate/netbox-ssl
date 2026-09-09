@@ -1311,6 +1311,10 @@ class CertificateAssignmentViewSet(NetBoxModelViewSet):
     serializer_class = CertificateAssignmentSerializer
     filterset_class = CertificateAssignmentFilterSet
 
+    def get_queryset(self):
+        """Expose `_assigned_object_name` so the API can order and filter on it (#167)."""
+        return super().get_queryset().with_assigned_object_name()
+
 
 class CertificateAuthorityViewSet(NetBoxModelViewSet):
     """API viewset for CertificateAuthority model."""
