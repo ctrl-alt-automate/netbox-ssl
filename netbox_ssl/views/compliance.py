@@ -15,7 +15,7 @@ from netbox.views import generic
 
 from ..filtersets import ComplianceCheckFilterSet, CompliancePolicyFilterSet
 from ..forms import ComplianceCheckFilterForm, CompliancePolicyFilterForm, CompliancePolicyForm
-from ..models import ComplianceCheck, CompliancePolicy
+from ..models import ComplianceCheck, CompliancePolicy, ComplianceResultChoices
 from ..tables import ComplianceCheckTable, CompliancePolicyTable
 
 
@@ -34,15 +34,18 @@ class CompliancePolicyView(generic.ObjectView):
     queryset = CompliancePolicy.objects.select_related("tenant").prefetch_related("tags", "tag_filter")
 
     def get_extra_context(self, request, instance):
-        checks = (
+        """Count the certificates currently failing this policy.
+
+        The results table itself is rendered by ``{% htmx_table %}`` against the
+        compliance check list view, so it is lazily loaded, paginated and
+        permission-filtered by that view rather than assembled here.
+        """
+        failing = (
             ComplianceCheck.objects.restrict(request.user, "view")
-            .filter(policy=instance)
-            .select_related("certificate", "policy")
+            .filter(policy=instance, result=ComplianceResultChoices.RESULT_FAIL)
+            .count()
         )
-        return {
-            "check_table": ComplianceCheckTable(checks),
-            "failing_count": checks.filter(result="fail").count(),
-        }
+        return {"failing_count": failing}
 
 
 class CompliancePolicyEditView(generic.ObjectEditView):
