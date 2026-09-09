@@ -22,6 +22,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="certificate",
             name="certificate_type",
-            field=models.CharField(db_index=True, default="server", max_length=20),
+            field=models.CharField(
+                choices=[("server", "Server"), ("client", "Client"), ("mtls", "mTLS")],
+                db_index=True,
+                default="server",
+                help_text="Role in the TLS handshake; detected from Extended Key Usage on import",
+                max_length=20,
+            ),
         ),
     ]
