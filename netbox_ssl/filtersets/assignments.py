@@ -48,7 +48,7 @@ class CertificateAssignmentFilterSet(NetBoxModelFilterSet):
         """Filter on the name of the Device/VM/Service the certificate is assigned to."""
         if not value.strip():
             return queryset
-        return queryset.with_assigned_object_name().filter(assigned_object_name__icontains=value)
+        return queryset.with_assigned_object_name().filter(_assigned_object_name__icontains=value)
 
     def search(self, queryset, name, value):
         """Search by certificate name, assigned object name, or notes.
@@ -60,6 +60,6 @@ class CertificateAssignmentFilterSet(NetBoxModelFilterSet):
             return queryset
         return queryset.with_assigned_object_name().filter(
             models.Q(certificate__common_name__icontains=value)
-            | models.Q(assigned_object_name__icontains=value)
+            | models.Q(_assigned_object_name__icontains=value)
             | models.Q(notes__icontains=value)
         )

@@ -32,7 +32,7 @@ class TestSortingIsWiredUp:
     def test_column_is_no_longer_marked_unorderable(self):
         table = _read("tables/assignments.py")
         assert "orderable=False" not in table, "the Assigned To column is still unsortable"
-        assert 'order_by="assigned_object_name"' in table
+        assert 'order_by="_assigned_object_name"' in table
 
     def test_annotation_is_applied_where_the_column_is_rendered(self):
         """A sortable column is useless if the annotation is missing from the queryset."""
@@ -44,6 +44,43 @@ class TestSortingIsWiredUp:
         model_source = _read("models/assignments.py")
         assert 'assigned_object_type__model="device"' in model_source
         assert "ContentType.objects.filter(model__in=" not in model_source
+
+    def test_annotation_names_do_not_shadow_model_properties(self):
+        """An annotation may not share a name with a @property on the same model.
+
+        Django hydrates annotated rows with ``setattr(obj, name, value)``. A
+        property without a setter rejects that with
+        ``AttributeError: property '<name>' ... has no setter``, breaking every
+        list view and API response that uses the annotation -- as a
+        `certificate_count` annotation did to ExternalSource in v1.0.1, and as
+        `assigned_object_name` did here before the rename.
+
+        The convention is a leading underscore on the annotation.
+        """
+        import ast
+
+        source = _read("models/assignments.py")
+        tree = ast.parse(source)
+
+        properties = {
+            node.name
+            for cls in tree.body
+            if isinstance(cls, ast.ClassDef)
+            for node in cls.body
+            if isinstance(node, ast.FunctionDef)
+            and any(getattr(d, "id", None) == "property" for d in node.decorator_list)
+        }
+
+        annotated = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and getattr(node.func, "attr", None) == "annotate":
+                annotated.update(kw.arg for kw in node.keywords if kw.arg)
+
+        collisions = sorted(annotated & properties)
+        assert not collisions, (
+            "these annotations shadow a @property on the same model, so Django's "
+            "row hydration raises 'property has no setter': " + ", ".join(collisions)
+        )
 
     def test_custom_manager_preserves_restrict(self):
         """Overriding `objects` must not drop NetBox's object-permission filtering.
@@ -61,7 +98,7 @@ class TestSortingIsWiredUp:
 
     def test_filterset_searches_the_assigned_object(self):
         filterset = _read("filtersets/assignments.py")
-        assert "assigned_object_name__icontains" in filterset
+        assert "_assigned_object_name__icontains" in filterset
         assert "filter_assigned_object_name" in filterset
 
 
@@ -114,7 +151,7 @@ class TestAssignedObjectNameAnnotation:
         assignment = self._assign(certificate, device)
 
         annotated = CertificateAssignment.objects.with_assigned_object_name().get(pk=assignment.pk)
-        assert annotated.assigned_object_name == device.name
+        assert annotated._assigned_object_name == device.name
 
     def test_assignments_can_be_ordered_by_the_assigned_object(self):
         from netbox_ssl.models import CertificateAssignment
@@ -127,8 +164,8 @@ class TestAssignedObjectNameAnnotation:
         ordered = (
             CertificateAssignment.objects.with_assigned_object_name()
             .filter(certificate=certificate)
-            .order_by("assigned_object_name")
-            .values_list("assigned_object_name", flat=True)
+            .order_by("_assigned_object_name")
+            .values_list("_assigned_object_name", flat=True)
         )
         assert list(ordered) == sorted(ordered)
 
@@ -144,7 +181,7 @@ class TestAssignedObjectNameAnnotation:
         device.save()
 
         annotated = CertificateAssignment.objects.with_assigned_object_name().get(pk=assignment.pk)
-        assert annotated.assigned_object_name == device.name
+        assert annotated._assigned_object_name == device.name
 
     def test_search_matches_the_assigned_object_name(self):
         from netbox_ssl.filtersets import CertificateAssignmentFilterSet

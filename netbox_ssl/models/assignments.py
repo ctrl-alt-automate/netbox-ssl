@@ -29,7 +29,7 @@ class CertificateAssignmentQuerySet(RestrictedQuerySet):
     """
 
     def with_assigned_object_name(self):
-        """Annotate ``assigned_object_name`` with the target's ``name``.
+        """Annotate ``_assigned_object_name`` with the target's ``name``.
 
         ``assigned_object`` is a GenericForeignKey, so it spans three tables and
         cannot appear in ``order_by()`` or a filter -- which is why the column was
@@ -44,6 +44,13 @@ class CertificateAssignmentQuerySet(RestrictedQuerySet):
         ContentType ids, so building the queryset issues no query of its own and
         is safe to call before the content types exist (a fresh database, or
         during ``migrate``).
+
+        The leading underscore matters: this model already defines an
+        ``assigned_object_name`` property, and Django hydrates annotations with
+        ``setattr()``, which a property without a setter rejects with
+        ``AttributeError: property ... has no setter``. The same collision broke
+        ``ExternalSource`` list views in v1.0.1, which is why the convention here
+        is to prefix an annotation that shadows a model attribute.
         """
         from dcim.models import Device
         from ipam.models import Service
@@ -53,7 +60,7 @@ class CertificateAssignmentQuerySet(RestrictedQuerySet):
             return Subquery(model.objects.filter(pk=OuterRef("assigned_object_id")).values("name")[:1])
 
         return self.annotate(
-            assigned_object_name=Case(
+            _assigned_object_name=Case(
                 When(assigned_object_type__model="device", then=_name_of(Device)),
                 When(assigned_object_type__model="virtualmachine", then=_name_of(VirtualMachine)),
                 When(assigned_object_type__model="service", then=_name_of(Service)),

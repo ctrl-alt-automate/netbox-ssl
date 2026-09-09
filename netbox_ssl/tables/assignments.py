@@ -25,7 +25,7 @@ class CertificateAssignmentTable(NetBoxTable):
         # A GenericForeignKey cannot appear in order_by(), so sort on the
         # `assigned_object_name` annotation added by
         # CertificateAssignmentQuerySet.with_assigned_object_name() (issue #167).
-        order_by="assigned_object_name",
+        order_by="_assigned_object_name",
     )
     is_primary = columns.BooleanColumn(
         verbose_name="Primary",
