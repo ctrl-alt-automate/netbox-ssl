@@ -427,8 +427,8 @@ class Certificate(ContactsMixin, NetBoxModel):
         permissions = [
             ("import_certificate", "Can import certificates from PEM/DER/PKCS7"),
             ("renew_certificate", "Can perform certificate renewal"),
-            ("bulk_operations", "Can perform bulk certificate operations"),
-            ("run_urlimport", "Can run URL certificate import"),
+            ("bulk_certificate", "Can perform bulk certificate operations"),
+            ("urlimport_certificate", "Can run URL certificate import"),
         ]
 
     def __init__(self, *args, **kwargs):

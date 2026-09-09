@@ -52,16 +52,16 @@ class TestCustomPermissionsOnModels:
         assert "Can perform certificate renewal" in self.cert_source
 
     def test_certificate_model_has_bulk_permission(self):
-        assert "bulk_operations" in self.cert_source
+        assert "bulk_certificate" in self.cert_source
         assert "Can perform bulk certificate operations" in self.cert_source
 
     def test_compliance_policy_has_manage_permission(self):
-        assert "manage_compliance" in self.compliance_source
+        assert "manage_compliancepolicy" in self.compliance_source
         assert "Can run compliance checks" in self.compliance_source
 
 
 class TestBulkOperationsPermission:
-    """Test that all bulk endpoints require bulk_operations permission."""
+    """Test that all bulk endpoints require bulk_certificate permission."""
 
     @pytest.fixture(autouse=True)
     def _load_api_source(self):
@@ -70,7 +70,7 @@ class TestBulkOperationsPermission:
     def test_check_bulk_perm_helper_exists(self):
         """The _check_bulk_perm helper function is defined."""
         assert "def _check_bulk_perm(" in self.api_source
-        assert "netbox_ssl.bulk_operations" in self.api_source
+        assert "netbox_ssl.bulk_certificate" in self.api_source
 
     def test_has_import_perm_fallback_helper(self):
         """_has_import_perm checks both import_certificate and add_certificate."""
@@ -100,19 +100,19 @@ class TestBulkOperationsPermission:
             )
 
     def test_bulk_import_requires_import_and_bulk(self):
-        """bulk-import checks both bulk_operations and import_certificate."""
+        """bulk-import checks both bulk_certificate and import_certificate."""
         assert '_check_bulk_perm(request, "netbox_ssl.import_certificate")' in self.api_source
 
     def test_bulk_validate_requires_change_and_bulk(self):
-        """bulk-validate-chain checks both bulk_operations and change_certificate."""
+        """bulk-validate-chain checks both bulk_certificate and change_certificate."""
         assert '_check_bulk_perm(request, "netbox_ssl.change_certificate")' in self.api_source
 
     def test_bulk_compliance_requires_manage_and_bulk(self):
-        """bulk-compliance-check checks both bulk_operations and manage_compliance."""
-        assert '_check_bulk_perm(request, "netbox_ssl.manage_compliance")' in self.api_source
+        """bulk-compliance-check checks both bulk_certificate and manage_compliancepolicy."""
+        assert '_check_bulk_perm(request, "netbox_ssl.manage_compliancepolicy")' in self.api_source
 
     def test_bulk_assign_requires_add_assignment_and_bulk(self):
-        """bulk-assign checks both bulk_operations and add_certificateassignment."""
+        """bulk-assign checks both bulk_certificate and add_certificateassignment."""
         assert '_check_bulk_perm(request, "netbox_ssl.add_certificateassignment")' in self.api_source
 
 
@@ -127,7 +127,7 @@ class TestSingleEndpointPermissions:
         assert 'has_perm("netbox_ssl.import_certificate")' in self.api_source
 
     def test_compliance_check_uses_manage_permission(self):
-        assert 'has_perm("netbox_ssl.manage_compliance")' in self.api_source
+        assert 'has_perm("netbox_ssl.manage_compliancepolicy")' in self.api_source
 
     def test_validate_chain_has_change_permission(self):
         assert 'has_perm("netbox_ssl.change_certificate")' in self.api_source
@@ -248,8 +248,8 @@ class TestDocumentation:
         source = (_PLUGIN_DIR.parent / "docs" / "permissions.md").read_text()
         assert "import_certificate" in source
         assert "renew_certificate" in source
-        assert "bulk_operations" in source
-        assert "manage_compliance" in source
+        assert "bulk_certificate" in source
+        assert "manage_compliancepolicy" in source
 
     def test_permissions_doc_covers_bulk_endpoints(self):
         source = (_PLUGIN_DIR.parent / "docs" / "permissions.md").read_text()
@@ -270,7 +270,20 @@ class TestMigrationExists:
         migration_path = _PLUGIN_DIR / "migrations" / "0016_custom_permissions.py"
         assert migration_path.exists()
 
-    def test_migration_contains_all_permissions(self):
+    def test_migration_0016_records_the_original_codenames(self):
+        """0016 is a historical record and must keep the codenames it shipped with."""
         source = _read_source("migrations/0016_custom_permissions.py")
         for perm in ["import_certificate", "renew_certificate", "bulk_operations", "manage_compliance"]:
+            assert perm in source, f"Missing permission in migration: {perm}"
+
+    def test_latest_migration_contains_the_current_permissions(self):
+        """0026 renamed the ungrantable codenames to <action>_<model> form (#166)."""
+        source = _read_source("migrations/0026_grantable_custom_permissions.py")
+        for perm in [
+            "import_certificate",
+            "renew_certificate",
+            "bulk_certificate",
+            "urlimport_certificate",
+            "manage_compliancepolicy",
+        ]:
             assert perm in source, f"Missing permission in migration: {perm}"

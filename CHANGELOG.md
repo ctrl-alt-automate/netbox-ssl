@@ -53,6 +53,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bulk-import and compliance how-tos, and the troubleshooting guide now use
   `/api/plugins/ssl/`. A new guard (`tests/test_docs_urls.py`) parses `base_url`
   out of the plugin config and fails the build if the docs and the code disagree.
+- **Three custom permissions could never be granted** ([#166](https://github.com/ctrl-alt-automate/netbox-ssl/issues/166)):
+  NetBox builds permission names as `<app>.<action>_<model>` from
+  `ObjectPermission.actions` and takes them apart again with
+  `codename.rsplit("_", 1)`, so the text after the final underscore must name a
+  real model. `bulk_operations` implied a model `operations`,
+  `manage_compliance` a model `compliance`, and `run_urlimport` a model
+  `urlimport` — none of which exist. NetBox could therefore never construct
+  those names, and the three permissions were silently ungrantable to every
+  non-superuser since v0.9, blocking all bulk endpoints, compliance checks and
+  URL import. Renamed to the grantable form (migration 0026, metadata-only):
+
+  | Old (ungrantable) | New |
+  |---|---|
+  | `bulk_operations` | `bulk_certificate` |
+  | `run_urlimport` | `urlimport_certificate` |
+  | `manage_compliance` | `manage_compliancepolicy` |
+
+  No ObjectPermission could reference the old names, so there is nothing to
+  migrate; update any automation that created permissions by codename.
+  `tests/test_permission_names.py` now fails the build if a custom permission
+  cannot decompose into an action plus a model this app defines, or if a
+  `has_perm()` call names a codename no model declares.
 
 ### Documentation
 
@@ -62,6 +84,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with no how-to documentation at all.
 - `docs/reference/scripts.md` now documents `MonitoredEndpointPoll` and includes
   it in the wrapper-module example.
+- `docs/reference/permissions.md` now explains **how** NetBox grants a
+  permission — Django groups and roles are ignored; only an ObjectPermission
+  carrying the bare action verb counts — with the object type and action to
+  enter for each custom permission. Its absence is why #166 was reported as a
+  permission bug: the reporter had ticked `renew_certificate` in a Django role,
+  which NetBox never consults.
 
 ## [1.3.0] - 2026-06-22
 

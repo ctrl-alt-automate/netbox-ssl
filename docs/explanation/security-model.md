@@ -94,7 +94,7 @@ Every request path enforces NetBox's permission model:
   enforces NetBox's ObjectPermission scoping
 - Every `@action` endpoint checks `has_perm()` before writes
 - Granular custom permissions (`import_certificate`, `renew_certificate`,
-  `bulk_operations`, `manage_compliance`) allow fine-grained RBAC
+  `bulk_certificate`, `manage_compliancepolicy`) allow fine-grained RBAC
 
 ### Error sanitisation
 
