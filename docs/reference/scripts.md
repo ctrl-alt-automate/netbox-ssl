@@ -26,6 +26,7 @@ from netbox_ssl.scripts import (
     ScheduledCertificateExport,
     CertificateURLScan,
     MonitoredEndpointPoll,
+    CertificateComplianceCheck,
 )
 ```
 
@@ -141,6 +142,48 @@ endpoints never leave the **Pending** state.
 !!! note "Private addresses are blocked by default"
     Endpoints resolving to private IP ranges are rejected unless you opt in via
     `url_import_private_cidr_allowlist` in `PLUGINS_CONFIG`.
+
+## Certificate Compliance Check
+
+The `CertificateComplianceCheck` script evaluates every enabled compliance
+policy against the certificate inventory and stores the results, which then feed
+the **Compliance Policies** and **Compliance Checks** lists and the Compliance
+Report.
+
+### Features
+
+- Evaluates all enabled policies, or a single policy
+- Optional tenant filtering
+- Skips archived and replaced certificates unless asked otherwise
+- Upserts one result per certificate/policy pair, so re-runs refresh rather than
+  accumulate
+- Logs every failing check as a warning
+
+### Running the Script
+
+1. Navigate to **Customization > Scripts**
+2. Select **Certificate Compliance Check**
+3. Configure options:
+   - **Tenant**: limit the run to one tenant (optional)
+   - **Policy**: evaluate a single policy instead of all enabled ones (optional)
+   - **Include inactive**: also check archived and replaced certificates
+   - **Dry run**: report what would be evaluated without writing results
+4. Click **Run Script**
+
+### Script Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `tenant` | Tenant | none | Restrict the run to one tenant |
+| `policy` | CompliancePolicy | none | Evaluate only this policy |
+| `include_inactive` | Boolean | `false` | Include archived/replaced certificates |
+| `dry_run` | Boolean | `false` | Report without writing |
+
+!!! note "Requires v1.4 or newer"
+    The documentation referenced this script from v0.7 onward, but it was never
+    actually shipped ([#164](https://github.com/ctrl-alt-automate/netbox-ssl/issues/164)).
+    Before v1.4, compliance could only be evaluated per certificate through the
+    REST API.
 
 ## Scheduling with NetBox Jobs
 

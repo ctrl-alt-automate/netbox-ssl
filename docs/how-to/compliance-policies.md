@@ -26,18 +26,36 @@ certificate on demand or on schedule.
 
 ## Step 1 — Create a policy
 
-Navigate to **Admin → NetBox SSL → Compliance Policies → + Add**.
+Navigate to **Plugins → SSL Certificates → Compliance Policies → + Add**.
 
 Example: "No RSA keys below 2048 bits"
 
 - **Name:** `RSA min key size 2048`
 - **Policy type:** `Minimum key size`
-- **Algorithm:** `rsa`
-- **Minimum value:** `2048`
 - **Severity:** `Error` (Error, Warning, or Info)
 - **Enabled:** ✓
+- **Parameters:** `{"min_bits": 2048}`
 
 Save. The policy is now part of your compliance ruleset.
+
+!!! note "Parameters are JSON"
+    Each policy type reads its thresholds from the **Parameters** field. The form
+    lists the shape for every type; the same examples appear in
+    [Built-in policy types](#built-in-policy-types) above.
+
+!!! warning "Requires v1.4 or newer"
+    Earlier releases shipped the compliance data model and REST API but never
+    wired up the UI, so this page did not exist and policies could only be
+    created through the API
+    ([#164](https://github.com/ctrl-alt-automate/netbox-ssl/issues/164)). On
+    v1.3.x and older, use:
+
+    ```bash
+    curl -X POST "$NETBOX/api/plugins/ssl/compliance-policies/" \\
+      -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \\
+      -d '{"name": "RSA min key size 2048", "policy_type": "min_key_size",
+           "severity": "error", "enabled": true, "parameters": {"min_bits": 2048}}'
+    ```
 
 ## Step 2 — Scope with tags (v0.9+)
 
@@ -67,10 +85,28 @@ certificate IDs. Returns per-cert per-policy results.
 
 ### Scheduled
 
-Schedule the `CertificateComplianceCheck` script (Admin → Scripts) to run daily
-or weekly. Results are stored per run, enabling the trend chart.
+Schedule the `CertificateComplianceCheck` script to run daily or weekly. Results
+are upserted per certificate/policy pair, and the report's trend chart is built
+from the stored snapshots.
 
-## Step 4 — View the compliance report
+The script is bundled with the plugin but, like every plugin script, must first
+be exposed through a `SCRIPTS_ROOT` wrapper before it appears under
+**Customization → Scripts** — see
+[Custom Scripts](../reference/scripts.md#making-the-scripts-available-to-netbox).
+
+!!! warning "Requires v1.4 or newer"
+    This script was referenced by the documentation from v0.7 onward but was
+    never actually shipped
+    ([#164](https://github.com/ctrl-alt-automate/netbox-ssl/issues/164)). On
+    older releases, run checks through the REST API endpoints above.
+
+## Step 4 — Browse the results
+
+Navigate to **Plugins → SSL Certificates → Compliance Checks** for every stored
+result, filterable by certificate, policy, and outcome. A policy's own detail
+page lists the checks it produced and how many certificates currently fail it.
+
+## Step 5 — View the compliance report
 
 Navigate to **Plugins → SSL Certificates → Compliance Report**.
 
@@ -81,7 +117,7 @@ The report shows:
 - **90-day trend chart** (is compliance improving or drifting?)
 - **Top failing certificates** (ranked by number of failed policies)
 
-## Step 5 — Export results
+## Step 6 — Export results
 
 Two export formats supported:
 
