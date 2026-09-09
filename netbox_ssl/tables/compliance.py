@@ -25,7 +25,9 @@ class CompliancePolicyTable(NetBoxTable):
     check_count = tables.Column(
         verbose_name="Checks",
         accessor="check_count",
-        orderable=False,
+        # A real annotation (Count("checks")) added by CompliancePolicyListView,
+        # so the database can order on it -- no reason to disable sorting.
+        order_by="check_count",
     )
     tags = columns.TagColumn(
         url_name="plugins:netbox_ssl:compliancepolicy_list",
