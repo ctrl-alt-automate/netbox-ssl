@@ -11,6 +11,7 @@ by an operator, so they get list and detail views but no create/edit form.
 """
 
 from django.db.models import Count
+from netbox.object_actions import BulkDelete, BulkExport
 from netbox.views import generic
 
 from ..filtersets import ComplianceCheckFilterSet, CompliancePolicyFilterSet
@@ -78,7 +79,14 @@ class ComplianceCheckListView(generic.ObjectListView):
     table = ComplianceCheckTable
     # Results are produced by the checker, so no add/import actions -- but a
     # stale result set should still be clearable in bulk.
-    actions = {"export": {"view"}, "bulk_delete": {"delete"}}
+    #
+    # Declared as ObjectAction classes, not the legacy {name: permissions} dict.
+    # NetBox 4.4-4.6 accepted the dict through a LEGACY_ACTIONS shim that 4.7
+    # removed, where iterating it yields plain strings and
+    # `action.permissions_required` raises AttributeError -- 500ing the list.
+    # `netbox.object_actions` exists since 4.4.0, so this form works everywhere
+    # the plugin claims support.
+    actions = (BulkExport, BulkDelete)
 
 
 class ComplianceCheckView(generic.ObjectView):

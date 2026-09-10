@@ -69,6 +69,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Compliance check list returned HTTP 500 on NetBox 4.7** (found by verifying
+  against every supported NetBox version, not just one): the list view declared
+  `actions` as the legacy `{name: permissions}` dict. NetBox 4.4-4.6 accepted
+  that through a `LEGACY_ACTIONS` shim which **4.7 removed** — iterating the dict
+  yields plain strings, so `action.permissions_required` raises `AttributeError`
+  and 500s the page. Now declared as `ObjectAction` classes
+  (`netbox.object_actions`, available since 4.4.0), which works across the whole
+  supported range.
+
 - **Compliance check list returned HTTP 500** (found while verifying
   [#164](https://github.com/ctrl-alt-automate/netbox-ssl/issues/164) against a
   live NetBox): `NetBoxTable`'s `ActionsColumn` renders Edit, Delete and
