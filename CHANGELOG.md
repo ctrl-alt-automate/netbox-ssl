@@ -69,6 +69,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docker compose up -d` aborted on NetBox 4.7**: the development stack's
+  healthcheck allowed roughly 135s (`start_period: 90s` plus 3 x 15s retries),
+  but a cold start with an empty database runs NetBox's full migration set —
+  measured at ~110s on 4.4 and ~150s on 4.7. Compose therefore reported
+  "dependency failed to start" even though NetBox came up fine moments later.
+  The budget is now 300s with 5 retries.
+
 - **Compliance check list returned HTTP 500 on NetBox 4.7** (found by verifying
   against every supported NetBox version, not just one): the list view declared
   `actions` as the legacy `{name: permissions}` dict. NetBox 4.4-4.6 accepted
