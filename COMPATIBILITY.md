@@ -6,7 +6,7 @@ This document tracks compatibility between NetBox SSL plugin versions and NetBox
 
 | Plugin Version | NetBox Version | Python Version | Status |
 |:--------------:|:--------------:|:--------------:|:------:|
-| 1.4.x          | 4.7.x          | 3.10 - 3.12   | Supported |
+| 1.4.x          | 4.7.x          | 3.12 - 3.14   | Supported |
 | 1.4.x          | 4.6.x          | 3.10 - 3.12   | Primary |
 | 1.4.x          | 4.5.x          | 3.10 - 3.12   | Supported |
 | 1.4.x          | 4.4.x          | 3.10 - 3.12   | Supported |
@@ -39,6 +39,11 @@ This document tracks compatibility between NetBox SSL plugin versions and NetBox
 - **Primary**: Actively developed and tested in CI
 - **Supported**: Tested in CI, receives bug fixes
 - **End of Life**: No longer tested or maintained
+
+The Python column is the range actually exercised: the unit suite runs 3.10,
+3.11 and 3.12, and each integration lane runs whatever interpreter that NetBox
+release ships (3.12 through 4.6, 3.14 on 4.7). The plugin's own floor is Python
+3.10 (`requires-python`); in practice the NetBox release you run decides.
 
 A newly released NetBox minor enters as **Supported** — covered by the full CI
 integration matrix — and is promoted to **Primary** once it has carried a plugin
