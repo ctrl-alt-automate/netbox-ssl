@@ -290,6 +290,11 @@ urlpatterns = [
         name="compliancecheck",
     ),
     path(
+        "compliance-checks/<int:pk>/delete/",
+        views.ComplianceCheckDeleteView.as_view(),
+        name="compliancecheck_delete",
+    ),
+    path(
         "compliance-checks/<int:pk>/changelog/",
         ObjectChangeLogView.as_view(),
         name="compliancecheck_changelog",

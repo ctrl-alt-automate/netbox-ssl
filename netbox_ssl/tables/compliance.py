@@ -60,6 +60,12 @@ class CompliancePolicyTable(NetBoxTable):
 class ComplianceCheckTable(NetBoxTable):
     """Table for displaying compliance check results."""
 
+    # Checks are produced by the checker, so there is no edit view -- but
+    # NetBoxTable's ActionsColumn reverses every action it renders, and a
+    # missing view raises NoReverseMatch which 500s the whole list page (and the
+    # HTMX fragment on the policy detail page). Only offer what actually exists.
+    actions = columns.ActionsColumn(actions=("delete", "changelog"))
+
     certificate = tables.Column(
         linkify=True,
     )

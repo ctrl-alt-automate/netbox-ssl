@@ -198,3 +198,83 @@ class TestDocumentedChoicesExist:
         used = set(re.findall(r'"policy_type":\s*"([a-z_]+)"', self._how_to()))
         unknown = sorted(used - valid)
         assert not unknown, f"how-to names policy types that do not exist: {unknown}"
+
+
+@pytest.mark.unit
+class TestTableActionsAreReversible:
+    """Every action a table renders must have a registered URL.
+
+    ``NetBoxTable`` attaches an ``ActionsColumn`` which defaults to
+    ``('edit', 'delete', 'changelog')`` and calls ``reverse()`` for each action on
+    **every row**. A missing view does not degrade gracefully: it raises
+    ``NoReverseMatch``, which 500s the entire list page -- and any HTMX fragment
+    that embeds it.
+
+    This bit the compliance check list, where the deliberate design decision
+    "check results have no edit form" left `compliancecheck_edit` unreversible.
+    The existing tests asserted that no edit view exists, which is the opposite
+    of the property that matters: the list must *render*.
+
+    Only reachable by running the real UI, so this guard encodes it statically.
+    """
+
+    _DEFAULT_ACTIONS = ("edit", "delete", "changelog")
+
+    def _table_actions(self) -> list[tuple[str, str, tuple[str, ...]]]:
+        """Return ``(file, model_name, actions)`` for every table in the plugin."""
+        import ast
+
+        results = []
+        for py_file in sorted((get_plugin_source_dir() / "tables").glob("*.py")):
+            tree = ast.parse(py_file.read_text(), filename=py_file.name)
+            for cls in tree.body:
+                if not isinstance(cls, ast.ClassDef):
+                    continue
+                if not any(getattr(b, "id", getattr(b, "attr", None)) == "NetBoxTable" for b in cls.bases):
+                    continue
+
+                model = None
+                actions = self._DEFAULT_ACTIONS
+                for node in cls.body:
+                    # class Meta: model = X
+                    if isinstance(node, ast.ClassDef) and node.name == "Meta":
+                        for stmt in node.body:
+                            if (
+                                isinstance(stmt, ast.Assign)
+                                and any(isinstance(t, ast.Name) and t.id == "model" for t in stmt.targets)
+                                and isinstance(stmt.value, ast.Name)
+                            ):
+                                model = stmt.value.id.lower()
+                    # actions = columns.ActionsColumn(actions=(...))
+                    if (
+                        isinstance(node, ast.Assign)
+                        and any(isinstance(t, ast.Name) and t.id == "actions" for t in node.targets)
+                        and isinstance(node.value, ast.Call)
+                    ):
+                        for kw in node.value.keywords:
+                            if kw.arg == "actions" and isinstance(kw.value, ast.List | ast.Tuple):
+                                actions = tuple(
+                                    e.value
+                                    for e in kw.value.elts
+                                    if isinstance(e, ast.Constant) and isinstance(e.value, str)
+                                )
+                if model:
+                    results.append((py_file.name, model, actions))
+        return results
+
+    def test_every_rendered_action_has_a_url(self):
+        urls = _read("urls.py")
+        tables = self._table_actions()
+        assert tables, "no NetBoxTable subclasses found — has the tables package moved?"
+
+        missing = [
+            f"{file}: {model} table renders '{action}' but no URL named '{model}_{action}' is registered"
+            for file, model, actions in tables
+            for action in actions
+            if f'name="{model}_{action}"' not in urls
+        ]
+
+        assert not missing, (
+            "NetBoxTable's ActionsColumn reverses every action it renders, so a missing "
+            "URL raises NoReverseMatch and 500s the whole list page:\n  " + "\n  ".join(missing)
+        )

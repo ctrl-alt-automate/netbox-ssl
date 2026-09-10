@@ -69,6 +69,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Compliance check list returned HTTP 500** (found while verifying
+  [#164](https://github.com/ctrl-alt-automate/netbox-ssl/issues/164) against a
+  live NetBox): `NetBoxTable`'s `ActionsColumn` renders Edit, Delete and
+  Changelog buttons by default and calls `reverse()` for each on every row.
+  Compliance checks are results with no edit form, so `compliancecheck_edit`
+  could not be reversed — `NoReverseMatch` took down the whole list page and the
+  HTMX results fragment on the policy detail page. The column now offers only
+  actions that exist, and a per-object delete view was added for consistency
+  with every other model. A new guard asserts that every action any table
+  renders has a registered URL.
+
 - **Monitored endpoints never got polled** ([#163](https://github.com/ctrl-alt-automate/netbox-ssl/issues/163)):
   the `MonitoredEndpointPoll` script shipped in v1.3.0 but was never re-exported
   from `netbox_ssl.scripts`, so the documented `SCRIPTS_ROOT` wrapper

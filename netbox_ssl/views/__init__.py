@@ -27,6 +27,7 @@ from .certificates import (
 )
 from .compliance import (
     ComplianceCheckBulkDeleteView,
+    ComplianceCheckDeleteView,
     ComplianceCheckListView,
     ComplianceCheckView,
     CompliancePolicyBulkDeleteView,
@@ -120,5 +121,6 @@ __all__ = [
     "CompliancePolicyBulkDeleteView",
     "ComplianceCheckListView",
     "ComplianceCheckView",
+    "ComplianceCheckDeleteView",
     "ComplianceCheckBulkDeleteView",
 ]
