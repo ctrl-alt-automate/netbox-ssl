@@ -24,9 +24,15 @@ services:
     env_file: env/netbox.env
     healthcheck:
       test: curl -f http://localhost:8080/login/ || exit 1
-      start_period: 90s
-      timeout: 3s
+      # NetBox runs its full migration set on first boot and that set keeps
+      # growing: measured cold start with an empty database is ~110s on 4.4 and
+      # ~150s on 4.7. The previous 90s start_period (plus 3 x 15s retries ~= 135s)
+      # was under that, so `docker compose up -d` aborted on 4.7 with
+      # "dependency failed to start" even though NetBox came up fine moments later.
+      start_period: 300s
+      timeout: 5s
       interval: 15s
+      retries: 5
     volumes:
       # Mount plugin source for development (hot-reload)
       - ./netbox_ssl:/opt/netbox/netbox/netbox_ssl:ro

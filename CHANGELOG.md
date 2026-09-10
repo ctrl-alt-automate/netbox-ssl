@@ -69,6 +69,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`docker compose up -d` aborted on NetBox 4.7**: the development stack's
+  healthcheck allowed roughly 135s (`start_period: 90s` plus 3 x 15s retries),
+  but a cold start with an empty database runs NetBox's full migration set —
+  measured at ~110s on 4.4 and ~150s on 4.7. Compose therefore reported
+  "dependency failed to start" even though NetBox came up fine moments later.
+  The budget is now 300s with 5 retries.
+
+- **Compliance check list returned HTTP 500 on NetBox 4.7** (found by verifying
+  against every supported NetBox version, not just one): the list view declared
+  `actions` as the legacy `{name: permissions}` dict. NetBox 4.4-4.6 accepted
+  that through a `LEGACY_ACTIONS` shim which **4.7 removed** — iterating the dict
+  yields plain strings, so `action.permissions_required` raises `AttributeError`
+  and 500s the page. Now declared as `ObjectAction` classes
+  (`netbox.object_actions`, available since 4.4.0), which works across the whole
+  supported range.
+
+- **Compliance check list returned HTTP 500** (found while verifying
+  [#164](https://github.com/ctrl-alt-automate/netbox-ssl/issues/164) against a
+  live NetBox): `NetBoxTable`'s `ActionsColumn` renders Edit, Delete and
+  Changelog buttons by default and calls `reverse()` for each on every row.
+  Compliance checks are results with no edit form, so `compliancecheck_edit`
+  could not be reversed — `NoReverseMatch` took down the whole list page and the
+  HTMX results fragment on the policy detail page. The column now offers only
+  actions that exist, and a per-object delete view was added for consistency
+  with every other model. A new guard asserts that every action any table
+  renders has a registered URL.
+
 - **Monitored endpoints never got polled** ([#163](https://github.com/ctrl-alt-automate/netbox-ssl/issues/163)):
   the `MonitoredEndpointPoll` script shipped in v1.3.0 but was never re-exported
   from `netbox_ssl.scripts`, so the documented `SCRIPTS_ROOT` wrapper
