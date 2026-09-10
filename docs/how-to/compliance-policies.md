@@ -146,6 +146,6 @@ the CSV export with the fields allowlisted by the exporter.
 ## Going further
 
 - [Reference: Data Models](../reference/data-models.md) — `CompliancePolicy` and
-  `ComplianceResult` schema
+  `ComplianceCheck` schema
 - [How-to: Bulk Operations](bulk-import.md) — combine bulk import with compliance
   check for migration validation

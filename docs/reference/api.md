@@ -97,6 +97,79 @@ Base URL: `/api/plugins/ssl/`
 | `GET` | `/compliance-checks/` | List all check results |
 | `GET` | `/compliance-checks/{id}/` | Get check result details |
 
+### Compliance Trends
+
+Read-only daily rollups powering the compliance report's 90-day trend chart.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/compliance-trends/` | List trend snapshots |
+| `GET` | `/compliance-trends/{id}/` | Get one snapshot |
+
+### Monitored Endpoints
+
+Websites whose presented certificate is tracked over time. See the
+[endpoint monitoring how-to](../how-to/endpoint-monitoring.md).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/monitored-endpoints/` | List endpoints |
+| `POST` | `/monitored-endpoints/` | Register an endpoint |
+| `GET` | `/monitored-endpoints/{id}/` | Get endpoint details |
+| `PUT` | `/monitored-endpoints/{id}/` | Update endpoint |
+| `DELETE` | `/monitored-endpoints/{id}/` | Delete endpoint |
+
+### External Sources
+
+Configured external certificate systems. See the
+[external sources how-to](../how-to/external-sources.md).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/external-sources/` | List sources |
+| `POST` | `/external-sources/` | Create source |
+| `GET` | `/external-sources/{id}/` | Get source details |
+| `PUT` | `/external-sources/{id}/` | Update source |
+| `DELETE` | `/external-sources/{id}/` | Delete source |
+| `POST` | `/external-sources/{id}/test-connection/` | Probe credentials and reachability without syncing |
+| `POST` | `/external-sources/{id}/sync/` | Run a sync for this source |
+
+!!! warning "Credentials are write-only"
+    `auth_credentials` accepts `env:VAR_NAME` references on write and is never
+    returned on read.
+
+---
+
+## Certificate Actions
+
+Custom actions on the certificate viewset, beyond standard CRUD.
+
+| Method | Endpoint | Description | Permission |
+|--------|----------|-------------|------------|
+| `POST` | `/certificates/import/` | Import from a PEM paste | `import_certificate` |
+| `POST` | `/certificates/import-file/` | Import from an uploaded PEM, DER or PKCS#7 file | `import_certificate` |
+| `POST` | `/certificates/{id}/assign-targets/` | Assign this certificate to many Devices, VMs and Services at once | `bulk_certificate` + `add_certificateassignment` |
+| `GET` | `/certificates/{id}/diff/` | Compare this certificate against another | `view_certificate` |
+| `POST` | `/certificates/{id}/validate-chain/` | Validate the chain of trust | `change_certificate` |
+| `POST` | `/certificates/{id}/compliance-check/` | Run compliance policies against it | `manage_compliancepolicy` |
+| `POST` | `/certificates/{id}/detect-acme/` | Detect ACME issuance | `change_certificate` |
+| `GET` | `/certificates/export/` | Export certificates as CSV, JSON or PEM | `view_certificate` |
+
+### Bulk Actions
+
+Every bulk endpoint requires `bulk_certificate` **in addition** to the
+operation-specific permission — see [Permissions](permissions.md).
+
+| Method | Endpoint | Description | Extra permission |
+|--------|----------|-------------|------------------|
+| `POST` | `/certificates/bulk-import/` | Import many PEM blobs | `import_certificate` |
+| `POST` | `/certificates/bulk-data-import/` | Import from CSV or JSON | `import_certificate` |
+| `POST` | `/certificates/bulk-assign/` | Assign many certificates to targets | `add_certificateassignment` |
+| `POST` | `/certificates/bulk-status-update/` | Change status on many certificates | `change_certificate` |
+| `POST` | `/certificates/bulk-validate-chain/` | Validate many chains | `change_certificate` |
+| `POST` | `/certificates/bulk-compliance-check/` | Run compliance on many certificates | `manage_compliancepolicy` |
+| `POST` | `/certificates/bulk-detect-acme/` | Detect ACME on many certificates | `change_certificate` |
+
 ---
 
 ## Filtering

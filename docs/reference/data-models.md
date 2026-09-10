@@ -144,6 +144,17 @@ The main model for storing certificate metadata.
 | `revoked` | Revoked | Certificate was revoked |
 | `pending` | Pending | Awaiting deployment |
 
+### Certificate Type Choices
+
+Detected from the X.509 Extended Key Usage extension when the certificate is
+imported, and editable afterwards.
+
+| Value | Label | Detected when EKU contains |
+|-------|-------|----------------------------|
+| `server` | Server | `serverAuth` only — also the default when no EKU extension is present |
+| `client` | Client | `clientAuth` only |
+| `mtls` | mTLS | both `serverAuth` and `clientAuth` |
+
 ### Algorithm Choices
 
 | Value | Label | Notes |
@@ -448,6 +459,191 @@ Only one check result per (certificate, policy) combination. Running compliance 
 
 ---
 
+## MonitoredEndpoint
+
+A website or URL whose presented certificate is tracked over time. This inverts
+the certificate-centric model: you register a URL you care about, and the plugin
+repeatedly asks it which certificate it is actually serving. See the
+[endpoint monitoring how-to](../how-to/endpoint-monitoring.md).
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `name` | CharField(200) | Yes | Human label, e.g. `HR portal` |
+| `url` | CharField(500) | Yes | `https://host:port` to monitor |
+| `sni` | CharField(255) | | SNI override; defaults to the URL host |
+| `certificate` | ForeignKey | | The certificate currently presented |
+| `assigned_object` | GenericForeignKey | | Optional Device, VM or Service |
+| `tenant` | ForeignKey(Tenant) | | Optional tenant scoping |
+| `status` | CharField(20) | | Poll outcome (default `pending`) |
+| `last_checked` | DateTimeField | | When the endpoint was last polled |
+| `last_seen` | DateTimeField | | When it was last reachable |
+| `last_error` | TextField | | Error from the most recent failed poll |
+| `tags` | ManyToMany(Tag) | | NetBox tags |
+
+### Status Choices
+
+| Value | Label | Meaning |
+|-------|-------|---------|
+| `pending` | Pending | Never polled — the poll script has not run |
+| `ok` | OK | Handshake succeeded and the chain verified |
+| `untrusted` | Untrusted | A certificate was served but its chain did not verify |
+| `unreachable` | Unreachable | No usable certificate retrieved; see `last_error` |
+
+!!! important "Endpoints stay Pending until the poll script runs"
+    Populated by the `MonitoredEndpointPoll` script, which must be registered
+    through a `SCRIPTS_ROOT` wrapper — see [Custom Scripts](scripts.md).
+
+---
+
+## MonitoredEndpointCertificate
+
+Rotation history: which certificate an endpoint presented, and when. One row per
+(endpoint, certificate) pair, upserted on each poll.
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `endpoint` | ForeignKey | Yes | The monitored endpoint |
+| `certificate` | ForeignKey | Yes | Certificate observed at that endpoint |
+| `first_seen` | DateTimeField | Yes | First poll that saw this certificate |
+| `last_seen` | DateTimeField | Yes | Most recent poll that saw it |
+
+---
+
+## ExternalSource
+
+Configuration for an external certificate management system that the plugin
+syncs from (Lemur, AWS ACM, or any REST API via the generic adapter). See the
+[external sources how-to](../how-to/external-sources.md).
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `name` | CharField | Yes | Unique name for this source |
+| `source_type` | CharField | Yes | Adapter to use (`lemur`, `aws_acm`, `generic_rest`) |
+| `base_url` | URLField | | API base URL (unused by AWS ACM) |
+| `auth_method` | CharField | Yes | Authentication scheme |
+| `auth_credentials` | JSONField | | Credential references, resolved as `env:VAR_NAME` |
+| `auth_credentials_reference` | CharField | | **Deprecated**, removed in v2.0.0 — use `auth_credentials` |
+| `region` | CharField | | AWS region (AWS ACM only) |
+| `field_mapping` | JSONField | | Maps source fields onto plugin fields |
+| `sync_interval_minutes` | PositiveIntegerField | | Advisory sync cadence |
+| `enabled` | BooleanField | | Whether the sync engine processes this source |
+| `verify_ssl` | BooleanField | | Verify the source's TLS certificate |
+| `tenant` | ForeignKey(Tenant) | | Tenant assigned to imported certificates |
+| `sync_status` | CharField | | Outcome of the most recent run |
+| `last_synced` | DateTimeField | | When the last run finished |
+| `last_sync_message` | TextField | | Summary of the last run |
+| `comments` | TextField | | Free-form notes |
+| `tags` | ManyToMany(Tag) | | NetBox tags |
+
+!!! warning "Credentials are never stored in plaintext"
+    `auth_credentials` holds **references** of the form `env:VAR_NAME`, resolved
+    at sync time. The field is write-only in the REST API and omitted from
+    GraphQL.
+
+---
+
+## ExternalSourceSyncLog
+
+Per-run statistics for an external source sync. Written by the sync engine's
+LOG phase.
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `source` | ForeignKey | Yes | The source that was synced |
+| `started_at` | DateTimeField | Yes | Run start |
+| `finished_at` | DateTimeField | | Run end |
+| `success` | BooleanField | | Whether the run completed without error |
+| `dry_run` | BooleanField | | Whether changes were withheld |
+| `message` | TextField | | Human-readable summary |
+| `certificates_fetched` | PositiveIntegerField | | Retrieved from the source |
+| `certificates_created` | PositiveIntegerField | | Newly imported |
+| `certificates_updated` | PositiveIntegerField | | Existing records changed |
+| `certificates_renewed` | PositiveIntegerField | | Processed as Janus renewals |
+| `certificates_removed` | PositiveIntegerField | | Gone from the source |
+| `certificates_unchanged` | PositiveIntegerField | | Already up to date |
+| `errors` | JSONField | | Per-certificate errors |
+
+---
+
+## CertificateLifecycleEvent
+
+Append-only audit trail of significant events in a certificate's life. Written
+automatically by `Certificate.save()` and by assignment create/delete.
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `certificate` | ForeignKey | Yes | Certificate the event belongs to |
+| `event_type` | CharField | Yes | What happened |
+| `timestamp` | DateTimeField | | When (defaults to now) |
+| `description` | TextField | | Human-readable detail |
+| `old_status` | CharField | | Previous status, for transitions |
+| `new_status` | CharField | | New status, for transitions |
+| `related_certificate` | ForeignKey | | The other certificate, for renewals |
+| `actor` | CharField | | User or system that caused the event |
+
+### Event Types
+
+`imported`, `issued`, `activated`, `status_changed`, `renewed`, `revoked`,
+`archived`, `assignment_added`, `assignment_removed`
+
+---
+
+## CertificateEventLog
+
+Idempotency ledger for the scheduled expiry scan: records that a given event has
+already been fired for a certificate at a given threshold, so a re-run within
+the cooldown window does not re-notify.
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `certificate` | ForeignKey | Yes | Certificate the event was fired for |
+| `event_type` | CharField | Yes | Event that was fired |
+| `threshold_days` | PositiveIntegerField | | Threshold that triggered it |
+| `fired_at` | DateTimeField | Yes | When it fired |
+| `scan_id` | UUIDField | | Groups all events from one scan run |
+
+### Class Methods
+
+| Method | Description |
+|--------|-------------|
+| `was_recently_fired(...)` | True if this event fired inside the cooldown window |
+| `cleanup_old_entries(...)` | Purges entries older than a retention period |
+
+---
+
+## ComplianceTrendSnapshot
+
+Daily rollup of compliance metrics, powering the 90-day trend chart on the
+compliance report. Exposed read-only at `/api/plugins/ssl/compliance-trends/`.
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `tenant` | ForeignKey(Tenant) | | Tenant the snapshot covers (null = all) |
+| `snapshot_date` | DateField | Yes | Day the snapshot represents |
+| `total_certificates` | PositiveIntegerField | | Certificates in scope |
+| `total_checks` | PositiveIntegerField | | Checks evaluated |
+| `passed_checks` | PositiveIntegerField | | Checks that passed |
+| `failed_checks` | PositiveIntegerField | | Checks that failed |
+| `compliance_score` | FloatField | | Passed / total, as a percentage |
+| `details` | JSONField | | Per-policy breakdown |
+| `tags` | ManyToMany(Tag) | | NetBox tags |
+
+---
+
 ## Database Tables
 
 | Model | Table Name |
@@ -458,6 +654,13 @@ Only one check result per (certificate, policy) combination. Running compliance 
 | CertificateSigningRequest | `netbox_ssl_certificatesigningrequest` |
 | CompliancePolicy | `netbox_ssl_compliancepolicy` |
 | ComplianceCheck | `netbox_ssl_compliancecheck` |
+| ComplianceTrendSnapshot | `netbox_ssl_compliancetrendsnapshot` |
+| MonitoredEndpoint | `netbox_ssl_monitoredendpoint` |
+| MonitoredEndpointCertificate | `netbox_ssl_monitoredendpointcertificate` |
+| ExternalSource | `netbox_ssl_externalsource` |
+| ExternalSourceSyncLog | `netbox_ssl_externalsourcesynclog` |
+| CertificateLifecycleEvent | `netbox_ssl_certificatelifecycleevent` |
+| CertificateEventLog | `netbox_ssl_certificateeventlog` |
 
 ### Indexes
 

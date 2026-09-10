@@ -231,6 +231,18 @@ Interactive topology view showing certificates per Tenant → Device/VM → Serv
 ### Email Notifications
 Receive email alerts when certificates are expiring. Configurable recipients, thresholds, and subject prefix. Sends HTML + plain-text reports.
 
+### Certificate Type
+Every certificate records its role in the TLS handshake — **Server**, **Client** or **mTLS** — detected automatically from the X.509 Extended Key Usage extension on import and editable afterwards. Client and mutual-TLS certificates are no longer indistinguishable from server certificates in the inventory.
+
+### Website Monitoring (Monitored Endpoints)
+Register the URLs you care about under **SSL Certificates → Monitored Endpoints** and let the plugin poll them: it scrapes the certificate each endpoint actually presents, links it, records rotation history, and fires events on rotation, untrusted chains and unreachable hosts. The fastest way to answer "is what we *think* is deployed the same as what is *really* deployed?"
+
+### Compliance Policies
+Define policy rules (minimum key size, allowed algorithms, forbidden issuers, wildcard bans, maximum validity, and more) in the UI, scope them by tenant or tag, and evaluate them across the fleet on a schedule with the `CertificateComplianceCheck` script. Results are browsable per policy and per certificate.
+
+### External Sources
+Sync certificates read-only from Lemur, AWS ACM, or any REST API via the generic adapter. Credentials are stored as `env:VAR_NAME` references, never in the database.
+
 ### Certificate Assignments
 Link certificates to the objects that use them:
 - **Services** (recommended) — Port-level granularity (e.g., HTTPS on port 443)
