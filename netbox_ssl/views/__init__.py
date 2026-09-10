@@ -25,6 +25,17 @@ from .certificates import (
     CertificateRenewView,
     CertificateView,
 )
+from .compliance import (
+    ComplianceCheckBulkDeleteView,
+    ComplianceCheckDeleteView,
+    ComplianceCheckListView,
+    ComplianceCheckView,
+    CompliancePolicyBulkDeleteView,
+    CompliancePolicyDeleteView,
+    CompliancePolicyEditView,
+    CompliancePolicyListView,
+    CompliancePolicyView,
+)
 from .csr import (
     CertificateSigningRequestBulkDeleteView,
     CertificateSigningRequestBulkEditView,
@@ -102,4 +113,14 @@ __all__ = [
     "MonitoredEndpointDeleteView",
     "MonitoredEndpointBulkDeleteView",
     "MonitoredEndpointImportView",
+    # Compliance views
+    "CompliancePolicyListView",
+    "CompliancePolicyView",
+    "CompliancePolicyEditView",
+    "CompliancePolicyDeleteView",
+    "CompliancePolicyBulkDeleteView",
+    "ComplianceCheckListView",
+    "ComplianceCheckView",
+    "ComplianceCheckDeleteView",
+    "ComplianceCheckBulkDeleteView",
 ]

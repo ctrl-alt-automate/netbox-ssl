@@ -30,6 +30,15 @@ class CertificateAssignmentListView(generic.ObjectListView):
     filterset_form = CertificateAssignmentFilterForm
     table = CertificateAssignmentTable
 
+    def get_queryset(self, request):
+        """Annotate the assigned object's name so the column can be sorted (#167).
+
+        Applied per request rather than on the class attribute: the annotation
+        imports the dcim/ipam/virtualization models, which must not happen while
+        this module is still being loaded.
+        """
+        return super().get_queryset(request).with_assigned_object_name()
+
 
 class CertificateAssignmentView(generic.ObjectView):
     """Display a single certificate assignment."""

@@ -36,7 +36,7 @@ menu = PluginMenu(
                 PluginMenuItem(
                     link="plugins:netbox_ssl:certificate_url_import",
                     link_text="Import from URLs (CSV)",
-                    permissions=["netbox_ssl.run_urlimport"],
+                    permissions=["netbox_ssl.urlimport_certificate"],
                 ),
                 PluginMenuItem(
                     link="plugins:netbox_ssl:certificateassignment_list",
@@ -117,6 +117,29 @@ menu = PluginMenu(
                             permissions=["netbox_ssl.add_monitoredendpoint"],
                         ),
                     ),
+                ),
+            ),
+        ),
+        (
+            "Compliance",
+            (
+                PluginMenuItem(
+                    link="plugins:netbox_ssl:compliancepolicy_list",
+                    link_text="Compliance Policies",
+                    permissions=["netbox_ssl.view_compliancepolicy"],
+                    buttons=(
+                        PluginMenuButton(
+                            link="plugins:netbox_ssl:compliancepolicy_add",
+                            title="Add",
+                            icon_class="mdi mdi-plus-thick",
+                            permissions=["netbox_ssl.add_compliancepolicy"],
+                        ),
+                    ),
+                ),
+                PluginMenuItem(
+                    link="plugins:netbox_ssl:compliancecheck_list",
+                    link_text="Compliance Checks",
+                    permissions=["netbox_ssl.view_compliancecheck"],
                 ),
             ),
         ),

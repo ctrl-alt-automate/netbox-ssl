@@ -236,6 +236,70 @@ urlpatterns = [
         name="externalsource_changelog",
         kwargs={"model": models.ExternalSource},
     ),
+    # CompliancePolicy URLs
+    path(
+        "compliance-policies/",
+        views.CompliancePolicyListView.as_view(),
+        name="compliancepolicy_list",
+    ),
+    path(
+        "compliance-policies/add/",
+        views.CompliancePolicyEditView.as_view(),
+        name="compliancepolicy_add",
+    ),
+    path(
+        "compliance-policies/delete/",
+        views.CompliancePolicyBulkDeleteView.as_view(),
+        name="compliancepolicy_bulk_delete",
+    ),
+    path(
+        "compliance-policies/<int:pk>/",
+        views.CompliancePolicyView.as_view(),
+        name="compliancepolicy",
+    ),
+    path(
+        "compliance-policies/<int:pk>/edit/",
+        views.CompliancePolicyEditView.as_view(),
+        name="compliancepolicy_edit",
+    ),
+    path(
+        "compliance-policies/<int:pk>/delete/",
+        views.CompliancePolicyDeleteView.as_view(),
+        name="compliancepolicy_delete",
+    ),
+    path(
+        "compliance-policies/<int:pk>/changelog/",
+        ObjectChangeLogView.as_view(),
+        name="compliancepolicy_changelog",
+        kwargs={"model": models.CompliancePolicy},
+    ),
+    # ComplianceCheck URLs
+    path(
+        "compliance-checks/",
+        views.ComplianceCheckListView.as_view(),
+        name="compliancecheck_list",
+    ),
+    path(
+        "compliance-checks/delete/",
+        views.ComplianceCheckBulkDeleteView.as_view(),
+        name="compliancecheck_bulk_delete",
+    ),
+    path(
+        "compliance-checks/<int:pk>/",
+        views.ComplianceCheckView.as_view(),
+        name="compliancecheck",
+    ),
+    path(
+        "compliance-checks/<int:pk>/delete/",
+        views.ComplianceCheckDeleteView.as_view(),
+        name="compliancecheck_delete",
+    ),
+    path(
+        "compliance-checks/<int:pk>/changelog/",
+        ObjectChangeLogView.as_view(),
+        name="compliancecheck_changelog",
+        kwargs={"model": models.ComplianceCheck},
+    ),
     # MonitoredEndpoint URLs
     path(
         "monitored-endpoints/",

@@ -22,7 +22,10 @@ class CertificateAssignmentTable(NetBoxTable):
         verbose_name="Assigned To",
         linkify=False,  # We handle linking manually
         accessor="assigned_object",
-        orderable=False,  # GenericForeignKey cannot be used in order_by()
+        # A GenericForeignKey cannot appear in order_by(), so sort on the
+        # `assigned_object_name` annotation added by
+        # CertificateAssignmentQuerySet.with_assigned_object_name() (issue #167).
+        order_by="_assigned_object_name",
     )
     is_primary = columns.BooleanColumn(
         verbose_name="Primary",

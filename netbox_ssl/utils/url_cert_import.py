@@ -77,6 +77,7 @@ def scrape_and_import(
             "sans": parsed.sans or [],
             "key_size": parsed.key_size,
             "algorithm": parsed.algorithm,
+            "certificate_type": parsed.certificate_type,
             "status": CertificateStatusChoices.STATUS_ACTIVE,
             "pem_content": parsed.pem_content,
             "issuer_chain": parsed.issuer_chain,

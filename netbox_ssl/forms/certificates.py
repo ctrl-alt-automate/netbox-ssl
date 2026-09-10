@@ -17,6 +17,7 @@ from ..models import (
     CertificateAlgorithmChoices,
     CertificateAuthority,
     CertificateStatusChoices,
+    CertificateTypeChoices,
 )
 
 
@@ -55,6 +56,7 @@ class CertificateForm(NetBoxModelForm):
         ),
         FieldSet(
             "algorithm",
+            "certificate_type",
             "key_size",
             name=_("Key Information"),
         ),
@@ -105,6 +107,7 @@ class CertificateForm(NetBoxModelForm):
             "sans",
             "key_size",
             "algorithm",
+            "certificate_type",
             "status",
             "private_key_location",
             "renewal_note",
@@ -225,6 +228,7 @@ class CertificateFilterForm(NetBoxModelFilterSetForm):
         ),
         FieldSet(
             "algorithm",
+            "certificate_type",
             "key_size",
             name=_("Key"),
         ),
@@ -260,6 +264,11 @@ class CertificateFilterForm(NetBoxModelFilterSetForm):
         choices=CertificateStatusChoices,
         required=False,
         label=_("Status"),
+    )
+    certificate_type = forms.MultipleChoiceField(
+        choices=CertificateTypeChoices,
+        required=False,
+        label=_("Type"),
     )
     algorithm = forms.MultipleChoiceField(
         choices=CertificateAlgorithmChoices,

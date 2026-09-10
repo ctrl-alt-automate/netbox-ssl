@@ -98,7 +98,7 @@ If you have binary certificate files instead of PEM text:
 - **PKCS#7** (`.p7b`, `.p7c`): bundle containing a certificate and its chain —
   the plugin extracts every certificate from the bundle as a separate record.
 
-Use the `POST /api/plugins/netbox-ssl/certificates/import-file/` endpoint with
+Use the `POST /api/plugins/ssl/certificates/import-file/` endpoint with
 multipart file upload, or paste the file content into the bulk import page (it
 auto-detects the format).
 
@@ -107,7 +107,7 @@ auto-detects the format).
 For scripted ingestion from your CI or automation:
 
 ```bash
-curl -X POST https://netbox.example/api/plugins/netbox-ssl/certificates/bulk-import/ \
+curl -X POST https://netbox.example/api/plugins/ssl/certificates/bulk-import/ \
   -H "Authorization: Token $NETBOX_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

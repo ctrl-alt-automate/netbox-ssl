@@ -500,7 +500,7 @@ Layered controls, each enforced independently:
 - **Private-key rejection** — parser refuses any input containing a private-key header (broad regex match across RSA, EC, Ed25519, and generic PRIVATE KEY forms).
 - **PEM size cap** — `max_length=65536` on form fields plus a size guard in the parser.
 - **SSRF guards** — shared `utils/url_validation.py` enforces HTTPS-only, DNS resolution to public IPs only, no redirect following, and streaming-response size caps on all outbound calls (ARI polling, external-source sync).
-- **Permission model** — all views inherit `LoginRequiredMixin`; all querysets use `.restrict(request.user, "view"/"change")`; all write actions check `has_perm()`; custom permissions (`import_certificate`, `renew_certificate`, `bulk_operations`, `manage_compliance`) enable granular RBAC.
+- **Permission model** — all views inherit `LoginRequiredMixin`; all querysets use `.restrict(request.user, "view"/"change")`; all write actions check `has_perm()`; custom permissions (`import_certificate`, `renew_certificate`, `bulk_certificate`, `urlimport_certificate`, `manage_compliancepolicy`) enable granular RBAC. Codenames follow NetBox's `<action>_<model>` form, without which an ObjectPermission cannot grant them.
 - **CSV injection prevention** — export sanitises formula-triggering characters in CSV values.
 - **Credential pattern** — external-source credentials reference `env:VAR_NAME` only; raw credentials are rejected by validation and never appear in API responses (serializer field is `write_only`).
 

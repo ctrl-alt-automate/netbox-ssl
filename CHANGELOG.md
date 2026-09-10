@@ -7,6 +7,163 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-10
+
+### Added
+
+- **Certificate type: server, client or mTLS** ([#168](https://github.com/ctrl-alt-automate/netbox-ssl/issues/168)):
+  a new `certificate_type` field records a certificate's role in the TLS
+  handshake, so client and mutual-TLS certificates are no longer indistinguishable
+  from server certificates in the inventory. The value is **derived from the
+  X.509 Extended Key Usage extension on import** — `serverAuth` alone gives
+  `server`, `clientAuth` alone gives `client`, both give `mtls`, and a
+  certificate with no EKU extension defaults to `server` — and can be overridden
+  by an operator. Exposed on the detail page, the list table, the filters, the
+  REST API and GraphQL. Additive migration 0027; existing certificates take the
+  `server` default, matching how the plugin has treated them until now.
+- **NetBox 4.7 support**: `max_version` raised to `4.7.99` and a NetBox 4.7 lane
+  added to the CI integration matrix, which now covers 4.4, 4.5, 4.6 and 4.7.
+  NetBox 4.7 (released 2026-09-02) carries a large set of breaking changes —
+  `ipam.Service.protocol`/`.ports` replaced by `port_mappings`, the `EMAIL_*`
+  settings superseded by `MAILERS`, django-tables2 v3.0 dropping
+  `RelatedLinkColumn` and renaming the `querystring` tag, `registry['models']`
+  removed, django-mptt replaced by `ltree` — **none of which the plugin
+  depends on**; see the audit table in `COMPATIBILITY.md`. NetBox 4.7 enters as
+  **Supported**; 4.6 remains **Primary** until 4.7 has carried a release.
+- **Compliance Policies and Compliance Checks in the UI** ([#164](https://github.com/ctrl-alt-automate/netbox-ssl/issues/164)):
+  the compliance data model, filtersets and REST API shipped in v0.7, but no
+  forms, tables, views, URLs or menu entries were ever written — so policies
+  could only be created through the API, and both models' `get_absolute_url()`
+  pointed at routes that did not exist (any link to one raised
+  `NoReverseMatch`). Adds a **Compliance** menu section with full CRUD for
+  policies (including a JSON parameters field that documents each policy type's
+  shape and rejects non-object input) and a filterable, read-only results list
+  for checks. A policy's detail page shows the checks it produced and how many
+  certificates currently fail it. No database migration.
+- **`CertificateComplianceCheck` script** ([#164](https://github.com/ctrl-alt-automate/netbox-ssl/issues/164)):
+  the documentation had referenced this script since v0.7, but it was never
+  written — there was no way to evaluate compliance across the fleet on a
+  schedule, only one certificate at a time via the REST API. It evaluates every
+  enabled policy (or a single one), supports tenant filtering and a dry run,
+  skips archived/replaced certificates by default, and upserts one result per
+  certificate/policy pair so re-runs refresh rather than accumulate.
+- **Sort and search assignments by the object they are assigned to** ([#167](https://github.com/ctrl-alt-automate/netbox-ssl/issues/167)):
+  the **Assigned To** column was unsortable and invisible to the search box
+  because `assigned_object` is a GenericForeignKey, which spans three tables and
+  cannot appear in `order_by()` or a filter — making the list unnavigable for a
+  wildcard certificate assigned to dozens of hosts. A new
+  `with_assigned_object_name()` queryset annotation resolves the target's name
+  with a correlated subquery selected by content type, so the column now sorts
+  and the search box matches device, VM and service names, in the UI and via the
+  REST API. No database migration: nothing is denormalised, so the value cannot
+  go stale when an object is renamed.
+
+### Changed
+
+- The CI integration matrix no longer enumerates the NetBox versions that use
+  the v2 API token scheme (`== v4.5 || == v4.6`) but excludes the one that does
+  not (`!= v4.4`), so a newly added version is covered by default instead of
+  silently falling into the legacy-token branch.
+- `scripts/release_preflight.py` now validates the NetBox badge in
+  `docs/index.md` as well as the one in `README.md`. v1.3.0 shipped with a stale
+  badge there that only the manual release rehearsal caught, because the
+  preflight checked README alone.
+
+### Fixed
+
+- **`docker compose up -d` aborted on NetBox 4.7**: the development stack's
+  healthcheck allowed roughly 135s (`start_period: 90s` plus 3 x 15s retries),
+  but a cold start with an empty database runs NetBox's full migration set —
+  measured at ~110s on 4.4 and ~150s on 4.7. Compose therefore reported
+  "dependency failed to start" even though NetBox came up fine moments later.
+  The budget is now 300s with 5 retries.
+
+- **Compliance check list returned HTTP 500 on NetBox 4.7** (found by verifying
+  against every supported NetBox version, not just one): the list view declared
+  `actions` as the legacy `{name: permissions}` dict. NetBox 4.4-4.6 accepted
+  that through a `LEGACY_ACTIONS` shim which **4.7 removed** — iterating the dict
+  yields plain strings, so `action.permissions_required` raises `AttributeError`
+  and 500s the page. Now declared as `ObjectAction` classes
+  (`netbox.object_actions`, available since 4.4.0), which works across the whole
+  supported range.
+
+- **Compliance check list returned HTTP 500** (found while verifying
+  [#164](https://github.com/ctrl-alt-automate/netbox-ssl/issues/164) against a
+  live NetBox): `NetBoxTable`'s `ActionsColumn` renders Edit, Delete and
+  Changelog buttons by default and calls `reverse()` for each on every row.
+  Compliance checks are results with no edit form, so `compliancecheck_edit`
+  could not be reversed — `NoReverseMatch` took down the whole list page and the
+  HTMX results fragment on the policy detail page. The column now offers only
+  actions that exist, and a per-object delete view was added for consistency
+  with every other model. A new guard asserts that every action any table
+  renders has a registered URL.
+
+- **Monitored endpoints never got polled** ([#163](https://github.com/ctrl-alt-automate/netbox-ssl/issues/163)):
+  the `MonitoredEndpointPoll` script shipped in v1.3.0 but was never re-exported
+  from `netbox_ssl.scripts`, so the documented `SCRIPTS_ROOT` wrapper
+  (`from netbox_ssl.scripts import MonitoredEndpointPoll`) failed with
+  `ImportError` and the script could not be registered in NetBox at all. Every
+  monitored endpoint therefore stayed on **Pending** forever, making
+  website-centric monitoring (#149) unusable. The class is now exported, and a
+  new AST guard (`tests/test_script_exports.py`) fails the build if any bundled
+  `Script` subclass is missing from the package's `__all__` or from
+  `docs/reference/scripts.md`.
+- **Renewal reminders quoted stale certificate data** ([#161](https://github.com/ctrl-alt-automate/netbox-ssl/issues/161)):
+  a consequence of #163 — with the poll script unregistrable, a monitored
+  endpoint stayed linked to the certificate it had at creation time, so
+  reminders reported the pre-renewal certificate. Endpoints now follow the live
+  certificate once the poll is scheduled.
+- **Documented API URLs returned 404** ([#165](https://github.com/ctrl-alt-automate/netbox-ssl/issues/165)):
+  the documentation addressed the plugin as `/api/plugins/netbox-ssl/`, but
+  NetBox mounts a plugin under its `PluginConfig.base_url` — which is `ssl`, not
+  the distribution name. All 54 affected examples across the API reference,
+  bulk-import and compliance how-tos, and the troubleshooting guide now use
+  `/api/plugins/ssl/`. A new guard (`tests/test_docs_urls.py`) parses `base_url`
+  out of the plugin config and fails the build if the docs and the code disagree.
+- **Three custom permissions could never be granted** ([#166](https://github.com/ctrl-alt-automate/netbox-ssl/issues/166)):
+  NetBox builds permission names as `<app>.<action>_<model>` from
+  `ObjectPermission.actions` and takes them apart again with
+  `codename.rsplit("_", 1)`, so the text after the final underscore must name a
+  real model. `bulk_operations` implied a model `operations`,
+  `manage_compliance` a model `compliance`, and `run_urlimport` a model
+  `urlimport` — none of which exist. NetBox could therefore never construct
+  those names, and the three permissions were silently ungrantable to every
+  non-superuser since v0.9, blocking all bulk endpoints, compliance checks and
+  URL import. Renamed to the grantable form (migration 0026, metadata-only):
+
+  | Old (ungrantable) | New |
+  |---|---|
+  | `bulk_operations` | `bulk_certificate` |
+  | `run_urlimport` | `urlimport_certificate` |
+  | `manage_compliance` | `manage_compliancepolicy` |
+
+  No ObjectPermission could reference the old names, so there is nothing to
+  migrate; update any automation that created permissions by codename.
+  `tests/test_permission_names.py` now fails the build if a custom permission
+  cannot decompose into an action plus a model this app defines, or if a
+  `has_perm()` call names a codename no model declares.
+
+### Documentation
+
+- New how-to guide for [website-centric endpoint monitoring](https://ctrl-alt-automate.github.io/netbox-ssl/latest/how-to/endpoint-monitoring/),
+  covering registration, the mandatory `SCRIPTS_ROOT` step, statuses, events,
+  the private-CIDR allowlist, and troubleshooting. The v1.3.0 feature shipped
+  with no how-to documentation at all.
+- `docs/reference/scripts.md` now documents `MonitoredEndpointPoll` and includes
+  it in the wrapper-module example.
+- `docs/reference/permissions.md` now explains **how** NetBox grants a
+  permission — Django groups and roles are ignored; only an ObjectPermission
+  carrying the bare action verb counts — with the object type and action to
+  enter for each custom permission. Its absence is why #166 was reported as a
+  permission bug: the reporter had ticked `renew_certificate` in a Django role,
+  which NetBox never consults.
+- `docs/how-to/compliance-policies.md` corrected: policies live under
+  **Plugins → SSL Certificates → Compliance Policies**, not Admin; the
+  parameters field is documented; the scheduled-run step now notes the
+  `SCRIPTS_ROOT` registration requirement; and a new step covers browsing
+  results. Both v1.4 prerequisites are called out with an API fallback for
+  older releases.
+
 ## [1.3.0] - 2026-06-22
 
 ### Added

@@ -76,8 +76,8 @@ def _has_import_perm(user) -> bool:
 
 
 def _check_bulk_perm(request, extra_perm: str) -> Response | None:
-    """Check bulk_operations permission plus an extra permission. Returns 403 Response or None."""
-    if not request.user.has_perm("netbox_ssl.bulk_operations"):
+    """Check bulk_certificate permission plus an extra permission. Returns 403 Response or None."""
+    if not request.user.has_perm("netbox_ssl.bulk_certificate"):
         return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
     # Use backward-compatible check for import permission
     if extra_perm == "netbox_ssl.import_certificate":
@@ -557,7 +557,7 @@ class CertificateViewSet(NetBoxModelViewSet):
             "policy_ids": [1, 2, 3]
         }
         """
-        if not request.user.has_perm("netbox_ssl.manage_compliance"):
+        if not request.user.has_perm("netbox_ssl.manage_compliancepolicy"):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
         certificate = self.get_object()
         serializer = ComplianceRunSerializer(data=request.data)
@@ -744,7 +744,7 @@ class CertificateViewSet(NetBoxModelViewSet):
             "policy_ids": [1, 2]  // optional
         }
         """
-        denied = _check_bulk_perm(request, "netbox_ssl.manage_compliance")
+        denied = _check_bulk_perm(request, "netbox_ssl.manage_compliancepolicy")
         if denied:
             return denied
         serializer = BulkComplianceRunSerializer(data=request.data)
@@ -1231,6 +1231,7 @@ class CertificateViewSet(NetBoxModelViewSet):
                     sans=parsed.sans,
                     key_size=parsed.key_size,
                     algorithm=parsed.algorithm,
+                    certificate_type=parsed.certificate_type,
                     pem_content=parsed.pem_content,
                     issuer_chain=parsed.issuer_chain,
                     status="active",
@@ -1309,6 +1310,10 @@ class CertificateAssignmentViewSet(NetBoxModelViewSet):
     )
     serializer_class = CertificateAssignmentSerializer
     filterset_class = CertificateAssignmentFilterSet
+
+    def get_queryset(self):
+        """Expose `_assigned_object_name` so the API can order and filter on it (#167)."""
+        return super().get_queryset().with_assigned_object_name()
 
 
 class CertificateAuthorityViewSet(NetBoxModelViewSet):

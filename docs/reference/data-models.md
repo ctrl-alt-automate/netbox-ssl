@@ -120,6 +120,7 @@ The main model for storing certificate metadata.
 | `valid_to` | DateTimeField | Yes | Certificate validity end |
 | `sans` | JSONField | | Subject Alternative Names (array) |
 | `algorithm` | CharField(20) | Yes | Key algorithm |
+| `certificate_type` | CharField(20) | Yes | `server`, `client` or `mtls`; detected from Extended Key Usage on import |
 | `key_size` | IntegerField | | Key size in bits |
 | `status` | CharField(20) | Yes | Certificate lifecycle status |
 | `private_key_location` | CharField(500) | | Hint for key storage location |
@@ -294,6 +295,7 @@ Tracks pending Certificate Signing Requests before they become issued certificat
 | `sans` | JSONField | | Subject Alternative Names (array) |
 | `key_size` | IntegerField | | Key size in bits |
 | `algorithm` | CharField(20) | Yes | Key algorithm (RSA, ECDSA, Ed25519) |
+| `certificate_type` | CharField(20) | Yes | TLS role: `server`, `client` or `mtls` |
 | `fingerprint_sha256` | CharField(95) | Yes | SHA256 fingerprint of CSR (unique) |
 | `pem_content` | TextField | Yes | CSR in PEM format |
 | `status` | CharField(20) | Yes | CSR lifecycle status |

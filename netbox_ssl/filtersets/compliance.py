@@ -5,8 +5,10 @@ FilterSets for compliance reporting models.
 import django_filters
 from django.db import models
 from netbox.filtersets import NetBoxModelFilterSet
+from tenancy.models import Tenant
 
 from ..models import (
+    Certificate,
     ComplianceCheck,
     CompliancePolicy,
     CompliancePolicyTypeChoices,
@@ -26,7 +28,13 @@ class CompliancePolicyFilterSet(NetBoxModelFilterSet):
         choices=ComplianceSeverityChoices,
     )
     enabled = django_filters.BooleanFilter()
-    tenant_id = django_filters.NumberFilter()
+    # ModelMultipleChoiceFilter, not NumberFilter: the filter form offers a
+    # multi-select, and a NumberFilter silently keeps only the last value --
+    # wrong results rather than an error. Matches every other filterset here.
+    tenant_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=Tenant.objects.all(),
+        label="Tenant",
+    )
     tenant = django_filters.CharFilter(
         field_name="tenant__name",
         lookup_expr="icontains",
@@ -54,12 +62,19 @@ class CompliancePolicyFilterSet(NetBoxModelFilterSet):
 class ComplianceCheckFilterSet(NetBoxModelFilterSet):
     """FilterSet for ComplianceCheck model."""
 
-    certificate_id = django_filters.NumberFilter()
+    certificate_id = django_filters.ModelMultipleChoiceFilter(
+        queryset=Certificate.objects.all(),
+        label="Certificate",
+    )
     certificate = django_filters.CharFilter(
         field_name="certificate__common_name",
         lookup_expr="icontains",
     )
-    policy_id = django_filters.NumberFilter()
+    policy_id = django_filters.ModelMultipleChoiceFilter(
+        field_name="policy",
+        queryset=CompliancePolicy.objects.all(),
+        label="Policy",
+    )
     policy = django_filters.CharFilter(
         field_name="policy__name",
         lookup_expr="icontains",

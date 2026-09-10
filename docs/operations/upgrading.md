@@ -39,7 +39,7 @@ sudo systemctl restart netbox netbox-rq
 **New migrations:** 5 (0015–0019)
 
 **Permissions change:**
-v0.9 introduces granular permissions: `import_certificate`, `renew_certificate`, `bulk_operations`, `manage_compliance`. For backward compatibility, import endpoints accept both `import_certificate` and the legacy `add_certificate` permission. This fallback will be removed in v1.1+.
+v0.9 introduces granular permissions: `import_certificate`, `renew_certificate`, `bulk_certificate`, `manage_compliancepolicy`. For backward compatibility, import endpoints accept both `import_certificate` and the legacy `add_certificate` permission. This fallback will be removed in v1.1+.
 
 **Recommended:** After upgrading, assign the new custom permissions to your users/groups via Admin > Permissions. See [permissions documentation](../reference/permissions.md) for details.
 
