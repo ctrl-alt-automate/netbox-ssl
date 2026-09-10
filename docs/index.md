@@ -94,6 +94,18 @@ infrastructure depends on which certificate.
 Scheduled scans + NetBox Event Rules + webhooks → Slack, Teams, or PagerDuty
 notifications long before anything breaks.
 
+### Watch what is actually deployed
+
+Register the URLs you care about. The plugin polls each one, records the
+certificate it really presents, and tells you when that changes — drift detection
+without importing anything by hand.
+
+### Distinguish server, client and mTLS certificates
+
+Every certificate records its TLS role, detected from its Extended Key Usage
+extension on import, so mutual-TLS deployments are representable rather than
+lumped in with server certificates.
+
 ### Compliance and analytics
 
 Define compliance policies, monitor a score over time, visualise the expiry

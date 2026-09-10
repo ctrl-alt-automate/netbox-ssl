@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Reference documentation caught up with the code.** Every feature since v0.8
+  shipped with its own how-to guide, but the reference documents — the ones
+  describing the whole surface rather than one task — fell behind. Added the
+  seven missing models to `docs/reference/data-models.md`
+  (`MonitoredEndpoint`, `MonitoredEndpointCertificate`, `ExternalSource`,
+  `ExternalSourceSyncLog`, `CertificateLifecycleEvent`, `CertificateEventLog`,
+  `ComplianceTrendSnapshot`) plus a Certificate Type choices table, and the three
+  missing REST collections and fifteen custom actions to
+  `docs/reference/api.md`.
+- Corrected `docs/explanation/architecture.md`, whose ER diagram named a
+  `ComplianceResult` model that has never existed — it is `ComplianceCheck` —
+  and which omitted the monitored-endpoint entities entirely.
+- Added the current feature set to `README.md` and `docs/index.md` (certificate
+  type, website monitoring, compliance policies, external sources), and a
+  v1.4.0 row to the roadmap changelog.
+- Fixed a broken relative link in `CHANGELOG.md`.
+- New guards (`tests/test_docs_coverage.py`) fail the build when a model, REST
+  collection or custom action has no reference entry, and when the reference
+  documentation names something that does not exist.
+
 ## [1.4.0] - 2026-09-10
 
 ### Added
@@ -227,7 +249,7 @@ changes; safe to upgrade from 1.2.x.
 
 - **How to register the bundled scripts** ([#143](https://github.com/ctrl-alt-automate/netbox-ssl/issues/143)):
   documented that NetBox does not auto-discover plugin-bundled scripts and added
-  a `SCRIPTS_ROOT` wrapper recipe to [Custom Scripts](reference/scripts.md) so
+  a `SCRIPTS_ROOT` wrapper recipe to [Custom Scripts](https://ctrl-alt-automate.github.io/netbox-ssl/latest/reference/scripts/) so
   the expiry scan and friends actually appear under **Customization → Scripts**.
 
 ## [1.2.1] - 2026-06-04
