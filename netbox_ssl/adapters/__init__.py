@@ -30,6 +30,17 @@ def _build_registry() -> dict[str, type[BaseAdapter]]:
             "AWS ACM adapter not registered (boto3 not installed): %s. Install with: pip install netbox-ssl[aws]",
             exc,
         )
+    # Optional adapter — requires netbox-ssl[azure]
+    try:
+        from .azure_kv import AzureKvAdapter
+
+        registry["azure_kv"] = AzureKvAdapter
+    except ImportError as exc:
+        logger.info(
+            "Azure Key Vault adapter not registered (azure SDK not installed): %s. "
+            "Install with: pip install netbox-ssl[azure]",
+            exc,
+        )
     return registry
 
 
