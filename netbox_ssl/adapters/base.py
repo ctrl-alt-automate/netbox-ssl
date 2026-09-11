@@ -86,6 +86,15 @@ class FetchedCertificate:
     pem_content: str = ""
     issuer_chain: str = ""
 
+    # Added for #101. Every default reproduces the behaviour the sync engine
+    # had before these existed, so an adapter that ignores them is unaffected:
+    #   tags             -> engine applies none
+    #   certificate_type -> the model default, which is what sync produced
+    #   status           -> engine falls back to STATUS_ACTIVE
+    tags: tuple[str, ...] = field(default_factory=tuple)
+    certificate_type: str = "server"
+    status: str | None = None
+
 
 class BaseAdapter(ABC):
     """Abstract base class for external source adapters."""
