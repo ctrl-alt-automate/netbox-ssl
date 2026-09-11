@@ -256,7 +256,7 @@ def execute_plan(
             log.certificates_updated += 1
             continue
         try:
-            _update_certificate(action.local_cert_id, action.fetched)
+            _update_certificate(action.local_cert_id, action.fetched, source)
             log.certificates_updated += 1
         except Exception as e:
             logger.error("Failed to update certificate %s: %s", action.external_id, e)
@@ -306,6 +306,26 @@ def execute_plan(
     return log
 
 
+def _apply_tags(cert: Any, fetched: FetchedCertificate, source: Any) -> None:
+    """Apply source tags to a certificate, when the source opts in.
+
+    Tag names arrive already flattened by the adapter (an Azure `key`/`value`
+    pair becomes `key=value`). Tags are created on demand; NetBox requires a
+    slug, so one is derived from the name.
+    """
+    if not getattr(source, "sync_tags", False) or not fetched.tags:
+        return
+
+    from django.utils.text import slugify
+    from extras.models import Tag
+
+    tags = []
+    for name in fetched.tags:
+        tag, _ = Tag.objects.get_or_create(name=name, defaults={"slug": slugify(name)[:100]})
+        tags.append(tag)
+    cert.tags.set(tags)
+
+
 def _create_certificate(fetched: FetchedCertificate, source: Any) -> None:
     """Create a new Certificate from a FetchedCertificate.
 
@@ -337,11 +357,14 @@ def _create_certificate(fetched: FetchedCertificate, source: Any) -> None:
         external_source=source,
         external_id=fetched.external_id,
         tenant=source.tenant,
-        status=CertificateStatusChoices.STATUS_ACTIVE,
+        status=fetched.status or CertificateStatusChoices.STATUS_ACTIVE,
+        certificate_type=fetched.certificate_type,
     )
     # CRIT-4: Set sync actor unconditionally — Python allows arbitrary attrs.
     cert._sync_actor = f"external_sync:{source.name}"
     cert.save()
+
+    _apply_tags(cert, fetched, source)
 
     # Auto-detect CA and ACME
     cert.auto_detect_ca()
@@ -355,12 +378,13 @@ def _create_certificate(fetched: FetchedCertificate, source: Any) -> None:
     )
 
 
-def _update_certificate(local_cert_id: int, fetched: FetchedCertificate) -> None:
+def _update_certificate(local_cert_id: int, fetched: FetchedCertificate, source: Any) -> None:
     """Update an existing Certificate with new metadata.
 
     Args:
         local_cert_id: The pk of the local Certificate.
         fetched: The fetched certificate data.
+        source: The ExternalSource, needed for the sync_tags opt-in.
 
     Raises:
         ValueError: If the fetched PEM contains a private key.
@@ -383,8 +407,13 @@ def _update_certificate(local_cert_id: int, fetched: FetchedCertificate) -> None
         cert.key_size = fetched.key_size
     if fetched.algorithm != "unknown":
         cert.algorithm = fetched.algorithm
+    if fetched.status:
+        cert.status = fetched.status
+    cert.certificate_type = fetched.certificate_type
     cert.source_removed = False
     cert.save()
+
+    _apply_tags(cert, fetched, source)
 
     logger.info("Updated certificate '%s' (pk=%s)", fetched.common_name, local_cert_id)
 
