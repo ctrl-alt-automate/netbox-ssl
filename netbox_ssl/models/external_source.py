@@ -82,11 +82,13 @@ class ExternalSourceTypeChoices(ChoiceSet):
     TYPE_LEMUR = "lemur"
     TYPE_GENERIC_REST = "generic_rest"
     TYPE_AWS_ACM = "aws_acm"
+    TYPE_AZURE_KV = "azure_kv"
 
     CHOICES = [
         (TYPE_LEMUR, "Lemur", "purple"),
         (TYPE_GENERIC_REST, "Generic REST API", "blue"),
         (TYPE_AWS_ACM, "AWS Certificate Manager", "orange"),
+        (TYPE_AZURE_KV, "Azure Key Vault", "cyan"),
     ]
 
 
@@ -220,6 +222,10 @@ class ExternalSource(NetBoxModel):
             "Verify TLS certificates when connecting to the source. "
             "WARNING: Disabling this removes protection against MITM attacks."
         ),
+    )
+    sync_tags = models.BooleanField(
+        default=False,
+        help_text="Copy tags from the external source onto imported certificates",
     )
 
     # Free-form comments (NetBox standard field; surfaced via CommentField in the form).
