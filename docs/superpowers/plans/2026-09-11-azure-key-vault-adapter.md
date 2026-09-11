@@ -215,24 +215,54 @@ adapters are unaffected."
 Create `tests/test_azure_kv_model.py`:
 
 ```python
-"""Model-level additions for the Azure Key Vault adapter (#101)."""
+"""Model-level additions for the Azure Key Vault adapter (#101).
+
+`netbox_ssl.models` cannot be imported on the host lane — Django models need
+configured settings — so the shape assertions read the model source, the same
+way tests/test_permission_names.py does. The behavioural assertion that the
+default actually applies runs in the container lane.
+"""
+
+import ast
+from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.unit
-
-from netbox_ssl.models import ExternalSourceTypeChoices
+MODEL_SOURCE = Path(__file__).parent.parent / "netbox_ssl" / "models" / "external_source.py"
 
 
+def _choice_values(class_name: str) -> set[str]:
+    """Return every string constant assigned inside a ChoiceSet class."""
+    tree = ast.parse(MODEL_SOURCE.read_text())
+    for cls in tree.body:
+        if isinstance(cls, ast.ClassDef) and cls.name == class_name:
+            return {
+                node.value
+                for stmt in cls.body
+                if isinstance(stmt, ast.Assign)
+                for node in ast.walk(stmt)
+                if isinstance(node, ast.Constant) and isinstance(node.value, str)
+            }
+    raise AssertionError(f"{class_name} not found in {MODEL_SOURCE.name}")
+
+
+@pytest.mark.unit
 def test_azure_kv_source_type_exists():
-    assert ExternalSourceTypeChoices.TYPE_AZURE_KV == "azure_kv"
+    assert "azure_kv" in _choice_values("ExternalSourceTypeChoices")
 
 
-def test_azure_kv_appears_in_choices():
-    values = [value for value, *_ in ExternalSourceTypeChoices.CHOICES]
-    assert "azure_kv" in values
+@pytest.mark.unit
+def test_azure_kv_has_a_human_label():
+    """A choice value with no label renders as a raw slug in the UI."""
+    assert "Azure Key Vault" in _choice_values("ExternalSourceTypeChoices")
 
 
+@pytest.mark.unit
+def test_sync_tags_field_is_declared():
+    assert "sync_tags = models.BooleanField(" in MODEL_SOURCE.read_text()
+
+
+@pytest.mark.django_db
 def test_sync_tags_defaults_to_false():
     """Opt-in: upgrading must never start writing tags to existing certificates."""
     from netbox_ssl.models import ExternalSource
@@ -243,8 +273,8 @@ def test_sync_tags_defaults_to_false():
 
 - [ ] **Step 2: Run the test and confirm it fails**
 
-Run: `python -m pytest tests/test_azure_kv_model.py -v -p no:django`
-Expected: FAIL — `AttributeError: type object 'ExternalSourceTypeChoices' has no attribute 'TYPE_AZURE_KV'`.
+Run: `python -m pytest tests/test_azure_kv_model.py -v -p no:django -m unit`
+Expected: FAIL — `'azure_kv' not in {...}` and the `sync_tags = models.BooleanField(` assertion. The `django_db` test is deselected on the host lane; it runs in the container in Step 6.
 
 - [ ] **Step 3: Add the choice and the field**
 
@@ -325,8 +355,8 @@ class Migration(migrations.Migration):
 
 - [ ] **Step 5: Run the tests and confirm they pass**
 
-Run: `python -m pytest tests/test_azure_kv_model.py -v -p no:django`
-Expected: 3 passed.
+Run: `python -m pytest tests/test_azure_kv_model.py -v -p no:django -m unit`
+Expected: 3 passed, 1 deselected.
 
 - [ ] **Step 6: Verify the migration matches Django's own output**
 
@@ -1474,6 +1504,21 @@ pytestmark = pytest.mark.unit
 _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
+
+# Importing the adapter pulls netbox_ssl/__init__.py, which imports
+# netbox.plugins. NetBox is absent on the host lane, so mock it — the repo's
+# established pattern, also used by test_credential_schema.py and test_adapters.py.
+import importlib.util  # noqa: E402
+
+try:
+    _spec = importlib.util.find_spec("netbox")
+    _NETBOX_AVAILABLE = _spec is not None and _spec.origin is not None
+except (ValueError, ModuleNotFoundError):
+    _NETBOX_AVAILABLE = False
+
+if not _NETBOX_AVAILABLE and "netbox" not in sys.modules:
+    sys.modules["netbox"] = MagicMock()
+    sys.modules["netbox.plugins"] = MagicMock()
 
 ADAPTER = Path(__file__).parent.parent / "netbox_ssl" / "adapters" / "azure_kv.py"
 
