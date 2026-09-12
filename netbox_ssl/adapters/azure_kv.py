@@ -34,6 +34,16 @@ from .base import BaseAdapter, CredentialField, FetchedCertificate
 
 logger = logging.getLogger("netbox_ssl.adapters")
 
+
+class ProhibitedFieldError(Exception):
+    """Raised when a Key Vault response carries a field that could hold key material.
+
+    Deliberately NOT caught by fetch_certificates' per-certificate handler: this
+    is a tripwire, and a tripwire that degrades to a skipped item is not a
+    tripwire. If Azure ever returns key material, the sync must stop and be seen.
+    """
+
+
 # Accepted Key Vault hostname suffixes, per design §6.2. The SDK bypasses
 # BaseAdapter._make_request, so this is the adapter's own SSRF guard.
 VAULT_HOST_SUFFIXES: tuple[str, ...] = (
@@ -175,6 +185,37 @@ class AzureKvAdapter(BaseAdapter):
             return False, "Unexpected error contacting Azure Key Vault."
         return True, f"Connected. {count} certificate(s) visible in the vault."
 
+    @staticmethod
+    def _assert_no_prohibited_keys(obj) -> None:
+        """Fail hard if a response carries a field that could hold key material.
+
+        Azure does not return key material from the certificates API today.
+        This is a tripwire for the day it changes, or the day someone widens
+        the RBAC role — see PROHIBITED_SYNC_FIELDS for the canonical list.
+
+        Deliberately raises ProhibitedFieldError, not ValueError:
+        fetch_certificates' per-certificate handler catches broad exceptions
+        to keep one bad certificate from failing the whole run, and a
+        tripwire that gets swallowed by that handler is not a tripwire. See
+        ProhibitedFieldError's docstring.
+
+        Raises:
+            ProhibitedFieldError: If any prohibited field name is present.
+        """
+        from .base import PROHIBITED_SYNC_FIELDS
+
+        if isinstance(obj, dict):
+            names = {str(key).lower() for key in obj}
+        else:
+            names = {name.lower() for name in dir(obj) if not name.startswith("_")}
+
+        found = names & PROHIBITED_SYNC_FIELDS
+        if found:
+            raise ProhibitedFieldError(
+                f"Azure Key Vault response contains prohibited field(s): {sorted(found)}. "
+                "Refusing to process — this adapter must never handle key material."
+            )
+
     def _to_fetched(self, kv_cert) -> FetchedCertificate | None:
         """Convert one KeyVaultCertificate into a FetchedCertificate.
 
@@ -186,6 +227,8 @@ class AzureKvAdapter(BaseAdapter):
         Returns:
             The mapped certificate, or None if it carries no public part yet.
         """
+        self._assert_no_prohibited_keys(kv_cert)
+
         from ..utils.parser import CertificateParser
 
         der = getattr(kv_cert, "cer", None)
@@ -285,6 +328,8 @@ class AzureKvAdapter(BaseAdapter):
             try:
                 kv_cert = client.get_certificate(name)
                 fetched = self._to_fetched(kv_cert)
+            except ProhibitedFieldError:
+                raise
             except Exception:
                 logger.exception("Skipping Azure certificate '%s': fetch failed", name)
                 continue
