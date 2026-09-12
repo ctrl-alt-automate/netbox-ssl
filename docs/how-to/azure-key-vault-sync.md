@@ -145,7 +145,7 @@ permission.
 pair becomes a NetBox tag named `key=value` (a valueless tag keeps just the
 key).
 
-!!! warning "sync_tags makes Azure authoritative for tags"
+!!! warning "sync_tags makes the vault authoritative for tags"
     With `sync_tags` on, every sync run **replaces** the certificate's whole
     NetBox tag set with the tags currently on the Azure certificate. Any tag
     an operator added by hand in NetBox on a synced certificate is removed on
@@ -155,6 +155,11 @@ key).
     There is no exception and no way to protect an individual tag. If you need
     operator-managed tags on synced certificates, leave `sync_tags` off — with
     it off the sync never reads, writes or clears tags.
+
+    The switch is offered on every source type, but only adapters that actually
+    supply tags honour it, and Azure Key Vault is the only one today. On a
+    Lemur, Generic REST or AWS ACM source, ticking it has no effect at all —
+    the sync leaves those certificates' tags alone rather than clearing them.
 
     Tag names are created on demand. A name longer than NetBox's 100-character
     limit is shortened with a short digest appended so two long Azure tags

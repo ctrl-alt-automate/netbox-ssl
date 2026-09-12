@@ -70,6 +70,8 @@ class AzureKvAdapter(BaseAdapter):
     IMPLICIT_AUTH_METHODS: tuple[str, ...] = ("azure_managed_identity",)
     REQUIRES_BASE_URL: bool = True
     REQUIRES_REGION: bool = False
+    # The only adapter that populates FetchedCertificate.tags (see _map_tags).
+    SUPPORTS_TAG_SYNC: bool = True
 
     @classmethod
     def credential_schema(cls, auth_method: str) -> dict[str, CredentialField]:

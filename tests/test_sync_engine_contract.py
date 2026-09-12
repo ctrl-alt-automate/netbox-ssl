@@ -346,6 +346,10 @@ class TestTagApplicationIsRobust:
         _create_certificate(_fetched(tags=tags), source)
         return Certificate.objects.get(common_name="sync.example.com")
 
+    def _cert_for(self, source):
+        """A synced certificate with no tags of its own."""
+        return self._cert(source, ())
+
     def test_names_that_slugify_identically_become_two_distinct_tags(self):
         """Finding 2.1: `Tag.slug` is unique and `slugify` strips `=` and `:`."""
         cert = self._cert(self._source(suffix="t1"), ("env=prod", "env:prod"))
@@ -381,6 +385,28 @@ class TestTagApplicationIsRobust:
         cert = self._cert(self._source(suffix="t4"), (prefix + "alice", prefix + "bob"))
 
         assert cert.tags.count() == 2
+
+    def test_sync_tags_on_a_non_tag_capable_source_never_touches_tags(self):
+        """`sync_tags` is offered on every source type, but only Azure supplies tags.
+
+        Gating on "the fetched tag tuple is empty" is not enough: a Lemur,
+        Generic REST or AWS ACM source with the box ticked would reach
+        `tags.set([])` and delete every tag on the certificate while copying
+        none back. The gate has to be the adapter's declared capability.
+        """
+        from extras.models import Tag
+
+        from netbox_ssl.models import Certificate
+        from netbox_ssl.utils.sync_engine import _update_certificate
+
+        source = self._source(suffix="t6", source_type="lemur", auth_method="bearer", sync_tags=True)
+        cert = self._cert_for(source)
+        cert.tags.set([Tag.objects.create(name="operator-owned", slug="operator-owned")])
+
+        # Lemur never populates fetched.tags — this is what its sync looks like.
+        _update_certificate(cert.pk, _fetched(), source)
+
+        assert set(Certificate.objects.get(pk=cert.pk).tags.values_list("name", flat=True)) == {"operator-owned"}
 
     def test_an_unresolvable_tag_is_skipped_and_the_others_still_apply(self):
         """Per-tag failure is non-fatal, matching the per-certificate posture."""

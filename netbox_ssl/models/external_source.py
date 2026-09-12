@@ -227,8 +227,10 @@ class ExternalSource(NetBoxModel):
         default=False,
         help_text=(
             "Copy tags from the external source onto imported certificates. "
-            "The source becomes authoritative: each sync replaces the full tag "
-            "set, and clears it when the source has no tags."
+            "Only Azure Key Vault sources supply tags today; on other source "
+            "types this has no effect. Where it applies, the source becomes "
+            "authoritative: each sync replaces the full tag set, and clears it "
+            "when the source has no tags."
         ),
     )
 

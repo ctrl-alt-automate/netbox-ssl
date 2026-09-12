@@ -370,6 +370,26 @@ def _resolve_tag(name: str) -> Any:
     return Tag.objects.filter(name=safe_name).first()
 
 
+def _source_supports_tag_sync(source: Any) -> bool:
+    """Whether the adapter behind this source actually supplies tags.
+
+    `sync_tags` is offered on every source type, but only adapters that declare
+    `SUPPORTS_TAG_SYNC` populate `FetchedCertificate.tags`. Since the opt-in
+    makes the source authoritative — including clearing tags it does not have —
+    a source whose adapter never supplies any must not reach `tags.set()`.
+
+    An unknown source type, or one whose optional extra is not installed, is not
+    registered at all; that resolves to False rather than raising, because a
+    tag decision must never be the thing that fails a sync run.
+    """
+    from ..adapters import get_adapter_class
+
+    try:
+        return bool(get_adapter_class(source.source_type).SUPPORTS_TAG_SYNC)
+    except (KeyError, AttributeError):
+        return False
+
+
 def _apply_tags(cert: Any, fetched: FetchedCertificate, source: Any) -> None:
     """Mirror the source's tags onto a certificate, when the source opts in.
 
@@ -381,11 +401,15 @@ def _apply_tags(cert: Any, fetched: FetchedCertificate, source: Any) -> None:
     a non-empty one replaces them. Preserving stale tags when the source has
     none would make an opt-in "authoritative" flag behave unpredictably.
 
+    That authority is gated on the adapter declaring it supplies tags at all.
+    Without the gate, ticking the box on a Lemur / Generic REST / AWS ACM source
+    would clear every tag on every certificate it syncs and copy none back.
+
     A single awkward tag must never cost the operator the whole sync run, so a
     failure to resolve one is logged and skipped — the same posture the adapter
     already takes for a single bad certificate.
     """
-    if not getattr(source, "sync_tags", False):
+    if not getattr(source, "sync_tags", False) or not _source_supports_tag_sync(source):
         return
 
     tags = []

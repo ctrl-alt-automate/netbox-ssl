@@ -117,6 +117,14 @@ class BaseAdapter(ABC):
     REQUIRES_BASE_URL: bool = True
     REQUIRES_REGION: bool = False
 
+    # Whether this adapter populates FetchedCertificate.tags. The engine's
+    # `sync_tags` opt-in makes the source AUTHORITATIVE for a certificate's
+    # tags, which includes clearing them when the source has none — so an
+    # adapter that never supplies tags must not reach that code at all, or
+    # ticking the box on it would silently delete every operator tag.
+    # Default False so a future adapter that forgets to declare it fails safe.
+    SUPPORTS_TAG_SYNC: bool = False
+
     # Auth methods that authorize via host identity (cloud instance role,
     # managed identity) and therefore do NOT require auth_credentials to be
     # populated. Used by serializers/GraphQL to derive `has_credentials`

@@ -140,7 +140,9 @@ Vault specifically, the
 `sync_tags` (boolean, default `false`) opts a source into copying its tags
 onto imported certificates. When enabled the source is authoritative: each
 sync **replaces** the certificate's full tag set, and a certificate with no
-tags at the source has its NetBox tags cleared. See
+tags at the source has its NetBox tags cleared. Only adapters that supply tags
+honour the flag — Azure Key Vault is the only one today; setting it on a
+`lemur`, `generic_rest` or `aws_acm` source has no effect. See
 [Azure Key Vault tag sync](../how-to/azure-key-vault-sync.md#step-4-optional-tag-sync)
 for the worked example.
 
