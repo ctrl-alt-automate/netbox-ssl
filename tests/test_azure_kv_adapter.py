@@ -84,3 +84,87 @@ class TestRegistration:
         from netbox_ssl.adapters.azure_kv import AzureKvAdapter
 
         assert get_adapter_class("azure_kv") is AzureKvAdapter
+
+
+def _source(**overrides):
+    """A stub ExternalSource good enough for adapter unit tests."""
+    source = MagicMock()
+    source.base_url = overrides.get("base_url", "https://kv-nbssl-test-2609.vault.azure.net/")
+    source.auth_method = overrides.get("auth_method", "azure_managed_identity")
+    source.auth_credentials = overrides.get("auth_credentials", {})
+    source.sync_tags = overrides.get("sync_tags", False)
+    source.name = "azure-test"
+    return source
+
+
+class TestVaultUrlValidation:
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://kv.vault.azure.net/",
+            "https://kv.vault.azure.cn/",
+            "https://kv.vault.usgovcloudapi.net/",
+            "https://kv.vault.microsoftazure.de/",
+        ],
+    )
+    def test_accepts_every_sovereign_cloud_suffix(self, url):
+        from netbox_ssl.adapters.azure_kv import AzureKvAdapter
+
+        AzureKvAdapter(_source(base_url=url))._validate_vault_url(url)
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://evil.example.com/",
+            "https://kv.vault.azure.net.evil.com/",
+            "http://kv.vault.azure.net/",
+        ],
+    )
+    def test_rejects_non_vault_hosts_and_plaintext(self, url):
+        from netbox_ssl.adapters.azure_kv import AzureKvAdapter
+
+        with pytest.raises(ValueError):
+            AzureKvAdapter(_source(base_url=url))._validate_vault_url(url)
+
+
+class TestTestConnection:
+    def test_success_reports_the_certificate_count(self, monkeypatch):
+        from netbox_ssl.adapters import azure_kv
+
+        client = MagicMock()
+        client.list_properties_of_certificates.return_value = iter([MagicMock(name="a"), MagicMock(name="b")])
+        monkeypatch.setattr(azure_kv, "CertificateClient", lambda **kw: client)
+
+        ok, message = azure_kv.AzureKvAdapter(_source()).test_connection()
+        assert ok is True
+        assert "2" in message
+
+    def test_auth_failure_is_reported_without_leaking_the_credential(self, monkeypatch):
+        from azure.core.exceptions import ClientAuthenticationError
+
+        from netbox_ssl.adapters import azure_kv
+
+        def _boom(**kwargs):
+            raise ClientAuthenticationError("secret-value-should-never-surface")
+
+        monkeypatch.setattr(azure_kv, "CertificateClient", _boom)
+
+        ok, message = azure_kv.AzureKvAdapter(_source()).test_connection()
+        assert ok is False
+        assert "secret-value-should-never-surface" not in message
+        assert "authentication" in message.lower()
+
+    def test_permission_denied_names_the_required_role(self, monkeypatch):
+        from azure.core.exceptions import HttpResponseError
+
+        from netbox_ssl.adapters import azure_kv
+
+        error = HttpResponseError("Forbidden")
+        error.status_code = 403
+        client = MagicMock()
+        client.list_properties_of_certificates.side_effect = error
+        monkeypatch.setattr(azure_kv, "CertificateClient", lambda **kw: client)
+
+        ok, message = azure_kv.AzureKvAdapter(_source()).test_connection()
+        assert ok is False
+        assert "Key Vault Reader" in message
