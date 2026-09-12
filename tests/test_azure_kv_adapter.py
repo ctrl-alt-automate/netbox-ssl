@@ -170,14 +170,21 @@ class TestTestConnection:
         assert "Key Vault Reader" in message
 
 
-def _kv_cert(name="test-webserver", der=b"", enabled=True, tags=None, expires=None):
-    """Build a stub KeyVaultCertificate."""
+def _kv_cert(name="test-webserver", der=b"", enabled=True, tags=None, expires=None, version="a1b2c3d4e5f6"):
+    """Build a stub KeyVaultCertificate.
+
+    `properties.id` is deliberately version-pinned, matching what the real
+    Azure SDK returns (".../certificates/<name>/<version>") — a stub that
+    hardcodes the unversioned form can't catch a mapping that accidentally
+    trusts `props.id` as-is.
+    """
     from datetime import datetime, timedelta, timezone
 
     cert = MagicMock()
     cert.cer = der
     cert.name = name
-    cert.properties.id = f"https://kv.vault.azure.net/certificates/{name}"
+    cert.properties.name = name
+    cert.properties.id = f"https://kv.vault.azure.net/certificates/{name}/{version}"
     cert.properties.enabled = enabled
     cert.properties.tags = tags or {}
     cert.properties.expires_on = expires or datetime.now(timezone.utc) + timedelta(days=365)
@@ -207,7 +214,12 @@ class TestFetchCertificates:
         assert len(results) == 1
         fetched = results[0]
         assert fetched.common_name == "www.netbox-ssl-demo.test"
-        assert fetched.external_id == "https://kv.vault.azure.net/certificates/test-webserver"
+        # Version-independent, NOT the version-pinned props.id the stub
+        # carries ("https://kv.vault.azure.net/certificates/test-webserver/a1b2c3d4e5f6") --
+        # renewals must not change external_id or the sync engine's diff
+        # would treat every renewal as a brand-new certificate.
+        assert fetched.external_id == "https://kv-nbssl-test-2609.vault.azure.net/certificates/test-webserver"
+        assert fetched.external_id != str(kv_cert.properties.id)
         assert fetched.pem_content.startswith("-----BEGIN CERTIFICATE-----")
         assert ":" in fetched.fingerprint_sha256  # canonical colon-separated form
         assert fetched.certificate_type == "server"  # from EKU, via the parser
@@ -239,3 +251,61 @@ class TestFetchCertificates:
         results = azure_kv.AzureKvAdapter(_source()).fetch_certificates()
 
         assert len(results) == 1
+
+
+class TestGetCertificateDetail:
+    def _der(self, cn="detail.netbox-ssl-demo.test"):
+        from cert_factory import CertFactory
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+
+        pem = CertFactory.create(cn=cn, extended_key_usage=["server"])
+        return x509.load_pem_x509_certificate(pem.encode()).public_bytes(serialization.Encoding.DER)
+
+    def test_unversioned_id_resolves_to_the_right_name(self, monkeypatch):
+        from netbox_ssl.adapters import azure_kv
+
+        kv_cert = _kv_cert(name="detail-cert", der=self._der())
+        client = MagicMock()
+        client.get_certificate.return_value = kv_cert
+        monkeypatch.setattr(azure_kv, "CertificateClient", lambda **kw: client)
+
+        result = azure_kv.AzureKvAdapter(_source()).get_certificate_detail(
+            "https://kv.vault.azure.net/certificates/detail-cert"
+        )
+
+        client.get_certificate.assert_called_once_with("detail-cert")
+        assert result is not None
+        assert result.common_name == "detail.netbox-ssl-demo.test"
+
+    def test_version_pinned_id_resolves_to_the_same_name(self, monkeypatch):
+        from netbox_ssl.adapters import azure_kv
+
+        kv_cert = _kv_cert(name="detail-cert", der=self._der())
+        client = MagicMock()
+        client.get_certificate.return_value = kv_cert
+        monkeypatch.setattr(azure_kv, "CertificateClient", lambda **kw: client)
+
+        result = azure_kv.AzureKvAdapter(_source()).get_certificate_detail(
+            "https://kv.vault.azure.net/certificates/detail-cert/a1b2c3d4e5f6"
+        )
+
+        # The version segment must never be mistaken for the certificate name.
+        client.get_certificate.assert_called_once_with("detail-cert")
+        assert result is not None
+        assert result.common_name == "detail.netbox-ssl-demo.test"
+
+    def test_not_found_returns_none(self, monkeypatch):
+        from azure.core.exceptions import ResourceNotFoundError
+
+        from netbox_ssl.adapters import azure_kv
+
+        client = MagicMock()
+        client.get_certificate.side_effect = ResourceNotFoundError("gone")
+        monkeypatch.setattr(azure_kv, "CertificateClient", lambda **kw: client)
+
+        result = azure_kv.AzureKvAdapter(_source()).get_certificate_detail(
+            "https://kv.vault.azure.net/certificates/detail-cert"
+        )
+
+        assert result is None

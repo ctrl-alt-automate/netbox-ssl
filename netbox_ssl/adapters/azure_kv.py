@@ -200,7 +200,15 @@ class AzureKvAdapter(BaseAdapter):
         props = kv_cert.properties
 
         return FetchedCertificate(
-            external_id=str(props.id),
+            # Deliberately NOT str(props.id): Azure's own id is version-pinned
+            # (".../certificates/<name>/<version>") because get_certificate()
+            # always returns the latest version. Using it as external_id would
+            # change on every renewal, and the sync engine's diff phase keys
+            # on external_id — a renewal would look like a brand-new
+            # certificate and never take the Janus renewal path. Build the
+            # version-independent URI ourselves instead of trusting a shape
+            # we do not control. Do not "simplify" this back to props.id.
+            external_id=f"{self.source.base_url.rstrip('/')}/certificates/{props.name}",
             common_name=parsed.common_name,
             serial_number=parsed.serial_number,
             fingerprint_sha256=parsed.fingerprint_sha256,
@@ -244,13 +252,24 @@ class AzureKvAdapter(BaseAdapter):
     def get_certificate_detail(self, external_id: str) -> FetchedCertificate | None:
         """Fetch one certificate by its vault URI.
 
+        Accepts both the version-independent form this adapter now writes
+        (".../certificates/<name>") and a version-pinned form
+        (".../certificates/<name>/<version>") that may still be stored from
+        an earlier run or entered by hand. The certificate name is always the
+        path segment immediately after "certificates/" — never simply the
+        last segment, which would be the version on a version-pinned id.
+
         Args:
-            external_id: The full vault-scoped certificate URI.
+            external_id: The vault-scoped certificate URI.
 
         Returns:
             The mapped certificate, or None if it is gone or has no public part.
         """
-        name = external_id.rstrip("/").split("/")[-1]
+        parts = external_id.rstrip("/").split("/")
+        try:
+            name = parts[parts.index("certificates") + 1]
+        except (ValueError, IndexError):
+            name = parts[-1]
         try:
             return self._to_fetched(self._get_client().get_certificate(name))
         except ResourceNotFoundError:
