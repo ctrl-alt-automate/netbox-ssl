@@ -52,6 +52,10 @@ dev = [
     "moto[acm]>=5.0,<6.0",
     "azure-identity>=1.25,<2.0",
     "azure-keyvault-certificates>=4.11,<5.0",
+    # Needed only by the test_azure_kv_live.py privilege canary, which
+    # constructs a SecretClient to prove the platform refuses it. Production
+    # code (the "azure" extra) must never carry a secrets client.
+    "azure-keyvault-secrets>=4.11,<5.0",
 ]
 docs = [
     "mkdocs>=1.5",

@@ -17,8 +17,12 @@ NIXPY="$(sed -n 's/^exec "\([^"]*\)".*/\1/p' "$(command -v python3)" 2>/dev/null
 DEPS="$PWD/.azure-deps"
 
 if [ "${1:-}" = "--install" ]; then
+  # azure-keyvault-secrets is dev-only: it backs the test_azure_kv_live.py
+  # privilege canary (which builds a SecretClient to prove the platform
+  # refuses it), never the adapter itself.
   "$NIXPY" -m pip install --target="$DEPS" \
-    'azure-identity>=1.25,<2.0' 'azure-keyvault-certificates>=4.11,<5.0'
+    'azure-identity>=1.25,<2.0' 'azure-keyvault-certificates>=4.11,<5.0' \
+    'azure-keyvault-secrets>=4.11,<5.0'
   shift
 fi
 

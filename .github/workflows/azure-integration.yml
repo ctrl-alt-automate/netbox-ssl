@@ -1,0 +1,42 @@
+name: Azure Integration
+
+# The federated credential is scoped to refs/heads/main, so this cannot run on a
+# pull request — fork PRs have no path to Azure by design. During development the
+# same checks run locally via `az login`; here they guard against drift.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "netbox_ssl/adapters/azure_kv.py"
+      - "tests/test_azure_kv_live.py"
+      - ".github/workflows/azure-integration.yml"
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+jobs:
+  integration-azure:
+    name: Azure Key Vault (live)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install -e '.[azure,dev]'
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Live adapter tests
+        run: python -m pytest tests/test_azure_kv_live.py -v -p no:django -m azure_live

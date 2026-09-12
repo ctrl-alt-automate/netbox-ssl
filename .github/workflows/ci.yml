@@ -101,8 +101,13 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # azure-identity + azure-keyvault-certificates pinned to match the
+          # "azure" extra in pyproject.toml, so the Azure Key Vault adapter
+          # tests (#101) actually run here instead of silently skipping
+          # (green-by-absence) on every Python version in this matrix.
           pip install pytest pytest-randomly cryptography django requests boto3 \
-                      'moto[acm]>=5.0,<6.0' jsonpath-ng pyyaml
+                      'moto[acm]>=5.0,<6.0' jsonpath-ng pyyaml \
+                      'azure-identity>=1.25,<2.0' 'azure-keyvault-certificates>=4.11,<5.0'
 
       - name: Assert the whole test suite collects (host lane)
         run: |
