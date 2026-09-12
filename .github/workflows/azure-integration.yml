@@ -39,4 +39,10 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Live adapter tests
+        env:
+          # This job authenticates as the CI service principal, which holds only
+          # `Key Vault Reader` on rg-netbox-ssl-test (verified: one role
+          # assignment, nothing wider). That is what makes the privilege canary
+          # meaningful here and skippable anywhere else.
+          AZURE_KV_LEAST_PRIVILEGE_IDENTITY: "1"
         run: python -m pytest tests/test_azure_kv_live.py -v -p no:django -m azure_live
