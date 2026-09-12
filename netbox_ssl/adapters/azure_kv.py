@@ -221,10 +221,55 @@ class AzureKvAdapter(BaseAdapter):
             pem_content=parsed.pem_content,
             issuer_chain=parsed.issuer_chain,
             certificate_type=parsed.certificate_type,
-            # Task 7 replaces these two literals with the mappers.
-            tags=(),
-            status=None,
+            tags=self._map_tags(props),
+            status=self._map_status(props, parsed.valid_to),
         )
+
+    # Azure certificate state -> plugin Certificate.status value.
+    #
+    # Deliberately NOT `from ..models import CertificateStatusChoices`: a
+    # sys.modules mock installed by another test file (test_analytics.py
+    # setdefault's a bare MagicMock for "netbox_ssl.models" so it stays
+    # importable without Django) persists for the rest of the pytest
+    # session and would silently replace the real choice values here too.
+    # AwsAcmAdapter hit the same constraint and solved it the same way with
+    # its own _STATUS_MAP — follow that precedent rather than re-litigate it.
+    # Kept honest against drift by
+    # TestStatusMapping.test_status_literals_match_the_real_choice_set,
+    # which checks these literals against the real ChoiceSet in the Docker
+    # container lane.
+    _STATUS_ARCHIVED = "archived"
+    _STATUS_EXPIRED = "expired"
+    _STATUS_ACTIVE = "active"
+
+    @classmethod
+    def _map_status(cls, props, valid_to) -> str:
+        """Map Azure certificate state onto a plugin status.
+
+        A disabled certificate outranks an expired one: disabling is an
+        explicit operator action, while expiry is a fact about the clock.
+        Expiry itself is judged on the parsed X.509 validity passed in, not
+        on Azure's own `expires_on` metadata, so the two can never disagree.
+        """
+        from datetime import datetime, timezone
+
+        if getattr(props, "enabled", True) is False:
+            return cls._STATUS_ARCHIVED
+        if valid_to and valid_to < datetime.now(timezone.utc):
+            return cls._STATUS_EXPIRED
+        return cls._STATUS_ACTIVE
+
+    def _map_tags(self, props) -> tuple[str, ...]:
+        """Flatten Azure's key/value tags into NetBox tag names.
+
+        `key`/`value` becomes `key=value`; a valueless tag keeps just the key.
+        Sorted so a sync run produces the same order every time. Returns empty
+        unless the source opted in.
+        """
+        if not getattr(self.source, "sync_tags", False):
+            return ()
+        tags = getattr(props, "tags", None) or {}
+        return tuple(sorted(f"{key}={value}" if value else str(key) for key, value in tags.items()))
 
     def fetch_certificates(self) -> list[FetchedCertificate]:
         """Fetch every certificate in the vault.

@@ -309,3 +309,101 @@ class TestGetCertificateDetail:
         )
 
         assert result is None
+
+
+class TestStatusMapping:
+    def _fetch_one(self, monkeypatch, **cert_kwargs):
+        from cert_factory import CertFactory
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+
+        from netbox_ssl.adapters import azure_kv
+
+        pem = CertFactory.create(cn="status.example.com", extended_key_usage=["server"])
+        der = x509.load_pem_x509_certificate(pem.encode()).public_bytes(serialization.Encoding.DER)
+        kv_cert = _kv_cert(der=der, **cert_kwargs)
+        client = MagicMock()
+        client.list_properties_of_certificates.return_value = iter([kv_cert.properties])
+        client.get_certificate.return_value = kv_cert
+        monkeypatch.setattr(azure_kv, "CertificateClient", lambda **kw: client)
+        return azure_kv.AzureKvAdapter(_source()).fetch_certificates()[0]
+
+    def test_disabled_certificate_maps_to_archived(self, monkeypatch):
+        assert self._fetch_one(monkeypatch, enabled=False).status == "archived"
+
+    def test_valid_enabled_certificate_maps_to_active(self, monkeypatch):
+        assert self._fetch_one(monkeypatch, enabled=True).status == "active"
+
+    def test_expired_certificate_maps_to_expired(self, monkeypatch):
+        """Expiry is judged on the parsed X.509 validity, not Azure metadata."""
+        from cert_factory import CertFactory
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+
+        from netbox_ssl.adapters import azure_kv
+
+        pem = CertFactory.create(cn="old.example.com", expired=True, extended_key_usage=["server"])
+        der = x509.load_pem_x509_certificate(pem.encode()).public_bytes(serialization.Encoding.DER)
+        kv_cert = _kv_cert(der=der, enabled=True)
+        client = MagicMock()
+        client.list_properties_of_certificates.return_value = iter([kv_cert.properties])
+        client.get_certificate.return_value = kv_cert
+        monkeypatch.setattr(azure_kv, "CertificateClient", lambda **kw: client)
+
+        assert azure_kv.AzureKvAdapter(_source()).fetch_certificates()[0].status == "expired"
+
+    def test_disabled_beats_expired(self, monkeypatch):
+        """An operator disabling a certificate is a stronger signal than expiry."""
+        assert self._fetch_one(monkeypatch, enabled=False).status == "archived"
+
+    @pytest.mark.django_db
+    @pytest.mark.skipif(
+        not _NETBOX_AVAILABLE,
+        reason="requires real netbox/Django - runs in the Docker container lane",
+    )
+    def test_status_literals_match_the_real_choice_set(self):
+        """_map_status returns literals, so guard them against ChoiceSet drift.
+
+        The adapter cannot import CertificateStatusChoices at module level — a
+        sys.modules mock from another test file would replace it — so it uses
+        string literals like AwsAcmAdapter does. This test is what keeps those
+        literals honest.
+        """
+        from netbox_ssl.models import CertificateStatusChoices
+
+        valid = {value for value, *_ in CertificateStatusChoices.CHOICES}
+        assert {"active", "expired", "archived"} <= valid
+
+
+class TestTagMapping:
+    def _fetch_with_tags(self, monkeypatch, tags, sync_tags):
+        from cert_factory import CertFactory
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+
+        from netbox_ssl.adapters import azure_kv
+
+        pem = CertFactory.create(cn="tagged.example.com", extended_key_usage=["server"])
+        der = x509.load_pem_x509_certificate(pem.encode()).public_bytes(serialization.Encoding.DER)
+        kv_cert = _kv_cert(der=der, tags=tags)
+        client = MagicMock()
+        client.list_properties_of_certificates.return_value = iter([kv_cert.properties])
+        client.get_certificate.return_value = kv_cert
+        monkeypatch.setattr(azure_kv, "CertificateClient", lambda **kw: client)
+        return azure_kv.AzureKvAdapter(_source(sync_tags=sync_tags)).fetch_certificates()[0]
+
+    def test_key_value_pairs_become_key_equals_value(self, monkeypatch):
+        fetched = self._fetch_with_tags(monkeypatch, {"env": "prod", "owner": "team-a"}, True)
+        assert set(fetched.tags) == {"env=prod", "owner=team-a"}
+
+    def test_valueless_tag_keeps_only_the_key(self, monkeypatch):
+        fetched = self._fetch_with_tags(monkeypatch, {"reviewed": ""}, True)
+        assert fetched.tags == ("reviewed",)
+
+    def test_tags_are_not_collected_when_sync_tags_is_off(self, monkeypatch):
+        fetched = self._fetch_with_tags(monkeypatch, {"env": "prod"}, False)
+        assert fetched.tags == ()
+
+    def test_tag_order_is_deterministic(self, monkeypatch):
+        fetched = self._fetch_with_tags(monkeypatch, {"z": "1", "a": "2"}, True)
+        assert fetched.tags == ("a=2", "z=1")
