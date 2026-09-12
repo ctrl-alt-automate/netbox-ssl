@@ -67,6 +67,7 @@ class CertificateAuthorityType(NetBoxObjectType):
         "sync_status",
         "last_synced",
         "verify_ssl",
+        "sync_tags",
         "tags",
         "created",
         "last_updated",
@@ -91,6 +92,7 @@ class ExternalSourceType(NetBoxObjectType):
     enabled: bool
     sync_status: str
     verify_ssl: bool
+    sync_tags: bool
 
     @strawberry_django.field
     def certificate_count(self) -> int:

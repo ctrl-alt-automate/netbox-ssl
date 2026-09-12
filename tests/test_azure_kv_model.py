@@ -52,3 +52,20 @@ def test_sync_tags_defaults_to_false():
 
     field = ExternalSource._meta.get_field("sync_tags")
     assert field.default is False
+
+
+@pytest.mark.unit
+class TestSyncTagsIsOperable:
+    """A model field nobody can set is not a feature."""
+
+    def _read(self, relative: str) -> str:
+        return (Path(__file__).parent.parent / "netbox_ssl" / relative).read_text()
+
+    def test_form_exposes_sync_tags(self):
+        assert "sync_tags" in self._read("forms/external_sources.py")
+
+    def test_serializer_exposes_sync_tags(self):
+        assert "sync_tags" in self._read("api/serializers/external_sources.py")
+
+    def test_graphql_exposes_sync_tags(self):
+        assert "sync_tags" in self._read("graphql/types.py")
