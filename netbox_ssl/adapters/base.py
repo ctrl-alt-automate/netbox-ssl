@@ -86,13 +86,19 @@ class FetchedCertificate:
     pem_content: str = ""
     issuer_chain: str = ""
 
-    # Added for #101. Every default reproduces the behaviour the sync engine
-    # had before these existed, so an adapter that ignores them is unaffected:
-    #   tags             -> engine applies none
-    #   certificate_type -> the model default, which is what sync produced
-    #   status           -> engine falls back to STATUS_ACTIVE
+    # Added for #101. Every default means "this adapter has no opinion", which
+    # the sync engine must be able to tell apart from a real value: on CREATE it
+    # falls back to what sync produced before these fields existed, and on
+    # UPDATE/RENEW it leaves the operator's value alone.
+    #   tags             -> engine applies none unless the source opts in
+    #   certificate_type -> engine falls back to the model default on create
+    #   status           -> engine falls back to STATUS_ACTIVE on create
+    # `certificate_type` is deliberately Optional rather than defaulting to
+    # "server": a literal "server" from an adapter and "unset" would otherwise
+    # be indistinguishable, and the engine would overwrite an operator's `mtls`
+    # override on every sync of a Lemur / Generic REST / AWS ACM source.
     tags: tuple[str, ...] = field(default_factory=tuple)
-    certificate_type: str = "server"
+    certificate_type: str | None = None
     status: str | None = None
 
 

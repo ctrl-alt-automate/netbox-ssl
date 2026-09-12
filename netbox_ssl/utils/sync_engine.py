@@ -5,6 +5,7 @@ Implements a 4-phase sync process: FETCH -> DIFF -> APPLY -> LOG.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from dataclasses import dataclass, field
 from typing import Any
@@ -306,23 +307,100 @@ def execute_plan(
     return log
 
 
-def _apply_tags(cert: Any, fetched: FetchedCertificate, source: Any) -> None:
-    """Apply source tags to a certificate, when the source opts in.
+def _truncate_tag_name(name: str, limit: int) -> str:
+    """Fit a tag name into the column, without merging two distinct tags.
 
-    Tag names arrive already flattened by the adapter (an Azure `key`/`value`
-    pair becomes `key=value`). Tags are created on demand; NetBox requires a
-    slug, so one is derived from the name.
+    Azure tag keys run to 512 characters and values to 256, so a flattened
+    `key=value` longer than NetBox's `Tag.name` column is ordinary. A plain
+    truncation would collapse two different long tags that share a prefix into
+    one, so the head is kept readable and a digest of the *full* name is
+    appended to preserve identity.
     """
-    if not getattr(source, "sync_tags", False) or not fetched.tags:
-        return
+    if len(name) <= limit:
+        return name
+    digest = hashlib.sha256(name.encode("utf-8")).hexdigest()[:8]
+    return f"{name[: limit - len(digest) - 1]}-{digest}"
 
+
+def _resolve_tag(name: str) -> Any:
+    """Return the Tag for `name`, creating it if needed, or None on failure.
+
+    Two properties of NetBox's Tag model make the obvious `get_or_create(name=…,
+    defaults={"slug": slugify(name)})` unsafe here:
+
+    * `Tag.slug` is unique, and `slugify()` strips exactly the punctuation that
+      distinguishes Azure tag names — `env=prod` and `env:prod` both slugify to
+      `envprod`. Matching on *name* never finds the existing row, so the insert
+      is attempted and raises IntegrityError.
+    * Both `name` and `slug` are length-capped, and only the slug was truncated.
+
+    Each insert attempt runs in its own savepoint so a database error rolls back
+    to the savepoint instead of aborting the surrounding transaction — the sync
+    Script wraps the whole run in `transaction.atomic()`.
+    """
+    from django.db import IntegrityError
     from django.utils.text import slugify
     from extras.models import Tag
 
+    name_limit = Tag._meta.get_field("name").max_length
+    slug_limit = Tag._meta.get_field("slug").max_length
+    safe_name = _truncate_tag_name(name, name_limit)
+
+    existing = Tag.objects.filter(name=safe_name).first()
+    if existing is not None:
+        return existing
+
+    digest = hashlib.sha256(safe_name.encode("utf-8")).hexdigest()[:8]
+    plain = slugify(safe_name)[:slug_limit]
+    # A name-derived fallback keeps the slug unique when the plain one is taken
+    # by a differently-named tag, and covers names that slugify to nothing.
+    disambiguated = f"{plain[: slug_limit - len(digest) - 1]}-{digest}" if plain else f"tag-{digest}"
+
+    for slug in (plain, disambiguated):
+        if not slug:
+            continue
+        try:
+            with transaction.atomic():
+                return Tag.objects.create(name=safe_name, slug=slug)
+        except IntegrityError:
+            # Either another tag already owns this slug, or a concurrent run
+            # created this very tag between the lookup and the insert.
+            continue
+
+    return Tag.objects.filter(name=safe_name).first()
+
+
+def _apply_tags(cert: Any, fetched: FetchedCertificate, source: Any) -> None:
+    """Mirror the source's tags onto a certificate, when the source opts in.
+
+    Tag names arrive already flattened by the adapter (an Azure `key`/`value`
+    pair becomes `key=value`).
+
+    `sync_tags` means the source is authoritative, with no special case: an
+    empty tag set at the source clears the certificate's NetBox tags, exactly as
+    a non-empty one replaces them. Preserving stale tags when the source has
+    none would make an opt-in "authoritative" flag behave unpredictably.
+
+    A single awkward tag must never cost the operator the whole sync run, so a
+    failure to resolve one is logged and skipped — the same posture the adapter
+    already takes for a single bad certificate.
+    """
+    if not getattr(source, "sync_tags", False):
+        return
+
     tags = []
     for name in fetched.tags:
-        tag, _ = Tag.objects.get_or_create(name=name, defaults={"slug": slugify(name)[:100]})
-        tags.append(tag)
+        try:
+            # A savepoint per tag: a database error here rolls back only this
+            # tag. Without it the error would abort the connection, and the
+            # sync Script's own outer atomic() would roll back the whole run.
+            with transaction.atomic():
+                tag = _resolve_tag(name)
+        except Exception:
+            logger.exception("Skipping tag %r for certificate %s: could not be resolved", name, fetched.external_id)
+            continue
+        if tag is not None:
+            tags.append(tag)
     cert.tags.set(tags)
 
 
@@ -336,7 +414,7 @@ def _create_certificate(fetched: FetchedCertificate, source: Any) -> None:
     Raises:
         ValueError: If the fetched PEM contains a private key.
     """
-    from ..models import Certificate, CertificateStatusChoices
+    from ..models import Certificate, CertificateStatusChoices, CertificateTypeChoices
 
     # CRIT-1: Reject certificates whose PEM content contains a private key.
     if _check_private_key(fetched):
@@ -358,7 +436,8 @@ def _create_certificate(fetched: FetchedCertificate, source: Any) -> None:
         external_id=fetched.external_id,
         tenant=source.tenant,
         status=fetched.status or CertificateStatusChoices.STATUS_ACTIVE,
-        certificate_type=fetched.certificate_type,
+        # An adapter with no opinion gets the pre-#101 result: the model default.
+        certificate_type=fetched.certificate_type or CertificateTypeChoices.TYPE_SERVER,
     )
     # CRIT-4: Set sync actor unconditionally — Python allows arbitrary attrs.
     cert._sync_actor = f"external_sync:{source.name}"
@@ -409,7 +488,12 @@ def _update_certificate(local_cert_id: int, fetched: FetchedCertificate, source:
         cert.algorithm = fetched.algorithm
     if fetched.status:
         cert.status = fetched.status
-    cert.certificate_type = fetched.certificate_type
+    # Only write what the adapter actually supplied. `certificate_type` is
+    # operator-editable and the engine did not touch it on update before #101,
+    # so writing an adapter default here would silently revert an `mtls` or
+    # `client` override on every sync of a source that knows nothing about it.
+    if fetched.certificate_type:
+        cert.certificate_type = fetched.certificate_type
     cert.source_removed = False
     cert.save()
 
@@ -435,7 +519,12 @@ def _renew_certificate(old_cert_id: int, fetched: FetchedCertificate, source: An
     """
     from django.core.exceptions import ValidationError
 
-    from ..models import Certificate, CertificateAssignment, CertificateStatusChoices
+    from ..models import (
+        Certificate,
+        CertificateAssignment,
+        CertificateStatusChoices,
+        CertificateTypeChoices,
+    )
 
     # CRIT-1: Reject certificates whose PEM content contains a private key.
     if _check_private_key(fetched):
@@ -461,11 +550,18 @@ def _renew_certificate(old_cert_id: int, fetched: FetchedCertificate, source: An
             external_source=source,
             external_id=fetched.external_id,
             tenant=source.tenant or old_cert.tenant,
-            status=CertificateStatusChoices.STATUS_ACTIVE,
+            # Renewal is the primary lifecycle path for a rotating vault
+            # certificate, so it must honour the #101 fields exactly as create
+            # does — falling back to the pre-#101 result when the adapter
+            # supplied nothing.
+            status=fetched.status or CertificateStatusChoices.STATUS_ACTIVE,
+            certificate_type=fetched.certificate_type or CertificateTypeChoices.TYPE_SERVER,
         )
         # CRIT-4: Set sync actor unconditionally.
         new_cert._sync_actor = f"external_sync:{source.name}"
         new_cert.save()
+
+        _apply_tags(new_cert, fetched, source)
 
         # HIGH-7: Prefetch old assignments in one query (avoid N+1).
         old_assignments = list(CertificateAssignment.objects.filter(certificate=old_cert))

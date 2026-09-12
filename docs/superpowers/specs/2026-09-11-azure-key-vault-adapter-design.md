@@ -127,10 +127,34 @@ adapters.
 
 ### 4.3 Why the shared fields are optional
 
-Each new field has a default that reproduces today's behaviour exactly
-(`tags=()`, `certificate_type="server"`, `status=None` → engine falls back to
-`STATUS_ACTIVE`). An adapter that knows nothing about them keeps working. This is
-one coherent contract extension rather than three separate ones.
+Each new field defaults to "this adapter has no opinion" — `tags=()`,
+`certificate_type=None`, `status=None` — and the engine turns that into today's
+behaviour on every path. An adapter that knows nothing about them keeps working.
+This is one coherent contract extension rather than three separate ones.
+
+The default must be *distinguishable from a real value*, not merely equal to the
+model default. An earlier draft of this section argued that `certificate_type =
+"server"` "reproduces today's behaviour exactly". That holds only on **create**,
+where the engine has to write something and the model default is `server`
+anyway. It is false on **update** and **renewal**: before this change the engine
+did not touch `certificate_type` at all, so an operator's `mtls` or `client`
+override survived a sync. A literal `"server"` default would be indistinguishable
+from "unset" and would silently revert that override on every sync of a Lemur,
+Generic REST or AWS ACM source — the very behaviour the global constraint
+("byte-for-byte unchanged") forbids.
+
+The rule the engine implements is therefore:
+
+| Path | Behaviour when the adapter supplies nothing |
+|---|---|
+| create | explicit fallback to the pre-#101 result (`STATUS_ACTIVE`, `server`, no tags) |
+| update | field is not written; the operator's value stands |
+| renewal | same fallback as create, since the new certificate has no prior value |
+
+`sync_tags` is the one field with no "leave it alone" mode by design: opting in
+makes the source authoritative, so an empty tag set at the source **clears** the
+certificate's NetBox tags rather than preserving them. An opt-in flag that means
+"authoritative" should not carry an unpredictable special case.
 
 ## 5. Data flow
 

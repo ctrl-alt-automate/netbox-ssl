@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fields are parsed from the vault's DER bytes by the plugin's own parser, so
   they match every other import path — including EKU-based certificate type.
   Optional tag sync (`sync_tags`, off by default) copies Azure tags onto
-  imported certificates. Requires `pip install netbox-ssl[azure]`. The minimum
+  imported certificates; when enabled the vault is authoritative, so each run
+  replaces the certificate's full tag set and an untagged vault certificate
+  clears it. Requires `pip install netbox-ssl[azure]`. The minimum
   Azure role is **`Key Vault Reader`**; `Key Vault Certificate User` is
   deliberately *not* required, because it also grants private-key export.
   Migration 0028 is additive.
@@ -23,10 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `FetchedCertificate` gained three optional fields (`status`,
   `certificate_type`, `tags`), closing two long-standing gaps — sync used to
   hardcode every imported certificate to Active, and never applied the
-  EKU-based certificate type added in v1.4.0. The new Azure Key Vault adapter
-  populates all three; the existing Lemur, AWS ACM and Generic REST adapters
-  are unchanged and keep defaulting to Active / server / no tags until they
-  are updated to supply them.
+  EKU-based certificate type added in v1.4.0. All three are honoured on every
+  lifecycle path: create, update and renewal. The new Azure Key Vault adapter
+  populates all three.
+
+  Each field is written only when the adapter actually supplies it. On create,
+  an adapter that supplies nothing still produces exactly what sync produced
+  before (Active / server / no tags); on update and renewal, a field the
+  adapter has no opinion about is left alone, so an operator's
+  `certificate_type` override survives. The existing Lemur, AWS ACM and Generic
+  REST adapters supply none of the three and are therefore behaviourally
+  unchanged.
 
 ### Documentation
 

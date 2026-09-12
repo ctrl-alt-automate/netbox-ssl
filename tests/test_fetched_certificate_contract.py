@@ -58,10 +58,17 @@ def _minimal() -> FetchedCertificate:
     )
 
 
-def test_new_fields_have_behaviour_preserving_defaults():
+def test_new_fields_default_to_no_opinion():
+    """Every default must be distinguishable from a real adapter-supplied value.
+
+    `certificate_type` defaults to None rather than "server" so the engine can
+    tell "this adapter does not know" from "this adapter says server". Without
+    that distinction, updating a Lemur / Generic REST / AWS ACM certificate
+    reverts an operator's `mtls` override to `server` on every sync.
+    """
     fetched = _minimal()
     assert fetched.tags == ()
-    assert fetched.certificate_type == "server"
+    assert fetched.certificate_type is None
     assert fetched.status is None
 
 

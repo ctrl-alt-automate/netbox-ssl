@@ -109,17 +109,22 @@ the first sync.
 pair becomes a NetBox tag named `key=value` (a valueless tag keeps just the
 key).
 
-!!! warning "sync_tags makes Azure authoritative for tags — except when it isn't"
+!!! warning "sync_tags makes Azure authoritative for tags"
     With `sync_tags` on, every sync run **replaces** the certificate's whole
     NetBox tag set with the tags currently on the Azure certificate. Any tag
     an operator added by hand in NetBox on a synced certificate is removed on
-    the next run.
+    the next run, and an Azure certificate that carries **no tags at all**
+    clears the certificate's NetBox tags entirely.
 
-    The one exception: if the Azure certificate carries **no tags at all**,
-    the sync leaves the certificate's existing NetBox tags untouched — an
-    untagged Azure certificate does not wipe tags added locally. Do not rely
-    on this as a way to "protect" specific tags: as soon as the certificate
-    has even one tag in Azure, the next sync replaces the full set again.
+    There is no exception and no way to protect an individual tag. If you need
+    operator-managed tags on synced certificates, leave `sync_tags` off — with
+    it off the sync never reads, writes or clears tags.
+
+    Tag names are created on demand. A name longer than NetBox's 100-character
+    limit is shortened with a short digest appended so two long Azure tags
+    cannot collapse into one, and names that differ only in punctuation
+    (`env=prod` and `env:prod`) get distinct slugs. A tag that still cannot be
+    created is logged and skipped; it never fails the sync run.
 
 ## Step 5 — Schedule
 
@@ -144,7 +149,8 @@ across adapters. Azure's own SHA-1 `x509_thumbprint` is not used.
   `valid_from`, `valid_to`, `sans`, `key_size`, `algorithm`, `pem_content`,
   `issuer_chain`, `certificate_type` — all parsed from the DER bytes
 - `status` — mapped from the vault's certificate properties (see below)
-- `tags` — only when `sync_tags` is enabled (see Step 4)
+- `tags` — only when `sync_tags` is enabled, in which case the vault is
+  authoritative and an empty Azure tag set clears NetBox's tags (see Step 4)
 
 ### Status mapping
 

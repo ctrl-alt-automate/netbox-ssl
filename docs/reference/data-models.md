@@ -536,7 +536,7 @@ and, for Azure specifically, the
 | `sync_interval_minutes` | PositiveIntegerField | | Advisory sync cadence |
 | `enabled` | BooleanField | | Whether the sync engine processes this source |
 | `verify_ssl` | BooleanField | | Verify the source's TLS certificate |
-| `sync_tags` | BooleanField | | Copy tags from the external source onto imported certificates (off by default; **replaces** the certificate's tag set on each run — see the [Azure Key Vault how-to](../how-to/azure-key-vault-sync.md#step-4-optional-tag-sync)) |
+| `sync_tags` | BooleanField | | Copy tags from the external source onto imported certificates (off by default; when on, the source is authoritative and **replaces** the certificate's tag set on each run, clearing it when the source has no tags — see the [Azure Key Vault how-to](../how-to/azure-key-vault-sync.md#step-4-optional-tag-sync)) |
 | `tenant` | ForeignKey(Tenant) | | Tenant assigned to imported certificates |
 | `sync_status` | CharField | | Outcome of the most recent run |
 | `last_synced` | DateTimeField | | When the last run finished |

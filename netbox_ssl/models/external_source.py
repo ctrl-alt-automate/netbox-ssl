@@ -225,7 +225,11 @@ class ExternalSource(NetBoxModel):
     )
     sync_tags = models.BooleanField(
         default=False,
-        help_text="Copy tags from the external source onto imported certificates",
+        help_text=(
+            "Copy tags from the external source onto imported certificates. "
+            "The source becomes authoritative: each sync replaces the full tag "
+            "set, and clears it when the source has no tags."
+        ),
     )
 
     # Free-form comments (NetBox standard field; surfaced via CommentField in the form).

@@ -138,9 +138,9 @@ Vault specifically, the
 | `POST` | `/external-sources/{id}/sync/` | Run a sync for this source |
 
 `sync_tags` (boolean, default `false`) opts a source into copying its tags
-onto imported certificates. When enabled, each sync **replaces** the full tag
-set on a certificate that has any tags at the source; a certificate with no
-tags at the source leaves NetBox's existing tags untouched. See
+onto imported certificates. When enabled the source is authoritative: each
+sync **replaces** the certificate's full tag set, and a certificate with no
+tags at the source has its NetBox tags cleared. See
 [Azure Key Vault tag sync](../how-to/azure-key-vault-sync.md#step-4-optional-tag-sync)
 for the worked example.
 
