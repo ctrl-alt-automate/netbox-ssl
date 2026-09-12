@@ -17,12 +17,11 @@ import logging
 
 try:
     # This try/except is an availability probe for the optional azure extras
-    # (registry fallback below). ResourceNotFoundError is unused until Task 6
-    # adds get_certificate_detail().
+    # (registry fallback below).
     from azure.core.exceptions import (
         ClientAuthenticationError,
         HttpResponseError,
-        ResourceNotFoundError,  # noqa: F401
+        ResourceNotFoundError,
     )
     from azure.identity import ClientSecretCredential, DefaultAzureCredential
     from azure.keyvault.certificates import CertificateClient
@@ -176,10 +175,83 @@ class AzureKvAdapter(BaseAdapter):
             return False, "Unexpected error contacting Azure Key Vault."
         return True, f"Connected. {count} certificate(s) visible in the vault."
 
+    def _to_fetched(self, kv_cert) -> FetchedCertificate | None:
+        """Convert one KeyVaultCertificate into a FetchedCertificate.
+
+        Everything X.509 knows comes from X.509: the DER bytes go through the
+        plugin's own parser, which yields canonical values and keeps this
+        adapter consistent with every other import path. Azure's own
+        x509_thumbprint is deliberately unused — it is SHA-1.
+
+        Returns:
+            The mapped certificate, or None if it carries no public part yet.
+        """
+        from ..utils.parser import CertificateParser
+
+        der = getattr(kv_cert, "cer", None)
+        if not der:
+            logger.info(
+                "Skipping Azure certificate '%s': no public certificate yet (issuance pending)",
+                getattr(kv_cert, "name", "?"),
+            )
+            return None
+
+        parsed = CertificateParser.parse_der(bytes(der))
+        props = kv_cert.properties
+
+        return FetchedCertificate(
+            external_id=str(props.id),
+            common_name=parsed.common_name,
+            serial_number=parsed.serial_number,
+            fingerprint_sha256=parsed.fingerprint_sha256,
+            issuer=parsed.issuer,
+            valid_from=parsed.valid_from,
+            valid_to=parsed.valid_to,
+            sans=tuple(parsed.sans),
+            key_size=parsed.key_size,
+            algorithm=parsed.algorithm,
+            pem_content=parsed.pem_content,
+            issuer_chain=parsed.issuer_chain,
+            certificate_type=parsed.certificate_type,
+            # Task 7 replaces these two literals with the mappers.
+            tags=(),
+            status=None,
+        )
+
     def fetch_certificates(self) -> list[FetchedCertificate]:
-        """Placeholder — implemented in Task 6."""
-        raise NotImplementedError
+        """Fetch every certificate in the vault.
+
+        A failure on one certificate is logged and skipped: one bad entry must
+        never cost the operator the whole sync run.
+        """
+        client = self._get_client()
+        results: list[FetchedCertificate] = []
+
+        for props in client.list_properties_of_certificates():
+            name = getattr(props, "name", None)
+            try:
+                kv_cert = client.get_certificate(name)
+                fetched = self._to_fetched(kv_cert)
+            except Exception:
+                logger.exception("Skipping Azure certificate '%s': fetch failed", name)
+                continue
+            if fetched is not None:
+                results.append(fetched)
+
+        logger.info("Fetched %d certificate(s) from Azure Key Vault", len(results))
+        return results
 
     def get_certificate_detail(self, external_id: str) -> FetchedCertificate | None:
-        """Placeholder — implemented in Task 6."""
-        raise NotImplementedError
+        """Fetch one certificate by its vault URI.
+
+        Args:
+            external_id: The full vault-scoped certificate URI.
+
+        Returns:
+            The mapped certificate, or None if it is gone or has no public part.
+        """
+        name = external_id.rstrip("/").split("/")[-1]
+        try:
+            return self._to_fetched(self._get_client().get_certificate(name))
+        except ResourceNotFoundError:
+            return None

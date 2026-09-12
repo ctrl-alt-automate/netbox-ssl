@@ -168,3 +168,74 @@ class TestTestConnection:
         ok, message = azure_kv.AzureKvAdapter(_source()).test_connection()
         assert ok is False
         assert "Key Vault Reader" in message
+
+
+def _kv_cert(name="test-webserver", der=b"", enabled=True, tags=None, expires=None):
+    """Build a stub KeyVaultCertificate."""
+    from datetime import datetime, timedelta, timezone
+
+    cert = MagicMock()
+    cert.cer = der
+    cert.name = name
+    cert.properties.id = f"https://kv.vault.azure.net/certificates/{name}"
+    cert.properties.enabled = enabled
+    cert.properties.tags = tags or {}
+    cert.properties.expires_on = expires or datetime.now(timezone.utc) + timedelta(days=365)
+    return cert
+
+
+class TestFetchCertificates:
+    def _der(self, cn="www.netbox-ssl-demo.test"):
+        from cert_factory import CertFactory
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+
+        pem = CertFactory.create(cn=cn, extended_key_usage=["server"])
+        return x509.load_pem_x509_certificate(pem.encode()).public_bytes(serialization.Encoding.DER)
+
+    def test_maps_a_certificate_through_the_plugin_parser(self, monkeypatch):
+        from netbox_ssl.adapters import azure_kv
+
+        kv_cert = _kv_cert(der=self._der())
+        client = MagicMock()
+        client.list_properties_of_certificates.return_value = iter([kv_cert.properties])
+        client.get_certificate.return_value = kv_cert
+        monkeypatch.setattr(azure_kv, "CertificateClient", lambda **kw: client)
+
+        results = azure_kv.AzureKvAdapter(_source()).fetch_certificates()
+
+        assert len(results) == 1
+        fetched = results[0]
+        assert fetched.common_name == "www.netbox-ssl-demo.test"
+        assert fetched.external_id == "https://kv.vault.azure.net/certificates/test-webserver"
+        assert fetched.pem_content.startswith("-----BEGIN CERTIFICATE-----")
+        assert ":" in fetched.fingerprint_sha256  # canonical colon-separated form
+        assert fetched.certificate_type == "server"  # from EKU, via the parser
+
+    def test_certificate_without_cer_is_skipped_not_fatal(self, monkeypatch):
+        """A certificate still being issued has no public part yet."""
+        from netbox_ssl.adapters import azure_kv
+
+        pending = _kv_cert(name="pending", der=None)
+        good = _kv_cert(name="good", der=self._der("api.netbox-ssl-demo.test"))
+        client = MagicMock()
+        client.list_properties_of_certificates.return_value = iter([pending.properties, good.properties])
+        client.get_certificate.side_effect = [pending, good]
+        monkeypatch.setattr(azure_kv, "CertificateClient", lambda **kw: client)
+
+        results = azure_kv.AzureKvAdapter(_source()).fetch_certificates()
+
+        assert [r.common_name for r in results] == ["api.netbox-ssl-demo.test"]
+
+    def test_one_failing_certificate_does_not_abort_the_run(self, monkeypatch):
+        from netbox_ssl.adapters import azure_kv
+
+        good = _kv_cert(name="good", der=self._der("api.netbox-ssl-demo.test"))
+        client = MagicMock()
+        client.list_properties_of_certificates.return_value = iter([MagicMock(name="broken"), good.properties])
+        client.get_certificate.side_effect = [RuntimeError("transient"), good]
+        monkeypatch.setattr(azure_kv, "CertificateClient", lambda **kw: client)
+
+        results = azure_kv.AzureKvAdapter(_source()).fetch_certificates()
+
+        assert len(results) == 1
