@@ -65,6 +65,13 @@ depends on:
 
 Each plugin release is tested against all supported NetBox versions via GitHub Actions CI.
 
+### Optional extras
+
+The Azure Key Vault External Source adapter requires the optional `azure`
+extra (`pip install netbox-ssl[azure]`); without it the plugin works
+normally and `azure_kv` is simply not offered as a source type. See the
+[Azure Key Vault how-to](docs/how-to/azure-key-vault-sync.md).
+
 ## Upgrade Path
 
 For upgrade instructions, see [docs/operations/upgrading.md](docs/operations/upgrading.md).

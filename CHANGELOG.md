@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Azure Key Vault external source** ([#101](https://github.com/ctrl-alt-automate/netbox-ssl/issues/101)):
+  read-only sync of certificate metadata from one Azure Key Vault, with managed
+  identity / workload identity or an explicit service principal. Certificate
+  fields are parsed from the vault's DER bytes by the plugin's own parser, so
+  they match every other import path — including EKU-based certificate type.
+  Optional tag sync (`sync_tags`, off by default) copies Azure tags onto
+  imported certificates. Requires `pip install netbox-ssl[azure]`. The minimum
+  Azure role is **`Key Vault Reader`**; `Key Vault Certificate User` is
+  deliberately *not* required, because it also grants private-key export.
+  Migration 0028 is additive.
+- **Sync engine can now apply status, certificate type and tags**:
+  `FetchedCertificate` gained three optional fields (`status`,
+  `certificate_type`, `tags`), closing two long-standing gaps — sync used to
+  hardcode every imported certificate to Active, and never applied the
+  EKU-based certificate type added in v1.4.0. The new Azure Key Vault adapter
+  populates all three; the existing Lemur, AWS ACM and Generic REST adapters
+  are unchanged and keep defaulting to Active / server / no tags until they
+  are updated to supply them.
+
 ### Documentation
 
 - **Reference documentation caught up with the code.** Every feature since v0.8

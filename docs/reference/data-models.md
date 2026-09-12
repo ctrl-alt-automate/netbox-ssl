@@ -516,16 +516,18 @@ Rotation history: which certificate an endpoint presented, and when. One row per
 ## ExternalSource
 
 Configuration for an external certificate management system that the plugin
-syncs from (Lemur, AWS ACM, or any REST API via the generic adapter). See the
-[external sources how-to](../how-to/external-sources.md).
+syncs from (Lemur, AWS ACM, Azure Key Vault, or any REST API via the generic
+adapter). See the [external sources how-to](../how-to/external-sources.md)
+and, for Azure specifically, the
+[Azure Key Vault how-to](../how-to/azure-key-vault-sync.md).
 
 ### Fields
 
 | Field | Type | Required | Description |
 |-------|------|:--------:|-------------|
 | `name` | CharField | Yes | Unique name for this source |
-| `source_type` | CharField | Yes | Adapter to use (`lemur`, `aws_acm`, `generic_rest`) |
-| `base_url` | URLField | | API base URL (unused by AWS ACM) |
+| `source_type` | CharField | Yes | Adapter to use (`lemur`, `aws_acm`, `azure_kv`, `generic_rest`) |
+| `base_url` | URLField | | API base URL (unused by AWS ACM; the vault URL for Azure Key Vault) |
 | `auth_method` | CharField | Yes | Authentication scheme |
 | `auth_credentials` | JSONField | | Credential references, resolved as `env:VAR_NAME` |
 | `auth_credentials_reference` | CharField | | **Deprecated**, removed in v2.0.0 — use `auth_credentials` |
@@ -534,6 +536,7 @@ syncs from (Lemur, AWS ACM, or any REST API via the generic adapter). See the
 | `sync_interval_minutes` | PositiveIntegerField | | Advisory sync cadence |
 | `enabled` | BooleanField | | Whether the sync engine processes this source |
 | `verify_ssl` | BooleanField | | Verify the source's TLS certificate |
+| `sync_tags` | BooleanField | | Copy tags from the external source onto imported certificates (off by default; **replaces** the certificate's tag set on each run — see the [Azure Key Vault how-to](../how-to/azure-key-vault-sync.md#step-4-optional-tag-sync)) |
 | `tenant` | ForeignKey(Tenant) | | Tenant assigned to imported certificates |
 | `sync_status` | CharField | | Outcome of the most recent run |
 | `last_synced` | DateTimeField | | When the last run finished |
