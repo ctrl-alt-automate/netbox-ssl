@@ -27,6 +27,23 @@ if not _NETBOX_AVAILABLE and "netbox" not in sys.modules:
     sys.modules["netbox"] = MagicMock()
     sys.modules["netbox.plugins"] = MagicMock()
 
+# WHY this file installs its own Django stub instead of leaning on another
+# test file's: `azure_kv._to_fetched` lazily imports `..utils.parser`, which
+# pulls netbox_ssl/utils/__init__.py -> assignments.py ->
+# django.contrib.contenttypes.models. On the host lane Django's app registry is
+# never populated, so that import raises AppRegistryNotReady. These tests used
+# to pass only because test_adapters.py -- imported earlier by alphabetical
+# collection -- happens to `setdefault` the same stub into sys.modules
+# globally. Borrowed state like that is collection-order luck: renaming the
+# donor, or splitting the suite, silently reds 13 real-behaviour tests (#101
+# review M3). Probing with a real import means the stub is installed ONLY when
+# the genuine module is unusable -- in the container lane, where Django is
+# fully configured, nothing is replaced.
+try:  # pragma: no cover - exercised by which lane runs this file
+    import django.contrib.contenttypes.models  # noqa: F401
+except Exception:  # AppRegistryNotReady / ImproperlyConfigured / ImportError
+    sys.modules.setdefault("django.contrib.contenttypes.models", MagicMock())
+
 
 class TestAdapterShape:
     def test_adapter_class_exists(self):
@@ -97,7 +114,42 @@ def _source(**overrides):
     return source
 
 
+_NON_VAULT_URLS = [
+    "https://evil.example.com/",
+    "https://kv.vault.azure.net.evil.com/",
+    "http://kv.vault.azure.net/",
+]
+
+
 class TestVaultUrlValidation:
+    """The host allowlist is a security control, so test it through the public API.
+
+    WHY not call `_validate_vault_url` directly (as this class used to): that
+    proves the validator works, not that the adapter uses it. Deleting the
+    `self._validate_vault_url(...)` call from `_get_client` left the whole
+    suite green, because every other test supplies a valid URL (#101 review
+    M7). These tests drive `test_connection()` and `fetch_certificates()` --
+    the only two ways an operator reaches the vault -- and additionally assert
+    that no `CertificateClient` was ever constructed, i.e. that not one request
+    left for the rejected host.
+    """
+
+    @staticmethod
+    def _spy_client(monkeypatch) -> list[dict]:
+        """Patch CertificateClient with a spy recording every construction."""
+        from netbox_ssl.adapters import azure_kv
+
+        constructed: list[dict] = []
+        client = MagicMock()
+        client.list_properties_of_certificates.return_value = iter([])
+
+        def _factory(**kwargs):
+            constructed.append(kwargs)
+            return client
+
+        monkeypatch.setattr(azure_kv, "CertificateClient", _factory)
+        return constructed
+
     @pytest.mark.parametrize(
         "url",
         [
@@ -107,24 +159,40 @@ class TestVaultUrlValidation:
             "https://kv.vault.microsoftazure.de/",
         ],
     )
-    def test_accepts_every_sovereign_cloud_suffix(self, url):
-        from netbox_ssl.adapters.azure_kv import AzureKvAdapter
+    def test_accepts_every_sovereign_cloud_suffix(self, url, monkeypatch):
+        """A legitimate vault in any sovereign cloud must still be reachable."""
+        from netbox_ssl.adapters import azure_kv
 
-        AzureKvAdapter(_source(base_url=url))._validate_vault_url(url)
+        constructed = self._spy_client(monkeypatch)
 
-    @pytest.mark.parametrize(
-        "url",
-        [
-            "https://evil.example.com/",
-            "https://kv.vault.azure.net.evil.com/",
-            "http://kv.vault.azure.net/",
-        ],
-    )
-    def test_rejects_non_vault_hosts_and_plaintext(self, url):
-        from netbox_ssl.adapters.azure_kv import AzureKvAdapter
+        ok, message = azure_kv.AzureKvAdapter(_source(base_url=url)).test_connection()
 
-        with pytest.raises(ValueError):
-            AzureKvAdapter(_source(base_url=url))._validate_vault_url(url)
+        assert ok is True, message
+        assert [c["vault_url"] for c in constructed] == [url]
+
+    @pytest.mark.parametrize("url", _NON_VAULT_URLS)
+    def test_test_connection_refuses_a_non_vault_host(self, url, monkeypatch):
+        from netbox_ssl.adapters import azure_kv
+
+        constructed = self._spy_client(monkeypatch)
+
+        ok, message = azure_kv.AzureKvAdapter(_source(base_url=url)).test_connection()
+
+        assert ok is False, f"test_connection accepted {url}"
+        assert "Key Vault" in message, f"the refusal does not explain itself: {message!r}"
+        assert constructed == [], f"a client was built for {url}; the SSRF guard is not wired in"
+
+    @pytest.mark.parametrize("url", _NON_VAULT_URLS)
+    def test_fetch_certificates_refuses_a_non_vault_host(self, url, monkeypatch):
+        """The sync path must refuse too -- test_connection is optional, syncing is not."""
+        from netbox_ssl.adapters import azure_kv
+
+        constructed = self._spy_client(monkeypatch)
+
+        with pytest.raises(ValueError, match="Key Vault"):
+            azure_kv.AzureKvAdapter(_source(base_url=url)).fetch_certificates()
+
+        assert constructed == [], f"a client was built for {url}; the SSRF guard is not wired in"
 
 
 class TestTestConnection:

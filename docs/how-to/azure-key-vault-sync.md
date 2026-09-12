@@ -64,12 +64,34 @@ For a **user-assigned** identity, set `AZURE_CLIENT_ID` in the NetBox process
 environment to the identity's client ID — `DefaultAzureCredential` picks it
 up automatically; there is no separate credential field for it.
 
+!!! danger "Never set `AZURE_TENANT_ID` / `AZURE_CLIENT_SECRET` on a managed-identity host"
+    `DefaultAzureCredential` tries `EnvironmentCredential` **first**, before it
+    ever looks for a managed identity. `EnvironmentCredential` activates as
+    soon as the bare triple `AZURE_TENANT_ID` + `AZURE_CLIENT_ID` +
+    `AZURE_CLIENT_SECRET` is present. So on a host where all three are set, an
+    `azure_managed_identity` source silently authenticates as that service
+    principal instead — same vault, different identity, different effective
+    permissions, and no visible symptom anywhere in NetBox.
+
+    `AZURE_CLIENT_ID` alone is safe and is exactly how a user-assigned
+    identity is selected. It becomes dangerous only in company of the other
+    two. That is why the service-principal option below uses `NETBOX_AZURE_*`
+    names: they cannot be picked up by `DefaultAzureCredential`'s own chain.
+
 ### Option B — Service Principal (`azure_explicit`)
 
 For NetBox installations outside Azure. Set `tenant_id`, `client_id` and
 `client_secret` as `env:VAR_NAME` references — the plaintext values live in
 your secret manager and the NetBox process environment, never in the
-database:
+database.
+
+The variable names are yours to choose (the `env:` resolver reads whatever
+you name), but **do not use the bare `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` /
+`AZURE_CLIENT_SECRET`**: those are the exact names `DefaultAzureCredential`'s
+own `EnvironmentCredential` consumes, and it sits ahead of managed identity in
+the chain. Setting them would hijack every `azure_managed_identity` source on
+the same host (see the warning under Option A). The `NETBOX_AZURE_*` prefix
+below is inert to Azure's chain and is what this plugin documents everywhere:
 
 ```bash
 export NETBOX_AZURE_TENANT_ID="..."
@@ -100,8 +122,22 @@ host suffixes are `.vault.azure.net`, `.vault.azure.cn`,
 `.vault.usgovcloudapi.net` and `.vault.microsoftazure.de`; anything else, or
 a non-`https` scheme, is rejected before any request is made.
 
-Use **Test Connection** on the source detail page to confirm access before
-the first sync.
+Confirm access before the first sync. There is no *Test Connection* button
+on the source detail page — the detail page offers **Sync Now** and **Dry
+Run**. Either:
+
+- click **Dry Run**, which contacts the vault and reports what a sync *would*
+  change without writing anything, or
+- call the REST endpoint directly:
+
+```bash
+curl -X POST -H "Authorization: Token $NETBOX_TOKEN" \
+  https://netbox.example.com/api/plugins/ssl/external-sources/<id>/test-connection/
+```
+
+It returns `{"success": true, "message": "Connected. N certificate(s) visible
+in the vault."}`. The endpoint requires the `change_externalsource`
+permission.
 
 ## Step 4 — Optional tag sync
 
@@ -175,7 +211,7 @@ judged on the certificate's own parsed validity period, never on Azure's
 
 ## Troubleshooting
 
-### "Access denied by Azure" / 403 on Test Connection
+### "Access denied by Azure" / 403 from Dry Run or test-connection
 
 The identity is missing the `Key Vault Reader` role on the vault or its
 resource group. Grant that role — not `Key Vault Certificate User` (see

@@ -28,6 +28,8 @@ if str(_tests_dir) not in sys.path:
 # established pattern, also used by test_credential_schema.py and test_adapters.py.
 import importlib.util  # noqa: E402
 
+from .conftest import get_plugin_source_dir  # noqa: E402
+
 try:
     _spec = importlib.util.find_spec("netbox")
     _NETBOX_AVAILABLE = _spec is not None and _spec.origin is not None
@@ -38,7 +40,32 @@ if not _NETBOX_AVAILABLE and "netbox" not in sys.modules:
     sys.modules["netbox"] = MagicMock()
     sys.modules["netbox.plugins"] = MagicMock()
 
-ADAPTER = Path(__file__).parent.parent / "netbox_ssl" / "adapters" / "azure_kv.py"
+# WHY this file installs its own Django stub instead of leaning on another
+# test file's: `azure_kv._to_fetched` lazily imports `..utils.parser`, which
+# pulls netbox_ssl/utils/__init__.py -> assignments.py ->
+# django.contrib.contenttypes.models. On the host lane Django's app registry is
+# never populated, so that import raises AppRegistryNotReady. These tests used
+# to pass only because test_adapters.py -- imported earlier by alphabetical
+# collection -- happens to `setdefault` the same stub into sys.modules
+# globally. Borrowed state like that is collection-order luck (#101 review M3).
+# Here the cost was subtler than a red test: without the stub, the good
+# certificate in TestProhibitedFieldAbortsTheWholeRun never got as far as being
+# parsed -- the per-certificate handler swallowed AppRegistryNotReady -- so the
+# control case passed while exercising nothing.
+# Probing with a real import means the stub is installed ONLY when
+# the genuine module is unusable -- in the container lane, where Django is
+# fully configured, nothing is replaced.
+try:  # pragma: no cover - exercised by which lane runs this file
+    import django.contrib.contenttypes.models  # noqa: F401
+except Exception:  # AppRegistryNotReady / ImproperlyConfigured / ImportError
+    sys.modules.setdefault("django.contrib.contenttypes.models", MagicMock())
+
+# get_plugin_source_dir(), not Path(__file__).parent.parent: in the container
+# lane these tests live at /tmp/plugin_tests/ while the plugin is mounted at
+# /opt/netbox/netbox/netbox_ssl/, so the hand-rolled form resolved to
+# /tmp/netbox_ssl/... and these key-material tripwires died with
+# FileNotFoundError instead of guarding anything (#101 review C3).
+ADAPTER = get_plugin_source_dir() / "adapters" / "azure_kv.py"
 
 
 def _source():

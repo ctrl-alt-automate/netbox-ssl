@@ -306,7 +306,18 @@ jobs:
       - name: Install pytest in NetBox container
         run: |
           docker compose exec -T netbox bash -c "curl -sS https://bootstrap.pypa.io/get-pip.py | /opt/netbox/venv/bin/python"
-          docker compose exec -T netbox /opt/netbox/venv/bin/pip install pytest 'pytest-django>=4.11' boto3 'moto[acm]>=5.0,<6.0'
+          # The plugin is volume-mounted, never `pip install`ed, so its extras
+          # never apply in this container: every optional test dependency has
+          # to be named here by hand. boto3/moto back the AWS ACM adapter
+          # tests; azure-identity + azure-keyvault-certificates (pinned to the
+          # "azure" extra in pyproject.toml) back the Azure Key Vault adapter
+          # tests (#101). Without them those tests ERROR on import rather than
+          # skip — a red lane that also hid, for a while, the fact that the
+          # live-vault tests were running here (see conftest's azure_live
+          # deselection). Keep this list in step with the unit-tests job above.
+          docker compose exec -T netbox /opt/netbox/venv/bin/pip install pytest 'pytest-django>=4.11' \
+            boto3 'moto[acm]>=5.0,<6.0' \
+            'azure-identity>=1.25,<2.0' 'azure-keyvault-certificates>=4.11,<5.0'
 
       - name: Copy tests to container
         run: |

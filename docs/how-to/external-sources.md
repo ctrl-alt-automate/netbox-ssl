@@ -50,11 +50,24 @@ Azure Key Vault with explicit service-principal credentials:
 
 ```json
 {
-  "tenant_id": "env:AZURE_TENANT_ID",
-  "client_id": "env:AZURE_CLIENT_ID",
-  "client_secret": "env:AZURE_CLIENT_SECRET"
+  "tenant_id": "env:NETBOX_AZURE_TENANT_ID",
+  "client_id": "env:NETBOX_AZURE_CLIENT_ID",
+  "client_secret": "env:NETBOX_AZURE_CLIENT_SECRET"
 }
 ```
+
+!!! danger "Do not name these variables `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET`"
+    Those three names are what Azure's own `EnvironmentCredential` reads, and
+    `DefaultAzureCredential` — which the `azure_managed_identity` method uses
+    — tries `EnvironmentCredential` **first**, ahead of managed identity. On a
+    host where all three are set, a source configured for managed identity
+    silently authenticates as this service principal instead. Nothing in
+    NetBox reports it: the sync succeeds, under the wrong identity and the
+    wrong permissions.
+
+    The `env:VAR_NAME` resolver reads whatever name you give it, so choose one
+    Azure's chain cannot claim. `NETBOX_AZURE_*` is the prefix this plugin's
+    documentation uses throughout.
 
 ### Role-based auth (cloud-native)
 
@@ -73,6 +86,12 @@ Supported role-based `auth_method` values:
   To select a **user-assigned** identity, set the `AZURE_CLIENT_ID` environment variable on the
   NetBox and worker processes — `DefaultAzureCredential` reads it. There is no `client_id`
   credential field for this auth method.
+
+  `AZURE_CLIENT_ID` on its own is safe and is the documented way to pick a user-assigned
+  identity. It is only dangerous alongside `AZURE_TENANT_ID` and `AZURE_CLIENT_SECRET`: that
+  full triple switches `DefaultAzureCredential` over to `EnvironmentCredential`, which wins
+  ahead of managed identity. Keep service-principal credentials under `NETBOX_AZURE_*` names
+  (see the warning above) and the two can coexist on one host.
 
 ### Deprecated — `auth_credentials_reference`
 
