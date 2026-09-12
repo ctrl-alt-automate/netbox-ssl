@@ -55,6 +55,21 @@
               {% endif %}
             </td>
           </tr>
+          {# Tag sync is shown here, not only on the edit form: enabling it makes
+             the external source authoritative for this certificate's tags, and a
+             setting with that blast radius should be visible where an operator
+             inspects the source. #}
+          <tr>
+            <th scope="row">Sync Tags</th>
+            <td>
+              {% if object.sync_tags %}
+                <span class="badge text-bg-info">Enabled</span>
+                <span class="text-muted ms-1">source is authoritative for tags</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Disabled</span>
+              {% endif %}
+            </td>
+          </tr>
           <tr>
             <th scope="row">Sync Interval</th>
             <td>
