@@ -362,17 +362,25 @@ class TestStatusMapping:
         reason="requires real netbox/Django - runs in the Docker container lane",
     )
     def test_status_literals_match_the_real_choice_set(self):
-        """_map_status returns literals, so guard them against ChoiceSet drift.
+        """_map_status returns literals, so guard them against drift in BOTH directions.
 
         The adapter cannot import CertificateStatusChoices at module level — a
-        sys.modules mock from another test file would replace it — so it uses
-        string literals like AwsAcmAdapter does. This test is what keeps those
-        literals honest.
+        sys.modules mock from another test file would replace it — so it holds
+        its own string constants. This test reads those constants and checks
+        each is a real member of the ChoiceSet, which catches a renamed choice
+        value AND a typo introduced in the adapter's own literal.
         """
+        from netbox_ssl.adapters.azure_kv import AzureKvAdapter
         from netbox_ssl.models import CertificateStatusChoices
 
         valid = {value for value, *_ in CertificateStatusChoices.CHOICES}
-        assert {"active", "expired", "archived"} <= valid
+        adapter_literals = {
+            AzureKvAdapter._STATUS_ACTIVE,
+            AzureKvAdapter._STATUS_EXPIRED,
+            AzureKvAdapter._STATUS_ARCHIVED,
+        }
+        unknown = adapter_literals - valid
+        assert not unknown, f"AzureKvAdapter emits status value(s) the model does not define: {sorted(unknown)}"
 
 
 class TestTagMapping:
