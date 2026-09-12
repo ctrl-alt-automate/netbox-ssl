@@ -14,10 +14,16 @@ endpoint — without manual CSV exports.
 
 ## Supported adapters
 
-| Adapter | Source | Config |
-|---------|--------|--------|
-| `lemur` | Netflix Lemur | Lemur API URL + API key (via env var) |
-| `generic_rest` | Any JSON REST endpoint | URL + optional auth header + field mapping |
+| Adapter | Source | Config | Extra required |
+|---------|--------|--------|----------------|
+| `lemur` | Netflix Lemur | Lemur API URL + API key (via env var) | — |
+| `generic_rest` | Any JSON REST endpoint | URL + optional auth header + field mapping | — |
+| `aws_acm` | AWS Certificate Manager | Region + IAM role or access key (via env var) | `netbox-ssl[aws]` |
+| `azure_kv` | Azure Key Vault | Vault URL + managed identity or service principal | `netbox-ssl[azure]` |
+
+`aws_acm` and `azure_kv` are registered only when their optional extra is
+installed; without it the source type does not appear in the form. See
+[AWS ACM sync](aws-acm-sync.md) and [Azure Key Vault sync](azure-key-vault-sync.md).
 
 Adapters live under `netbox_ssl/adapters/`. New adapters can be added by
 subclassing `BaseAdapter`.
