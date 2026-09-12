@@ -67,7 +67,12 @@ When NetBox runs on an AWS EC2 instance with an IAM role or on Azure with a Mana
 Supported role-based `auth_method` values:
 
 - `aws_instance_role` — AWS IAM role attached to the NetBox host (EC2, ECS, Lambda). Requires IMDSv2 enabled.
-- `azure_managed_identity` — Azure Managed Identity (system- or user-assigned). For user-assigned, include `client_id` pointing at the identity's client-ID.
+- `azure_managed_identity` — Azure Managed Identity (system- or user-assigned), a federated
+  workload identity, or a local `az login`. Leave `auth_credentials` empty: the adapter builds
+  `DefaultAzureCredential()` with no arguments, so any key you put there is ignored.
+  To select a **user-assigned** identity, set the `AZURE_CLIENT_ID` environment variable on the
+  NetBox and worker processes — `DefaultAzureCredential` reads it. There is no `client_id`
+  credential field for this auth method.
 
 ### Deprecated — `auth_credentials_reference`
 
