@@ -80,6 +80,22 @@ enforces this via `.coveragerc`'s `fail_under = 70`. Higher layers (models,
 views, scripts) are covered by Docker-based integration tests that also run
 in CI.
 
+### Azure Key Vault live tests
+
+`tests/test_azure_kv_live.py` (marker `azure_live`) runs against a real Azure
+Key Vault and is not part of the standard unit/api/browser/load lanes — it
+runs via the `Azure Integration` GitHub Actions workflow
+(`.github/workflows/azure-integration.yml`), authenticated through OIDC as a
+service principal holding only `Key Vault Reader`.
+
+One of its tests is a privilege canary: it constructs a `SecretClient` and
+asserts `get_secret()` is refused with a 403 under that identity, proving the
+CI principal is not over-privileged. It only runs when
+`AZURE_KV_LEAST_PRIVILEGE_IDENTITY=1` is set explicitly — without it, a local
+`az login` identity with broader access would make `get_secret()` succeed and
+turn a real regression into a false pass, so the test refuses to run instead
+of giving a misleading green.
+
 ## Code style
 
 We use [Ruff](https://github.com/astral-sh/ruff) for linting and formatting:

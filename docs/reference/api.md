@@ -121,8 +121,11 @@ Websites whose presented certificate is tracked over time. See the
 
 ### External Sources
 
-Configured external certificate systems. See the
-[external sources how-to](../how-to/external-sources.md).
+Configured external certificate systems. `source_type` accepts `lemur`,
+`aws_acm`, `azure_kv` and `generic_rest`. See the
+[external sources how-to](../how-to/external-sources.md) and, for Azure Key
+Vault specifically, the
+[Azure Key Vault how-to](../how-to/azure-key-vault-sync.md).
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -133,6 +136,15 @@ Configured external certificate systems. See the
 | `DELETE` | `/external-sources/{id}/` | Delete source |
 | `POST` | `/external-sources/{id}/test-connection/` | Probe credentials and reachability without syncing |
 | `POST` | `/external-sources/{id}/sync/` | Run a sync for this source |
+
+`sync_tags` (boolean, default `false`) opts a source into copying its tags
+onto imported certificates. When enabled the source is authoritative: each
+sync **replaces** the certificate's full tag set, and a certificate with no
+tags at the source has its NetBox tags cleared. Only adapters that supply tags
+honour the flag — Azure Key Vault is the only one today; setting it on a
+`lemur`, `generic_rest` or `aws_acm` source has no effect. See
+[Azure Key Vault tag sync](../how-to/azure-key-vault-sync.md#step-4-optional-tag-sync)
+for the worked example.
 
 !!! warning "Credentials are write-only"
     `auth_credentials` accepts `env:VAR_NAME` references on write and is never
