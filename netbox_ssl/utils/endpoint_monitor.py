@@ -52,18 +52,26 @@ def _host_port(url: str) -> tuple[str, int]:
     return parts.hostname or "", parts.port or 443
 
 
-def _supersede_previous_certificates(
-    endpoint: MonitoredEndpoint, current: Certificate, previous_id: int | None
-) -> tuple[int, ...]:
+def _supersede_previous_certificates(endpoint: MonitoredEndpoint, current: Certificate) -> tuple[int, ...]:
     """Run the Janus renewal for certificates this endpoint has stopped serving.
 
     A renewal done outside NetBox (ACME, a load balancer) shows up here as the
     endpoint presenting a new certificate. Without this step the predecessor
     stays Active forever, next to its successor (#184).
 
-    Candidates are every certificate the endpoint is known to have served — its
-    history plus the one it pointed at before this poll — so a rotation an
-    older plugin version left unlinked is healed on the next poll too.
+    Only call this for a poll whose chain verified. Retiring a certificate is a
+    change to the inventory made on the word of a remote host, so that host has
+    to be authenticated: anyone on the network path can answer an unverified
+    handshake with a self-signed certificate for the right name.
+
+    Candidates are the certificates in the endpoint's history, i.e. the ones the
+    poll itself has seen this endpoint serve. That history is written nowhere
+    else, and a completed handshake proves the server held the private key. The
+    certificate the endpoint merely *points at* is deliberately not a candidate:
+    that link is set on a form, and whoever may edit an endpoint must not be
+    able to nominate an arbitrary certificate for retirement. Working from the
+    whole history also means a rotation an older plugin version left unlinked
+    is healed on the next poll.
 
     A Replaced certificate drops out of expiry alerting, so a predecessor is
     only retired when all of this holds:
@@ -74,6 +82,7 @@ def _supersede_previous_certificates(
       is a rollback, or a second node behind the same name, not a renewal;
     - the two share a name — otherwise the host now answers with an unrelated
       certificate, which is drift;
+    - they do not belong to two different tenants;
     - no other monitored endpoint still serves it.
 
     Returns the pks of the certificates that were marked Replaced.
@@ -86,8 +95,6 @@ def _supersede_previous_certificates(
     candidate_ids = set(
         MonitoredEndpointCertificate.objects.filter(endpoint=endpoint).values_list("certificate_id", flat=True)
     )
-    if previous_id is not None:
-        candidate_ids.add(previous_id)
     candidate_ids.discard(current.pk)
     if not candidate_ids:
         return ()
@@ -101,6 +108,8 @@ def _supersede_previous_certificates(
     replaced: list[int] = []
     for predecessor in predecessors:
         if not shares_a_name(predecessor, current):
+            continue
+        if predecessor.tenant_id and current.tenant_id and predecessor.tenant_id != current.tenant_id:
             continue
         if MonitoredEndpoint.objects.filter(certificate=predecessor).exclude(pk=endpoint.pk).exists():
             continue
@@ -137,8 +146,8 @@ def poll_endpoint(endpoint: MonitoredEndpoint, *, allowlist: list[str]) -> PollR
     - endpoint.certificate, last_checked, last_seen, last_error updated atomically.
     - MonitoredEndpointCertificate history row upserted (get_or_create + bump last_seen).
     - Rotation detected when the previous cert pk differs from the new one.
-    - Certificates the endpoint no longer serves are renewed onto the current
-      one (see ``_supersede_previous_certificates``) + fire certificate_renewed.
+    - On a trusted poll, certificates the endpoint no longer serves are renewed
+      onto the current one (see ``_supersede_previous_certificates``).
     """
     host, port = _host_port(endpoint.url)
     sni = endpoint.sni or None
@@ -202,7 +211,9 @@ def poll_endpoint(endpoint: MonitoredEndpoint, *, allowlist: list[str]) -> PollR
             hist.last_seen = now
             hist.save(update_fields=["last_seen"])
 
-    replaced_ids = _supersede_previous_certificates(endpoint, cert, prev_cert_id)
+    # An endpoint the poll could not authenticate gets its certificate recorded,
+    # but is not believed about what that certificate replaces.
+    replaced_ids = () if untrusted else _supersede_previous_certificates(endpoint, cert)
 
     if untrusted:
         events.append(EVENT_ENDPOINT_UNTRUSTED_CERT)

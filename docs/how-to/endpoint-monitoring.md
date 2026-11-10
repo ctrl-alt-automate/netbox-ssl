@@ -111,10 +111,13 @@ retires a predecessor when it is sure. All of the following must hold:
 
 | Condition | Why |
 |-----------|-----|
+| The poll verified the endpoint's chain (status **OK**, not **Untrusted**) | Retiring a certificate changes your inventory on the word of a remote host, so that host has to be authenticated. Anyone on the network path can answer with a self-signed certificate for the right name. |
+| This endpoint was itself seen serving the predecessor | The certificate chosen on the endpoint form is user input, not evidence; only a poll that saw the endpoint serve a certificate makes it a predecessor |
 | The certificate now served is **Active** | A revoked or already replaced certificate is not a successor |
 | The predecessor is **Active** or **Expired** | Revoked, archived and replaced certificates were already dealt with |
 | The predecessor was issued **earlier** | Falling back to an older certificate is a rollback, not a renewal |
 | Both certificates share a name (CN or SAN) | Otherwise the host now answers with an unrelated certificate — that is drift |
+| The two certificates are not in different tenants | A renewal never crosses a tenant boundary |
 | No other monitored endpoint still serves the predecessor | It is still in service somewhere; it is retired once the last endpoint has rotated |
 
 When a condition is not met the poll still records the rotation; it just leaves
@@ -182,8 +185,10 @@ PLUGINS_CONFIG = {
     ([#184](https://github.com/ctrl-alt-automate/netbox-ssl/issues/184)); upgrade
     and run the poll once. If it still happens, one of the conditions under
     [What happens when a certificate is renewed](#what-happens-when-a-certificate-is-renewed)
-    is not met — most often another monitored endpoint still serves the old
-    certificate.
+    is not met. The two most common ones: another monitored endpoint still
+    serves the old certificate, or the endpoint is **Untrusted** — a certificate
+    from an internal CA is only recognised as a renewal once that CA's root is
+    in the trust store of the NetBox host.
 
 !!! question "A renewal reminder quotes an old certificate"
     Reminders read the certificate the endpoint is currently linked to. If the

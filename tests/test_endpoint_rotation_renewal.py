@@ -87,6 +87,27 @@ def _poll(endpoint, pem: str):
         return poll_endpoint(endpoint, allowlist=[])
 
 
+def _poll_untrusted(endpoint, pem: str):
+    """Poll ``endpoint`` presenting ``pem`` over a chain that does not verify."""
+    from netbox_ssl.utils.endpoint_monitor import poll_endpoint
+    from netbox_ssl.utils.tls_scraper import TLSScrapeError
+
+    def scrape(*args, verify_chain: bool = True, **kwargs) -> str:
+        if verify_chain:
+            raise TLSScrapeError("certificate verify failed: self-signed certificate")
+        return pem
+
+    with (
+        patch("netbox_ssl.utils.url_cert_import.validate_https_url"),
+        patch(
+            "netbox_ssl.utils.url_cert_import.socket.getaddrinfo",
+            return_value=[(2, 1, 6, "", ("203.0.113.10", 443))],
+        ),
+        patch("netbox_ssl.utils.url_cert_import.scrape_tls_certificate", side_effect=scrape),
+    ):
+        return poll_endpoint(endpoint, allowlist=[])
+
+
 def _import(cn: str, pem: str):
     """Import ``pem`` the way URL import does, without any monitored endpoint."""
     from netbox_ssl.utils.url_cert_import import scrape_and_import
@@ -154,14 +175,15 @@ class TestRotationRunsRenewal:
         assert old.status == CertificateStatusChoices.STATUS_REPLACED
         assert old.replaced_by == new
 
-    def test_certificate_linked_to_the_endpoint_by_hand_is_replaced_too(self):
-        """#184 as reported: import the certificate, then configure the endpoint for it."""
+    def test_the_reported_flow_import_then_link_by_hand_then_renew(self):
+        """#184 as reported: import the certificate, configure the endpoint for it, wait."""
         from netbox_ssl.models import CertificateStatusChoices
 
         cn = _cn()
         old_pem, new_pem = _old_pem(cn), _new_pem(cn)
         old = _import(cn, old_pem)
-        endpoint = _endpoint(cn, certificate=old)  # never polled: no history row yet
+        endpoint = _endpoint(cn, certificate=old)
+        _poll(endpoint, old_pem)  # the daily poll, while the old certificate is still served
 
         _poll(endpoint, new_pem)
 
@@ -452,6 +474,68 @@ class TestRotationGuards:
         assert _cert(new_pem).tenant == cert_tenant
         assert _cert(new_pem).assignments.count() == 0
         assert _cert(old_pem).status == CertificateStatusChoices.STATUS_REPLACED
+
+    def test_untrusted_successor_does_not_retire_the_previous_certificate(self):
+        """An endpoint the poll could not authenticate must not change the inventory.
+
+        Anyone on the network path can answer with a self-signed certificate for
+        the right name. Importing it is fine; retiring the real one on its word
+        would silence that certificate's expiry alerts.
+        """
+        from netbox_ssl.models import CertificateStatusChoices, MonitoredEndpointStatusChoices
+
+        cn = _cn()
+        old_pem, new_pem = _old_pem(cn), _new_pem(cn)
+        endpoint = _endpoint(cn)
+        _poll(endpoint, old_pem)
+
+        result = _poll_untrusted(endpoint, new_pem)
+
+        assert result.status == MonitoredEndpointStatusChoices.STATUS_UNTRUSTED
+        assert result.replaced_certificate_ids == ()
+        assert _cert(old_pem).status == CertificateStatusChoices.STATUS_ACTIVE
+
+    def test_certificate_only_linked_by_hand_is_not_retired(self):
+        """The link on the form is user input, not evidence.
+
+        Whoever may edit an endpoint could otherwise point it at any certificate
+        and have the poll retire it. Only a certificate this endpoint was seen
+        serving counts as a predecessor.
+        """
+        from netbox_ssl.models import CertificateStatusChoices
+
+        cn = _cn()
+        old_pem, new_pem = _old_pem(cn), _new_pem(cn)
+        old = _import(cn, old_pem)
+        endpoint = _endpoint(cn, certificate=old)  # never observed serving it
+
+        _poll(endpoint, new_pem)
+
+        old.refresh_from_db()
+        assert old.status == CertificateStatusChoices.STATUS_ACTIVE
+        assert old.replaced_by is None
+
+    def test_predecessor_in_another_tenant_is_not_retired(self):
+        from tenancy.models import Tenant
+
+        from netbox_ssl.models import CertificateStatusChoices
+
+        uid = uuid.uuid4().hex[:8]
+        first = Tenant.objects.create(name=f"first-{uid}", slug=f"first-{uid}")
+        second = Tenant.objects.create(name=f"second-{uid}", slug=f"second-{uid}")
+        cn = _cn()
+        old_pem, new_pem = _old_pem(cn), _new_pem(cn)
+        endpoint = _endpoint(cn, tenant=first)
+        _poll(endpoint, old_pem)  # imported into the first tenant
+        _assign(_cert(old_pem), _device("web"))
+        endpoint.tenant = second  # the endpoint changes hands before the renewal
+        endpoint.save()
+
+        _poll(endpoint, new_pem)
+
+        assert _cert(new_pem).tenant == second
+        assert _cert(old_pem).status == CertificateStatusChoices.STATUS_ACTIVE
+        assert _cert(new_pem).assignments.count() == 0
 
     def test_poll_still_succeeds_when_the_renewal_itself_fails(self):
         """One broken renewal must not abort the endpoint, or the whole script run."""

@@ -21,10 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   entry naming its predecessor.
 
   Because a Replaced certificate stops raising expiry alerts, a predecessor is
-  only retired when the certificate now served is Active, was issued later,
-  shares a name with it, and no other monitored endpoint still serves the old
-  one. Rotations that v1.3.0 – v1.4.0 left unlinked are repaired by the first
-  poll after upgrading. The run summary reports `replaced=N`.
+  only retired when the poll verified the endpoint's chain, the endpoint was
+  itself seen serving the predecessor, the certificate now served is Active, was
+  issued later, shares a name with it and is not in another tenant, and no other
+  monitored endpoint still serves the old one. An **Untrusted** endpoint — one
+  using an internal CA the NetBox host does not trust, for instance — still has
+  its certificate recorded but never retires one. Rotations that v1.3.0 – v1.4.0
+  left unlinked are repaired by the first poll after upgrading. The run summary
+  reports `replaced=N`.
 
 ### Documentation
 
