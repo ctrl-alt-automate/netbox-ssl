@@ -97,10 +97,9 @@ certificate both **Active**:
 - the successor receives a copy of the predecessor's **assignments** (the
   predecessor keeps its own, as a record)
 - operator-maintained metadata carries over: **private key location**, the
-  **renewal note**, the **tenant**, and — when the predecessor is an ACME
-  certificate — the ACME provider, account e-mail, challenge type, server URL,
-  auto-renewal flag and renewal days. A value already set on the successor is
-  never overwritten.
+  **renewal note**, and — when the predecessor is an ACME certificate — the ACME
+  provider, account e-mail, challenge type, server URL, auto-renewal flag and
+  renewal days. A value already set on the successor is never overwritten.
 - the successor gets a **Renewed** entry on its Lifecycle tab naming the
   predecessor
 - NetBox raises an *Object updated* event for the predecessor (its status
@@ -117,7 +116,7 @@ retires a predecessor when it is sure. All of the following must hold:
 | The predecessor is **Active** or **Expired** | Revoked, archived and replaced certificates were already dealt with |
 | The predecessor was issued **earlier** | Falling back to an older certificate is a rollback, not a renewal |
 | Both certificates share a name (CN or SAN) | Otherwise the host now answers with an unrelated certificate — that is drift |
-| The two certificates are not in different tenants | A renewal never crosses a tenant boundary |
+| Both certificates are in the same tenant, or both in none | A renewal never crosses a tenant boundary. A certificate the poll imports takes the endpoint's tenant, so give the endpoint the tenant of its certificate. |
 | No other monitored endpoint still serves the predecessor | It is still in service somewhere; it is retired once the last endpoint has rotated |
 
 When a condition is not met the poll still records the rotation; it just leaves
@@ -185,10 +184,18 @@ PLUGINS_CONFIG = {
     ([#184](https://github.com/ctrl-alt-automate/netbox-ssl/issues/184)); upgrade
     and run the poll once. If it still happens, one of the conditions under
     [What happens when a certificate is renewed](#what-happens-when-a-certificate-is-renewed)
-    is not met. The two most common ones: another monitored endpoint still
-    serves the old certificate, or the endpoint is **Untrusted** — a certificate
-    from an internal CA is only recognised as a renewal once that CA's root is
-    in the trust store of the NetBox host.
+    is not met. The most common ones: another monitored endpoint still serves
+    the old certificate; the endpoint is **Untrusted** — a certificate from an
+    internal CA is only recognised as a renewal once that CA's root is in the
+    trust store of the NetBox host; or the old certificate has a tenant and the
+    endpoint does not (or the other way round).
+
+!!! question "Unreachable: \"…serial number and issuer of certificate #N but a different fingerprint\""
+    The endpoint presented a certificate that copies the serial number and
+    issuer of a certificate in your inventory without being that certificate.
+    A certificate authority never issues two certificates like that, so this is
+    a forged or mis-generated certificate. The plugin refuses to record it as
+    the real one. Check what is answering on that address.
 
 !!! question "A renewal reminder quotes an old certificate"
     Reminders read the certificate the endpoint is currently linked to. If the

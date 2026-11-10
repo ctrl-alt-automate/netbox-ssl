@@ -88,10 +88,6 @@ def _carry_metadata(old: Certificate, new: Certificate) -> tuple[str, ...]:
             setattr(new, field_name, value)
             carried.append(field_name)
 
-    if new.tenant_id is None and old.tenant_id is not None:
-        new.tenant_id = old.tenant_id
-        carried.append("tenant")
-
     if carried:
         new.save(update_fields=carried)
     return tuple(carried)

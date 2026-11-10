@@ -16,19 +16,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so every ACME renewal left two Active certificates behind. The poll now runs
   the Janus renewal: the predecessor becomes **Replaced** and links to its
   successor, its assignments are copied across, and the private key location,
-  renewal note, tenant and ACME settings carry over without overwriting anything
+  renewal note and ACME settings carry over without overwriting anything
   already set on the successor. The successor gets a **Renewed** lifecycle
   entry naming its predecessor.
 
   Because a Replaced certificate stops raising expiry alerts, a predecessor is
   only retired when the poll verified the endpoint's chain, the endpoint was
   itself seen serving the predecessor, the certificate now served is Active, was
-  issued later, shares a name with it and is not in another tenant, and no other
+  issued later, shares a name with it and is in the same tenant, and no other
   monitored endpoint still serves the old one. An **Untrusted** endpoint — one
   using an internal CA the NetBox host does not trust, for instance — still has
   its certificate recorded but never retires one. Rotations that v1.3.0 – v1.4.0
   left unlinked are repaired by the first poll after upgrading. The run summary
   reports `replaced=N`.
+
+### Security
+
+- **A scraped certificate is matched to an inventory certificate by fingerprint,
+  not by serial number and issuer alone.** URL import and endpoint monitoring
+  looked an incoming certificate up by serial number and issuer. Both are plain
+  fields that anyone can copy into a self-signed certificate, and the scrape of
+  an untrusted endpoint does not verify the chain — so a look-alike was taken to
+  *be* the inventory certificate: its `last seen` and discovery URL were updated,
+  and a monitored endpoint was linked to it and recorded as having served it. A
+  certificate with a known serial number and issuer but a different fingerprint
+  is now refused, and the endpoint reports **Unreachable** with an explanatory
+  error. Present since URL import was added in v1.2.0.
 
 ### Documentation
 

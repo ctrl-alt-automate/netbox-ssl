@@ -66,7 +66,10 @@ def _supersede_previous_certificates(endpoint: MonitoredEndpoint, current: Certi
 
     Candidates are the certificates in the endpoint's history, i.e. the ones the
     poll itself has seen this endpoint serve. That history is written nowhere
-    else, and a completed handshake proves the server held the private key. The
+    else, a completed handshake proves the server held the private key, and the
+    import only maps a presented certificate onto an inventory record when the
+    fingerprints are equal — so a history row cannot be faked for a certificate
+    the server does not own. The
     certificate the endpoint merely *points at* is deliberately not a candidate:
     that link is set on a form, and whoever may edit an endpoint must not be
     able to nominate an arbitrary certificate for retirement. Working from the
@@ -82,7 +85,7 @@ def _supersede_previous_certificates(endpoint: MonitoredEndpoint, current: Certi
       is a rollback, or a second node behind the same name, not a renewal;
     - the two share a name — otherwise the host now answers with an unrelated
       certificate, which is drift;
-    - they do not belong to two different tenants;
+    - both are in the same tenant, or both in none;
     - no other monitored endpoint still serves it.
 
     Returns the pks of the certificates that were marked Replaced.
@@ -109,7 +112,7 @@ def _supersede_previous_certificates(endpoint: MonitoredEndpoint, current: Certi
     for predecessor in predecessors:
         if not shares_a_name(predecessor, current):
             continue
-        if predecessor.tenant_id and current.tenant_id and predecessor.tenant_id != current.tenant_id:
+        if predecessor.tenant_id != current.tenant_id:
             continue
         if MonitoredEndpoint.objects.filter(certificate=predecessor).exclude(pk=endpoint.pk).exists():
             continue

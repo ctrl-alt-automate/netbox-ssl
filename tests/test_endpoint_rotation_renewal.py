@@ -286,23 +286,6 @@ class TestRotationRunsRenewal:
         assert new.acme_auto_renewal is True
         assert new.acme_renewal_days == 20
 
-    def test_tenant_carries_over_when_the_endpoint_has_none(self):
-        from tenancy.models import Tenant
-
-        cn = _cn()
-        old_pem, new_pem = _old_pem(cn), _new_pem(cn)
-        endpoint = _endpoint(cn)
-        _poll(endpoint, old_pem)
-        uid = uuid.uuid4().hex[:8]
-        tenant = Tenant.objects.create(name=f"tenant-{uid}", slug=f"tenant-{uid}")
-        old = _cert(old_pem)
-        old.tenant = tenant
-        old.save()
-
-        _poll(endpoint, new_pem)
-
-        assert _cert(new_pem).tenant == tenant
-
     def test_metadata_already_on_the_successor_is_not_overwritten(self):
         cn = _cn()
         old_pem, new_pem = _old_pem(cn), _new_pem(cn)
@@ -451,6 +434,7 @@ class TestRotationGuards:
         assert _cert(old_pem).status == CertificateStatusChoices.STATUS_ACTIVE
 
     def test_assignment_crossing_a_tenant_boundary_is_skipped_and_the_renewal_completes(self):
+        """An assignment the tenant rules no longer allow is not carried forward."""
         from tenancy.models import Tenant
 
         from netbox_ssl.models import CertificateStatusChoices
@@ -460,18 +444,15 @@ class TestRotationGuards:
         device_tenant = Tenant.objects.create(name=f"device-{uid}", slug=f"device-{uid}")
         cn = _cn()
         old_pem, new_pem = _old_pem(cn), _new_pem(cn)
-        endpoint = _endpoint(cn)
+        endpoint = _endpoint(cn, tenant=cert_tenant)
         _poll(endpoint, old_pem)
         device = _device("web")
         device.tenant = device_tenant
         device.save()
-        _assign(_cert(old_pem), device)  # allowed: the old certificate has no tenant
-        endpoint.tenant = cert_tenant  # ...but its successor is imported into one
-        endpoint.save()
+        _assign(_cert(old_pem), device)  # written straight to the table, as legacy data would be
 
         _poll(endpoint, new_pem)
 
-        assert _cert(new_pem).tenant == cert_tenant
         assert _cert(new_pem).assignments.count() == 0
         assert _cert(old_pem).status == CertificateStatusChoices.STATUS_REPLACED
 
@@ -514,6 +495,43 @@ class TestRotationGuards:
         old.refresh_from_db()
         assert old.status == CertificateStatusChoices.STATUS_ACTIVE
         assert old.replaced_by is None
+
+    def test_tenanted_predecessor_is_not_retired_through_an_untenanted_endpoint(self):
+        """No tenant is a scope of its own: a renewal stays inside one scope."""
+        from tenancy.models import Tenant
+
+        from netbox_ssl.models import CertificateStatusChoices
+
+        cn = _cn()
+        old_pem, new_pem = _old_pem(cn), _new_pem(cn)
+        endpoint = _endpoint(cn)  # no tenant, so the successor is imported without one
+        _poll(endpoint, old_pem)
+        uid = uuid.uuid4().hex[:8]
+        old = _cert(old_pem)
+        old.tenant = Tenant.objects.create(name=f"tenant-{uid}", slug=f"tenant-{uid}")
+        old.save()
+
+        _poll(endpoint, new_pem)
+
+        assert _cert(old_pem).status == CertificateStatusChoices.STATUS_ACTIVE
+        assert _cert(new_pem).tenant is None
+
+    def test_untenanted_predecessor_is_not_retired_through_a_tenanted_endpoint(self):
+        from tenancy.models import Tenant
+
+        from netbox_ssl.models import CertificateStatusChoices
+
+        cn = _cn()
+        old_pem, new_pem = _old_pem(cn), _new_pem(cn)
+        endpoint = _endpoint(cn)
+        _poll(endpoint, old_pem)  # imported without a tenant
+        uid = uuid.uuid4().hex[:8]
+        endpoint.tenant = Tenant.objects.create(name=f"tenant-{uid}", slug=f"tenant-{uid}")
+        endpoint.save()
+
+        _poll(endpoint, new_pem)
+
+        assert _cert(old_pem).status == CertificateStatusChoices.STATUS_ACTIVE
 
     def test_predecessor_in_another_tenant_is_not_retired(self):
         from tenancy.models import Tenant
@@ -613,3 +631,75 @@ class TestCertificateNames:
         second = self._certificate("", ["DNS:b.example.com"])
 
         assert shares_a_name(first, second) is False
+
+
+@pytest.mark.django_db
+class TestForgedCertificateIsNotMistakenForAnInventoryRecord:
+    """Serial and issuer are just fields; without a verified chain anyone can copy them.
+
+    The import used to match an existing certificate on those two alone. A
+    self-signed certificate carrying the serial and issuer of a certificate in
+    the inventory was then taken to *be* that certificate: the endpoint got
+    linked to it and a history row recorded that the endpoint had served it,
+    without the server ever holding its key.
+    """
+
+    @staticmethod
+    def _pair(cn: str) -> tuple[str, str]:
+        """A genuine certificate and a forgery reusing its serial and issuer."""
+        serial = uuid.uuid4().int >> 8
+        return _old_pem(cn, serial=serial), _new_pem(cn, serial=serial)
+
+    def test_forgery_is_refused_instead_of_being_linked_to_the_genuine_record(self):
+        from netbox_ssl.models import MonitoredEndpointCertificate, MonitoredEndpointStatusChoices
+
+        cn = _cn()
+        genuine_pem, forged_pem = self._pair(cn)
+        genuine = _import(cn, genuine_pem)
+        impostor = _endpoint(cn)
+
+        result = _poll_untrusted(impostor, forged_pem)
+
+        impostor.refresh_from_db()
+        assert result.status == MonitoredEndpointStatusChoices.STATUS_UNREACHABLE
+        assert impostor.certificate is None
+        assert not MonitoredEndpointCertificate.objects.filter(endpoint=impostor, certificate=genuine).exists()
+
+    def test_forgery_leaves_the_genuine_record_untouched(self):
+        cn = _cn()
+        genuine_pem, forged_pem = self._pair(cn)
+        genuine = _import(cn, genuine_pem)
+        seen_before = genuine.last_seen_at
+
+        _poll_untrusted(_endpoint(cn), forged_pem)
+
+        genuine.refresh_from_db()
+        assert genuine.last_seen_at == seen_before
+
+    def test_forgery_cannot_set_up_the_genuine_certificate_for_retirement(self):
+        """The whole chain: fake the history first, then present a real successor."""
+        from netbox_ssl.models import CertificateStatusChoices
+
+        cn = _cn()
+        genuine_pem, forged_pem = self._pair(cn)
+        genuine = _import(cn, genuine_pem)
+        impostor = _endpoint(cn)
+        _poll_untrusted(impostor, forged_pem)
+
+        _poll(impostor, _new_pem(cn))  # a verified, newer certificate for the same name
+
+        genuine.refresh_from_db()
+        assert genuine.status == CertificateStatusChoices.STATUS_ACTIVE
+
+    def test_the_same_certificate_seen_again_is_still_matched(self):
+        """The check must not break the ordinary case: same certificate, second poll."""
+        from netbox_ssl.models import Certificate
+
+        cn = _cn()
+        pem = _old_pem(cn)
+        endpoint = _endpoint(cn)
+        _poll(endpoint, pem)
+
+        _poll(endpoint, pem)
+
+        assert Certificate.objects.filter(common_name=cn).count() == 1
