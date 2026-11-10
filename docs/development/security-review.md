@@ -56,7 +56,7 @@ This document describes the security measures implemented in NetBox SSL and serv
 |-------|--------|----------------|
 | Ruff linting | Enabled | Runs on every push/PR |
 | Bandit SAST scanning | Enabled | Static analysis for common Python security issues |
-| Multi-version testing | Enabled | Python 3.10/3.11/3.12, NetBox 4.4/4.5 |
+| Multi-version testing | Enabled | Python 3.10 – 3.14, NetBox 4.4 – 4.7 (newest patch of each, re-run weekly) |
 | Dependabot | Enabled | Automated dependency updates and security alerts |
 | Secret scanning | Enabled | GitHub secret scanning + push protection |
 

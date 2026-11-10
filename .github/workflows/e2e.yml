@@ -35,13 +35,21 @@ on:
 
 env:
   PYTHON_VERSION: "3.12"
-  NETBOX_VERSION: "v4.5-4.0.0"
 
 jobs:
   e2e-tests:
-    name: Playwright E2E Tests
+    name: Playwright E2E Tests (NetBox ${{ matrix.netbox_version }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # The two ends of the UI the plugin has to render on: v4.5 is the oldest
+        # release with v2 API tokens (which the fixtures below need), v4.7 the
+        # newest. Both are floating tags, i.e. the newest patch of that minor.
+        # This job used to run on 4.5 only, so no browser test ever saw the
+        # NetBox most people install.
+        netbox_version: ["v4.5", "v4.7"]
     steps:
       - uses: actions/checkout@v4
 
@@ -111,7 +119,7 @@ jobs:
 
       - name: Start NetBox
         run: |
-          NETBOX_VERSION=${{ env.NETBOX_VERSION }} docker compose up -d postgres redis redis-cache netbox
+          NETBOX_VERSION=${{ matrix.netbox_version }} docker compose up -d postgres redis redis-cache netbox
 
           echo "Waiting for NetBox to be healthy..."
           timeout 900 bash -c 'until docker compose exec -T netbox curl -sf http://localhost:8080/login/ > /dev/null 2>&1; do echo "Waiting for NetBox..."; sleep 15; done'
@@ -155,7 +163,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-traces
+          name: playwright-traces-${{ matrix.netbox_version }}
           path: test-results/
           retention-days: 7
 

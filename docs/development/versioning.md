@@ -93,8 +93,9 @@ removed NetBox API we depend on), we may cut a plugin MAJOR instead.
 
 ## Python compatibility
 
-The plugin supports Python 3.10, 3.11, and 3.12 in v1.0. Python version
-support is reviewed annually:
+The plugin supports Python 3.10 through 3.14 (3.13 and 3.14 were added in
+v1.5; v1.0 shipped with 3.10 – 3.12). Python version support is reviewed
+annually:
 
 - Drop a Python version when NetBox itself drops it, or when the ecosystem
   (Django, cryptography) does

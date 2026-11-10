@@ -5,6 +5,14 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  schedule:
+    # Mondays 05:17 UTC, on the default branch. The integration matrix follows
+    # floating NetBox image tags, so this run is what notices a new upstream
+    # patch release that breaks the plugin — within a week, on a run nobody's
+    # pull request depends on, instead of on whichever change happens to come
+    # next. (Before this, the 4.7 lane sat on v4.7.0 while 4.7.1–4.7.5 shipped.)
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
 
 env:
   PYTHON_VERSION: "3.12"
@@ -90,7 +98,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        # 3.10 is the plugin's floor (requires-python); 3.14 is what the
+        # NetBox 4.7 container image actually runs.
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
 
@@ -118,7 +128,7 @@ jobs:
       - name: Run unit tests
         run: |
           # Run the ENTIRE unit suite (not a hand-picked allowlist), so every
-          # host-runnable test is exercised on all three Python versions. The
+          # host-runnable test is exercised on every Python version. The
           # 5-file allowlist previously hid the test_checks Python-3.10 failure
           # (issue #116). pytest-randomly shuffles collection order each run so
           # any future order-dependence fails CI instead of shipping silently.
@@ -154,12 +164,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # netbox_version is the image tag. These are the floating minor tags,
+        # which netbox-docker re-points at every patch release, so each lane
+        # always tests the newest patch of its minor — pinning ".0" meant the
+        # releases people actually run were never exercised. To hold a lane
+        # still during an upstream incident, pin it here (e.g. "v4.7.4").
         include:
-          - netbox_version: "v4.7.0"
+          - netbox_version: "v4.7"
             netbox_major: "v4.7"
-          - netbox_version: "v4.6.0"
+          - netbox_version: "v4.6"
             netbox_major: "v4.6"
-          - netbox_version: "v4.5-4.0.0"
+          - netbox_version: "v4.5"
             netbox_major: "v4.5"
           - netbox_version: "v4.4"
             netbox_major: "v4.4"
@@ -323,6 +338,46 @@ jobs:
         run: |
           docker compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py check --tag netbox_ssl
 
+      - name: Set up Python for the REST API tests
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Create an API token for the REST API tests
+        run: |
+          if [[ "${{ matrix.netbox_major }}" == "v4.4" ]]; then
+            # v4.4 predates v2 tokens: use the superuser token from env/netbox.env.
+            TOKEN="0123456789abcdef0123456789abcdef01234567"
+          else
+            # Filter with grep: manage.py shell emits 'loaded config' lines to stdout.
+            TOKEN=$(docker compose exec -T netbox /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py shell -c "
+          import secrets
+          from users.models import Token, User
+          user = User.objects.get(username='admin')
+          plain_secret = ''.join(secrets.choice('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') for _ in range(40))
+          t = Token(user=user, description='CI REST API token')
+          t.token = plain_secret
+          t.save()
+          print(f'nbt_{t.key}.{plain_secret}', end='')
+          " | grep '^nbt_')
+          fi
+          echo "::add-mask::${TOKEN}"
+          echo "NETBOX_TOKEN=${TOKEN}" >> "$GITHUB_ENV"
+
+      - name: Run REST API integration tests
+        run: |
+          # tests/test_api_endpoints.py drives the running NetBox over HTTP. The
+          # in-container run above has no token, so all 40 of them skip there,
+          # and the E2E job (which has one) only selects `-m browser`: until
+          # this step existed, no CI job ran these tests at all. One of them
+          # had been skipping on a stale fixture payload for that long.
+          # assert_tests_ran.py makes a skip here a failure, so they cannot go
+          # quiet again.
+          pip install --quiet pytest requests cryptography defusedxml
+          python -m pytest tests/test_api_endpoints.py -m api -p no:django \
+            -o addopts='' -p no:cacheprovider -v --tb=short --junitxml=api.xml
+          python scripts/assert_tests_ran.py api.xml
+
       - name: Validate OpenAPI schema (#111 regression gate)
         run: |
           # Regenerates the exact document served by /api/schema/ (Swagger UI).
@@ -334,32 +389,37 @@ jobs:
           echo "OpenAPI schema generated and validated successfully."
 
       - name: OpenAPI schema is warning-free (#119)
-        if: matrix.netbox_major == 'v4.6'
+        if: matrix.netbox_major == 'v4.6' || matrix.netbox_major == 'v4.7'
         run: |
           # --fail-on-warn promotes drf-spectacular warnings to errors, so a new
           # serializer field or custom action added without a type hint /
           # @extend_schema fails CI instead of silently shipping a permissive or
           # empty schema (the soft-warning -> hard-error vector of #111).
-          # Pinned to v4.6 only: older NetBox cores (4.4/4.5) ship their own
+          # Limited to v4.6 and v4.7: older NetBox cores (4.4/4.5) ship their own
           # unfixable drf-spectacular warnings (e.g. circuits filtersets) AND the
           # TagFilter/django-filter "cannot guess choice type" warnings that the
           # NetBoxModelFilterSet machinery emits on older versions — neither is
-          # under the plugin's control, so a multi-version --fail-on-warn gate
-          # would fail on upstream issues. v4.6 is clean for both core and plugin.
+          # under the plugin's control, so the gate would fail there on upstream
+          # issues. v4.6 and v4.7 (checked through 4.7.5) are clean for both core
+          # and plugin; 4.7 is included because it runs a newer Django and
+          # drf-spectacular than 4.6, so a warning can exist on one and not the
+          # other.
           docker compose exec -T netbox /opt/netbox/venv/bin/python \
             /opt/netbox/netbox/manage.py spectacular --file /tmp/schema_warn.yml --validate --fail-on-warn
-          echo "OpenAPI schema generated warning-free on NetBox 4.6."
+          echo "OpenAPI schema generated warning-free on NetBox ${{ matrix.netbox_major }}."
 
       - name: Check for migration drift (#118)
-        if: matrix.netbox_major == 'v4.6'
+        if: matrix.netbox_major == 'v4.6' || matrix.netbox_major == 'v4.7'
         run: |
           # `makemigrations --check` exits non-zero if the models have changes
           # not captured in a migration. This is the gate that would have caught
           # the v1.0.1 ComplianceTrendSnapshot 500 and the #118 compliance-tags
-          # drift before release. Pinned to v4.6 only: cross-version field churn
-          # (encoder/through-table internals differ per NetBox/Django) would make
-          # a multi-version gate flaky. NetBox's makemigrations override allows
-          # `--check` without DEVELOPER=True (it only blocks actual file writes).
+          # drift before release. Limited to v4.6 and v4.7: cross-version field
+          # churn (encoder/through-table internals differ per NetBox/Django)
+          # makes the older lanes unreliable. 4.7 runs Django 6.1 where 4.6 does
+          # not, and both are drift-free today (4.7 checked through 4.7.5).
+          # NetBox's makemigrations override allows `--check` without
+          # DEVELOPER=True (it only blocks actual file writes).
           docker compose exec -T netbox /opt/netbox/venv/bin/python \
             /opt/netbox/netbox/manage.py makemigrations netbox_ssl --check
           echo "No migration drift detected."
