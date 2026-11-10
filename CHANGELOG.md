@@ -37,6 +37,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   REST adapters supply none of the three and are therefore behaviourally
   unchanged.
 
+### Fixed
+
+- **External source sync failed on every run after a certificate was renewed**
+  ([#180](https://github.com/ctrl-alt-automate/netbox-ssl/issues/180)): AWS ACM
+  and Azure Key Vault keep the same identifier when a certificate is renewed, so
+  after a renewal two local certificates share it — the Replaced predecessor and
+  its successor. The sync engine looked the identifier up and got the
+  predecessor, so each later run planned the same renewal again, failed with an
+  integrity error on the duplicate serial, and flagged the live certificate as
+  removed from the source. The current certificate now wins the lookup
+  regardless of row order, and earlier versions of an identifier the source
+  still serves are no longer reported as removals. Affects AWS ACM sources since
+  v1.1.0.
+
 ### Documentation
 
 - **Reference documentation caught up with the code.** Every feature since v0.8

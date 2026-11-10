@@ -426,3 +426,147 @@ class TestTagApplicationIsRobust:
             sync_engine._resolve_tag = real_resolve
 
         assert set(cert.tags.values_list("name", flat=True)) == {"fine"}
+
+
+@pytest.mark.django_db
+class TestSyncAcrossARenewal:
+    """Whole sync runs, one after another, for a source with stable identifiers (#180).
+
+    AWS ACM (the ARN) and Azure Key Vault (the version-independent URI) keep the
+    same `external_id` when a certificate is renewed. After the renewal two
+    local rows carry that identifier: the Replaced predecessor and its Active
+    successor. Every later run has to recognise the successor as the current
+    certificate.
+
+    These tests run `build_plan` and `execute_plan` back to back, the way the
+    sync script does. The per-function tests above never run a second sync,
+    which is why the engine could re-plan a finished renewal on every run.
+    """
+
+    EXTERNAL_ID = "arn:aws:acm:eu-west-1:111122223333:certificate/stable-id"
+
+    def _source(self, suffix: str):
+        from netbox_ssl.models import ExternalSource
+
+        return ExternalSource.objects.create(
+            name=f"renewal-{suffix}",
+            source_type="azure_kv",
+            base_url="https://kv-test.vault.azure.net/",
+            auth_method="azure_managed_identity",
+            sync_tags=False,
+        )
+
+    def _version(self, number: int) -> FetchedCertificate:
+        """The certificate as the source serves it after its n-th issuance."""
+        issued = datetime.now(timezone.utc) - timedelta(days=400 - 90 * number)
+        return _fetched(
+            external_id=self.EXTERNAL_ID,
+            serial_number=f"0{number}:AA",
+            fingerprint_sha256=f"F{number}:00:11:22",
+            valid_from=issued,
+            valid_to=issued + timedelta(days=90),
+        )
+
+    @staticmethod
+    def _sync(source, *fetched: FetchedCertificate):
+        from netbox_ssl.models import Certificate
+        from netbox_ssl.utils.sync_engine import build_plan, execute_plan
+
+        plan = build_plan(list(fetched), Certificate.objects.filter(external_source=source), source)
+        return execute_plan(plan, source)
+
+    @staticmethod
+    def _cert(number: int):
+        from netbox_ssl.models import Certificate
+
+        return Certificate.objects.get(serial_number=f"0{number}:AA")
+
+    def test_the_run_after_a_renewal_changes_nothing(self):
+        source = self._source("a")
+        self._sync(source, self._version(1))
+        self._sync(source, self._version(2))  # the renewal
+
+        log = self._sync(source, self._version(2))
+
+        assert log.errors == []
+        assert (log.certificates_renewed, log.certificates_created, log.certificates_unchanged) == (0, 0, 1)
+
+    def test_the_successor_is_not_flagged_as_removed_from_the_source(self):
+        source = self._source("b")
+        self._sync(source, self._version(1))
+        self._sync(source, self._version(2))
+
+        self._sync(source, self._version(2))
+
+        assert self._cert(2).source_removed is False
+
+    def test_the_predecessor_is_not_flagged_as_removed_while_its_identifier_is_still_served(self):
+        """The object still exists at the source; only its previous version is gone."""
+        source = self._source("c")
+        self._sync(source, self._version(1))
+        self._sync(source, self._version(2))
+
+        log = self._sync(source, self._version(2))
+
+        assert log.certificates_removed == 0
+        assert self._cert(1).source_removed is False
+
+    def test_a_second_renewal_replaces_the_current_certificate(self):
+        source = self._source("d")
+        self._sync(source, self._version(1))
+        self._sync(source, self._version(2))
+
+        log = self._sync(source, self._version(3))
+
+        assert log.errors == []
+        assert self._cert(3).status == "active"
+        assert self._cert(2).status == "replaced"
+        assert self._cert(2).replaced_by == self._cert(3)
+        assert self._cert(1).replaced_by == self._cert(2)
+
+    def test_the_replaced_row_loses_even_when_its_dates_look_newer(self):
+        """Status decides, not dates: a source may reissue with an older notBefore."""
+        source = self._source("g")
+        now = datetime.now(timezone.utc)
+        first = _fetched(
+            external_id=self.EXTERNAL_ID,
+            serial_number="01:AA",
+            fingerprint_sha256="F1:00:11:22",
+            valid_from=now - timedelta(days=10),
+        )
+        second = _fetched(
+            external_id=self.EXTERNAL_ID,
+            serial_number="02:AA",
+            fingerprint_sha256="F2:00:11:22",
+            valid_from=now - timedelta(days=100),
+        )
+        self._sync(source, first)
+        self._sync(source, second)
+
+        log = self._sync(source, second)
+
+        assert log.errors == []
+        assert (log.certificates_renewed, log.certificates_unchanged) == (0, 1)
+
+    def test_every_version_is_flagged_once_the_identifier_disappears(self):
+        """Removal from the source still reaches the row that matters."""
+        source = self._source("e")
+        self._sync(source, self._version(1))
+        self._sync(source, self._version(2))
+
+        self._sync(source)  # the source no longer lists the certificate
+
+        assert self._cert(2).source_removed is True
+
+    def test_the_plan_does_not_depend_on_the_order_local_certificates_arrive_in(self):
+        from netbox_ssl.models import Certificate
+        from netbox_ssl.utils.sync_engine import build_plan
+
+        source = self._source("f")
+        self._sync(source, self._version(1))
+        self._sync(source, self._version(2))
+        local = list(Certificate.objects.filter(external_source=source))
+
+        for ordering in (local, local[::-1]):
+            plan = build_plan([self._version(2)], ordering, source)
+            assert (len(plan.renewals), len(plan.creates), len(plan.removals), plan.unchanged) == (0, 0, 0, 1)

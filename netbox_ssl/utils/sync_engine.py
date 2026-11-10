@@ -68,13 +68,25 @@ def build_plan(
     # HIGH-4: Materialize the queryset once to avoid iterating it twice.
     local_certs: list[Any] = list(local_certs_qs)
 
-    # Build lookup maps for local certificates
-    local_by_ext_id: dict[str, object] = {}
+    # Build lookup maps for local certificates.
+    #
+    # A source with stable identifiers (the AWS ACM ARN, the Azure Key Vault
+    # URI) keeps one external_id across renewals, so after a renewal two rows
+    # carry it: the Replaced predecessor and its successor. The lookup must
+    # return the current one. It used to keep whichever row came last, and with
+    # the model's default ordering (latest valid_to first) that was the
+    # predecessor — so every later run re-planned the finished renewal, failed
+    # on the unique serial, and flagged the live certificate as removed (#180).
+    local_by_ext_id: dict[str, Any] = {}
+    local_ids_by_ext_id: dict[str, list[int]] = {}
     local_by_fingerprint: dict[str, object] = {}
 
     for cert in local_certs:
         if cert.external_id:
-            local_by_ext_id[cert.external_id] = cert
+            local_ids_by_ext_id.setdefault(cert.external_id, []).append(cert.pk)
+            current = local_by_ext_id.get(cert.external_id)
+            if current is None or _currency(cert) > _currency(current):
+                local_by_ext_id[cert.external_id] = cert
         if cert.fingerprint_sha256:
             local_by_fingerprint[cert.fingerprint_sha256] = cert
 
@@ -95,6 +107,9 @@ def build_plan(
 
         if local is not None:
             seen_local_ids.add(local.pk)
+            # Earlier versions of an identifier the source still serves are
+            # history, not removals: the object is still there.
+            seen_local_ids.update(local_ids_by_ext_id.get(fetched.external_id, ()))
 
             # Same external_id + different serial -> renewal
             if local.external_id == fetched.external_id and local.serial_number != fetched.serial_number:
@@ -146,6 +161,17 @@ def build_plan(
             )
 
     return plan
+
+
+def _currency(cert: Any) -> tuple[bool, Any, int]:
+    """Sort key: of several rows sharing an external_id, the largest is current.
+
+    A row that has not been replaced beats one that has; among equals the most
+    recently issued wins, then the most recently created.
+    """
+    from ..models import CertificateStatusChoices
+
+    return (cert.status != CertificateStatusChoices.STATUS_REPLACED, cert.valid_from, cert.pk)
 
 
 def _has_metadata_diff(local: Any, fetched: FetchedCertificate) -> bool:
