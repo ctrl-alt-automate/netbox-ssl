@@ -130,3 +130,77 @@ def test_reference_docs_only_name_models_that_exist():
                     offenders.append(f"explanation/architecture.md: ER diagram names unknown entity '{entity}'")
 
     assert not offenders, "documentation names things that do not exist:\n  " + "\n  ".join(offenders)
+
+
+# ---------------------------------------------------------------------------
+# Guides: scripts must be reachable, versions must exist
+# ---------------------------------------------------------------------------
+
+_REGISTRATION_ANCHOR = "scripts.md#making-the-scripts-available-to-netbox"
+
+
+def _bundled_scripts() -> set[str]:
+    """Class names in ``netbox_ssl.scripts.__all__`` (read by AST, not imported)."""
+    tree = ast.parse((get_plugin_source_dir() / "scripts" / "__init__.py").read_text())
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(getattr(target, "id", "") == "__all__" for target in node.targets):
+            return {element.value for element in node.value.elts}
+    return set()
+
+
+@pytest.mark.unit
+def test_guides_that_use_a_bundled_script_link_to_its_registration():
+    """A guide that tells the reader to run a script must say how to get it.
+
+    NetBox lists a script only once its module has been registered, and
+    installing the plugin registers nothing. The ARI how-to and the expiry
+    tutorial both sent readers straight to the scripts page, where there was
+    nothing to find (discussion #160).
+    """
+    docs = _repo_root() / "docs"
+    if not docs.is_dir():
+        pytest.skip("docs/ not available (in-container runs copy only tests/)")
+
+    scripts = _bundled_scripts()
+    assert scripts, "could not read netbox_ssl.scripts.__all__"
+
+    offenders: list[str] = []
+    for folder in ("how-to", "tutorials"):
+        for page in sorted((docs / folder).glob("*.md")):
+            text = page.read_text()
+            used = sorted(name for name in scripts if name in text)
+            if used and _REGISTRATION_ANCHOR not in text:
+                offenders.append(f"{folder}/{page.name} uses {', '.join(used)}")
+    assert not offenders, (
+        f"Guides that use a bundled script without linking to '{_REGISTRATION_ANCHOR}':\n  " + "\n  ".join(offenders)
+    )
+
+
+@pytest.mark.unit
+def test_docs_only_cite_plugin_versions_that_were_released():
+    """`Requires v1.3.1 or newer` stood in three places; 1.3.1 was never released.
+
+    Any three-part 0.x / 1.x version the documentation cites must be a release
+    in the changelog, or be newer than the latest one (work in progress).
+    """
+    docs = _repo_root() / "docs"
+    changelog = _repo_root() / "CHANGELOG.md"
+    if not docs.is_dir() or not changelog.is_file():
+        pytest.skip("docs/ not available (in-container runs copy only tests/)")
+
+    def as_tuple(version: str) -> tuple[int, ...]:
+        return tuple(int(part) for part in version.split("."))
+
+    released = set(re.findall(r"(?m)^## \[(\d+\.\d+\.\d+)\]", changelog.read_text()))
+    assert released, "no releases found in CHANGELOG.md"
+    latest = max(as_tuple(version) for version in released)
+
+    offenders: list[str] = []
+    for page in sorted(docs.rglob("*.md")):
+        if "superpowers" in page.parts:  # historical plans and design notes
+            continue
+        # A plugin version: three parts, major 0 or 1, not part of a longer dotted number.
+        for version in set(re.findall(r"(?<![\w.])v([01]\.\d+\.\d+)(?![\w]|\.\d)", page.read_text())):
+            if version not in released and as_tuple(version) < latest:
+                offenders.append(f"{page.relative_to(docs)} cites v{version}")
+    assert not offenders, "Documentation cites plugin versions that were never released:\n  " + "\n  ".join(offenders)

@@ -44,7 +44,8 @@ v0.9 introduces granular permissions: `import_certificate`, `renew_certificate`,
 **Recommended:** After upgrading, assign the new custom permissions to your users/groups via Admin > Permissions. See [permissions documentation](../reference/permissions.md) for details.
 
 **New features requiring configuration:**
-- ARI polling: enable via the `CertificateARIPoll` scheduled script
+- ARI polling: enable via the `CertificateARIPoll` scheduled script (bundled
+  scripts must be [registered](../reference/scripts.md#making-the-scripts-available-to-netbox) first)
 - Performance: field deferral controlled by `lazy_load_pem_content` setting (default: True)
 - Compliance: policies can now use `tag_filter` to scope to tagged certificates
 
@@ -69,7 +70,8 @@ v0.9 introduces granular permissions: `import_certificate`, `renew_certificate`,
 **New migrations:** 1 (0007 merge + 0008)
 
 - Event rules: configure via NetBox Admin > Event Rules
-- Expiry scan: schedule the `CertificateExpiryScan` script
+- Expiry scan: [register](../reference/scripts.md#making-the-scripts-available-to-netbox)
+  and schedule the `CertificateExpiryScan` script
 - Configure `expiry_scan_thresholds` in plugin settings
 
 ## Rollback Procedure

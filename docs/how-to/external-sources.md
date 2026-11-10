@@ -140,8 +140,10 @@ Check the result in the **Sync Logs** tab of the source's detail page.
 
 ## Step 4 — Enable scheduled sync
 
-Schedule the `ExternalSourceSync` NetBox Script (Admin → Scripts) with your
-desired cadence. It picks up every enabled source whose schedule is due.
+Schedule the `ExternalSourceSync` NetBox script (**Customization → Scripts**)
+with your desired cadence. It picks up every enabled source whose schedule is
+due. Like every script bundled with the plugin it has to be
+[registered with NetBox](../reference/scripts.md#making-the-scripts-available-to-netbox) before it shows up there.
 
 ## Security guarantees
 

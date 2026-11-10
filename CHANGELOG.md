@@ -28,6 +28,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New guards (`tests/test_docs_coverage.py`) fail the build when a model, REST
   collection or custom action has no reference entry, and when the reference
   documentation names something that does not exist.
+- **The instructions for making the bundled scripts available did not work.**
+  They said to place a wrapper file in `SCRIPTS_ROOT` and the scripts would
+  appear. NetBox lists a script only once its module is *registered*, so they
+  never did — the cause of two unanswered community questions. `reference/scripts.md`
+  now describes what works: upload the wrapper under **Customization → Scripts →
+  Add**, or register it from the command line. Every guide that uses a script
+  links to that section, the ARI and external-source guides no longer point at a
+  non-existent "Admin → Scripts" page, and a troubleshooting entry covers the
+  empty scripts page.
+- **Script scheduling instructions corrected**: the UI steps named a *Schedule*
+  button that does not exist (it is the **Schedule at** / **Recurs every** fields
+  on the run form, interval in minutes), and the API example posted to
+  `/api/extras/scheduled-jobs/`, which is not a NetBox endpoint, using a script
+  identifier NetBox does not accept.
+- **Tutorial 3 (expiry monitoring) rewritten.** It told readers to create an
+  Event Rule for a custom `certificate.expiry_warning` event. No such event type
+  exists; the scan raises a regular *Object updated* event, and the tutorial now
+  says so, with a condition that keeps ordinary edits quiet.
+- Three places required plugin version "v1.3.1", which was never released; the
+  fix they refer to shipped in v1.4.0.
+- Added the changelog sections for v0.8.0, v0.7.5, v0.7.1 and v0.4.2, which were
+  released without one, and regenerated the comparison links at the foot of this
+  file, which stopped at v1.1.1.
+- New guards: a guide that uses a bundled script must link to its registration
+  instructions, and the documentation may only cite plugin versions that were
+  actually released.
 
 ## [1.4.0] - 2026-09-10
 
@@ -640,6 +666,67 @@ https://ctrl-alt-automate.github.io/netbox-ssl/.
 - **Assignment list FieldError** ([#86](https://github.com/ctrl-alt-automate/netbox-ssl/issues/86)):
   - Added `orderable=False` to the `assigned_object` table column to prevent django-tables2 from attempting `order_by()` on a `GenericForeignKey`, which does not support reverse queries
 
+## [0.8.0] - 2026-03-22
+
+Workflow Automation & External Sources. *(Section added retroactively from the
+published release notes.)*
+
+### Added
+
+- **Auto-archive policy** ([#50](https://github.com/ctrl-alt-automate/netbox-ssl/issues/50)):
+  a new **Archived** status, the `CertificateAutoArchive` script with a
+  configurable threshold (default 90 days), an archive pin to exempt individual
+  certificates, dry-run mode and tenant filtering.
+- **Bulk operations** ([#48](https://github.com/ctrl-alt-automate/netbox-ssl/issues/48)):
+  `bulk-status-update` and `bulk-assign` REST actions, with a content type
+  allowlist, duplicate detection and batch size limits.
+- **Certificate lifecycle tracking** ([#49](https://github.com/ctrl-alt-automate/netbox-ssl/issues/49)):
+  the `CertificateLifecycleEvent` model, automatic events on status transitions
+  and assignment changes, a timeline tab on the certificate page and a
+  `lifecycle` REST action.
+- **Renewal reminders and runbooks** ([#47](https://github.com/ctrl-alt-automate/netbox-ssl/issues/47)):
+  per-CA `renewal_instructions` (Markdown), a per-certificate `renewal_note`
+  override, and a Renewal Guide card on the certificate page.
+- **External Source Framework** ([#62](https://github.com/ctrl-alt-automate/netbox-ssl/issues/62)):
+  read-only certificate sync from Netflix Lemur and from generic REST APIs
+  through a four-phase engine (fetch, diff, apply, log), with Janus renewal
+  detection, the `ExternalSource` model, the `ExternalSourceSync` script and
+  `env:VAR_NAME` credential references.
+
+### Security
+
+- 34 review findings addressed, among them SSRF prevention for source URLs, a
+  private-key guard on synced PEM content, atomic renewals and sanitised API
+  errors.
+
+### Migration Notes
+
+- Migrations 0010 – 0014 (archive fields, lifecycle events, renewal
+  instructions, external sources, and a merge migration).
+
+## [0.7.5] - 2026-03-18
+
+Security hardening. *(Section added retroactively.)*
+
+### Security
+
+- Ten review findings fixed ([#69](https://github.com/ctrl-alt-automate/netbox-ssl/issues/69) –
+  [#78](https://github.com/ctrl-alt-automate/netbox-ssl/issues/78)):
+  `LoginRequiredMixin` on every custom view, `.restrict()` and explicit field
+  lists in GraphQL, permission checks on every custom REST action, a size limit
+  on PEM input and broader private-key detection, generic API error messages, a
+  field allowlist and formula-injection protection for exports, and a maximum
+  chain depth of 10.
+
+## [0.7.1] - 2026-03-16
+
+*(Section added retroactively.)*
+
+### Fixed
+
+- `TypeError` in `snapshot()` when editing a certificate
+  ([#67](https://github.com/ctrl-alt-automate/netbox-ssl/issues/67)).
+
 ## [0.7.0] - 2026-03-12
 
 ### Added
@@ -762,6 +849,18 @@ https://ctrl-alt-automate.github.io/netbox-ssl/.
 
 - Updated documentation for all v0.5.0 features
 - Updated compatibility table to v0.5.x
+
+## [0.4.2] - 2026-03-09
+
+*(Section added retroactively from the published release notes.)*
+
+### Fixed
+
+- **Templates missing from pip installs**
+  ([#30](https://github.com/ctrl-alt-automate/netbox-ssl/issues/30)): templates
+  and static files are now included in the distributed package.
+- The template-not-found system check is a warning rather than an error, so
+  `manage.py migrate` is no longer blocked on a first-time installation.
 
 ## [0.4.1] - 2026-02-10
 
@@ -985,13 +1084,26 @@ Initial release of NetBox SSL Plugin.
 - NetBox 4.4.0 - 4.5.x
 - Python 3.10+
 
-[Unreleased]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.2.2...v1.3.0
+[1.2.2]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.0.1...v1.1.0
+[1.0.1]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.9.0...v1.0.0
+[0.9.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.8.1...v0.9.0
+[0.8.1]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.7.5...v0.8.0
+[0.7.5]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.7.1...v0.7.5
+[0.7.1]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.5.0...v0.5.1
-[0.5.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.4.1...v0.5.0
+[0.5.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.4.2...v0.5.0
+[0.4.2]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v0.2.0...v0.3.0
