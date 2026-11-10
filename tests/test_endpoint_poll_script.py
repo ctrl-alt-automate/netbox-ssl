@@ -85,3 +85,21 @@ class TestMonitoredEndpointPollScript:
         )
         result = MonitoredEndpointPoll().run({"tenant": None, "dry_run": False}, commit=True)
         assert "rotated=1" in result
+
+    @patch("netbox_ssl.scripts.endpoint_monitor.poll_endpoint")
+    def test_replaced_count_in_summary(self, mock_poll):
+        """The summary says how many predecessors a run retired (#184)."""
+        from netbox_ssl.models import MonitoredEndpointStatusChoices
+        from netbox_ssl.scripts.endpoint_monitor import MonitoredEndpointPoll
+        from netbox_ssl.utils.endpoint_monitor import PollResult
+
+        self._ep()
+        mock_poll.side_effect = lambda ep, **kw: PollResult(
+            ep,
+            MonitoredEndpointStatusChoices.STATUS_OK,
+            True,
+            ("endpoint_cert_rotated", "certificate_renewed"),
+            (41, 42),
+        )
+        result = MonitoredEndpointPoll().run({"tenant": None, "dry_run": False}, commit=True)
+        assert "replaced=2" in result

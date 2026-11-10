@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A certificate renewed outside NetBox stayed Active next to its successor**
+  ([#184](https://github.com/ctrl-alt-automate/netbox-ssl/issues/184)): when the
+  Monitored Endpoint Poll saw an endpoint present a new certificate it imported
+  that certificate and re-pointed the endpoint, but never retired the old one,
+  so every ACME renewal left two Active certificates behind. The poll now runs
+  the Janus renewal: the predecessor becomes **Replaced** and links to its
+  successor, its assignments are copied across, and the private key location,
+  renewal note, tenant and ACME settings carry over without overwriting anything
+  already set on the successor. The successor gets a **Renewed** lifecycle
+  entry naming its predecessor.
+
+  Because a Replaced certificate stops raising expiry alerts, a predecessor is
+  only retired when the certificate now served is Active, was issued later,
+  shares a name with it, and no other monitored endpoint still serves the old
+  one. Rotations that v1.3.0 – v1.4.0 left unlinked are repaired by the first
+  poll after upgrading. The run summary reports `replaced=N`.
+
 ### Documentation
 
 - **Reference documentation caught up with the code.** Every feature since v0.8

@@ -38,6 +38,7 @@ class CertFactory:
         issuer_cn: str = "Test CA",
         issuer_o: str = "Test Organization",
         extended_key_usage: list[str] | None = None,
+        issued_days_ago: int = 0,
     ) -> str:
         """Generate a self-signed certificate and return PEM string.
 
@@ -51,6 +52,9 @@ class CertFactory:
             issuer_o: Organization for the issuer.
             extended_key_usage: EKU purposes to add, any of "server" and
                 "client". None omits the extension entirely.
+            issued_days_ago: Backdate ``notBefore`` by this many days, so two
+                certificates can be told apart by issue date the way a real
+                predecessor and its renewal can. Ignored when ``expired``.
 
         Returns:
             PEM-encoded certificate as a string.
@@ -85,7 +89,7 @@ class CertFactory:
             not_before = now - timedelta(days=400)
             not_after = now - timedelta(days=35)
         else:
-            not_before = now - timedelta(hours=1)
+            not_before = now - timedelta(days=issued_days_ago, hours=1)
             not_after = now + timedelta(days=valid_days)
 
         # Unique serial number per invocation

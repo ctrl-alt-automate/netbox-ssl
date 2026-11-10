@@ -114,6 +114,9 @@ endpoints never leave the **Pending** state.
 - Re-scrapes each endpoint's live certificate over a TLS handshake
 - Links the endpoint to the matching `Certificate`, importing it if it is new
 - Detects certificate rotation and records it in the endpoint's history
+- Recognises a rotation as a renewal: the predecessor becomes **Replaced**, and
+  its assignments and operator-maintained metadata move to the successor (see
+  [What happens when a certificate is renewed](../how-to/endpoint-monitoring.md#what-happens-when-a-certificate-is-renewed))
 - Marks unreachable endpoints as **Unreachable** and untrusted chains as **Untrusted**
 - Optional tenant filtering and a dry-run mode
 
@@ -132,6 +135,10 @@ endpoints never leave the **Pending** state.
 |--------|------|---------|-------------|
 | `tenant` | Tenant | none | Restrict the poll to one tenant |
 | `dry_run` | Boolean | `false` | Log what would happen without writing |
+
+The run summary counts endpoints per status plus, when they occurred,
+`rotated=N` (endpoints that presented a different certificate) and `replaced=N`
+(predecessors retired by a renewal), for example `ok=12, rotated=2, replaced=2`.
 
 !!! tip "Schedule it"
     Endpoint data is only as fresh as the last poll. Schedule this script daily
