@@ -5,18 +5,17 @@ NetBox SSL includes built-in custom scripts for certificate management automatio
 ## Making the scripts available to NetBox
 
 !!! important "Plugin scripts are not auto-registered"
-    NetBox only discovers scripts that live in its **`SCRIPTS_ROOT`** directory
-    (default `/opt/netbox/netbox/scripts/`). Scripts bundled *inside* a plugin
-    package — like the ones below — do **not** appear in
-    **Customization → Scripts** automatically when you install the plugin. You
-    expose them with a one-line wrapper module.
+    Scripts bundled *inside* a plugin package — like the ones below — do **not**
+    appear in **Customization → Scripts** when you install the plugin. NetBox
+    lists a script only once the module containing it has been **registered**:
+    it keeps a database record per script module. A file that is merely copied
+    into `SCRIPTS_ROOT` is not picked up either.
 
-Create a file in your `SCRIPTS_ROOT` (for example
-`/opt/netbox/netbox/scripts/netbox_ssl_scripts.py`) that imports the script
-classes you want:
+You register the scripts through a one-line wrapper module. Create a file called
+`netbox_ssl_scripts.py` that imports the script classes you want:
 
 ```python
-# /opt/netbox/netbox/scripts/netbox_ssl_scripts.py
+# netbox_ssl_scripts.py
 from netbox_ssl.scripts import (
     CertificateExpiryScan,
     CertificateExpiryNotification,
@@ -30,9 +29,35 @@ from netbox_ssl.scripts import (
 )
 ```
 
-Then open **Customization → Scripts** in NetBox — the scripts now appear and can
-be run manually, scheduled, or invoked via the REST API (see below). The file
-must be readable by the NetBox service user; no restart is required.
+Then register that file with NetBox, in one of two ways.
+
+**Through the UI.** Go to **Customization → Scripts → Add**, choose the file
+under *File Upload* and save. NetBox stores it in its `SCRIPTS_ROOT` (default
+`/opt/netbox/netbox/scripts/`) and registers the module.
+
+**From the command line** — for container images and configuration management.
+Put the file in `SCRIPTS_ROOT` yourself, readable by the NetBox service user,
+and register it:
+
+```bash
+python manage.py shell -c '
+from extras.models import ScriptModule
+module, _ = ScriptModule.objects.get_or_create(file_path="netbox_ssl_scripts.py")
+module.save()
+'
+```
+
+The command is safe to repeat: it registers the module the first time and
+re-reads the file every time after.
+
+Either way the scripts now appear under the **netbox_ssl_scripts** module in
+**Customization → Scripts** and can be run manually, scheduled, or invoked via
+the REST API (see below). No restart is required.
+
+!!! tip "When a plugin upgrade adds a script"
+    NetBox reads a module's scripts when the module is saved, not on every page
+    view. After adding a name to the wrapper, upload the file again or re-run
+    the command above so the new script is registered.
 
 !!! note "Requires v1.2.2 or newer"
     Earlier releases shipped scripts that failed to load on NetBox 4.x because a
@@ -40,7 +65,7 @@ must be readable by the NetBox service user; no restart is required.
     ([#143](https://github.com/ctrl-alt-automate/netbox-ssl/issues/143)). Upgrade
     to **1.2.2+** before registering the scripts.
 
-!!! warning "`MonitoredEndpointPoll` requires v1.3.1 or newer"
+!!! warning "`MonitoredEndpointPoll` requires v1.4.0 or newer"
     In v1.3.0 the script module shipped but the class was never re-exported from
     `netbox_ssl.scripts`, so importing it in the wrapper raised `ImportError` and
     the whole wrapper failed to load
@@ -194,48 +219,57 @@ Report.
 
 ## Scheduling with NetBox Jobs
 
-NetBox 4.4+ supports scheduled jobs. To run the expiry notification on a schedule:
+Any registered script can run on a schedule. A scheduled run needs the NetBox
+background worker (`netbox-rq`) to be running.
 
 ### Using the NetBox UI
 
-1. Run the script once manually to verify it works
-2. In the script results, click **Schedule**
-3. Configure the schedule:
-   - **Interval**: Daily recommended
-   - **Start Time**: Off-peak hours (e.g., 06:00 UTC)
-4. Save the scheduled job
+1. Open the script under **Customization → Scripts**
+2. Fill in its options, and leave **Commit changes** ticked
+3. Set **Schedule at** to the first run (off-peak, e.g. 06:00) and **Recurs
+   every** to the interval **in minutes** — `1440` for daily
+4. Click **Run Script**
+
+NetBox queues the first run and re-queues the script after each one. Scheduled
+and finished runs are listed on the script's **Jobs** tab.
 
 ### Using the API
 
-First, get the script's ID:
+Look the script up to get its `id`:
 
 ```bash
-# Get the script ID
 curl -H "Authorization: Token $NETBOX_TOKEN" \
-  https://netbox.example.com/api/extras/scripts/netbox_ssl.scripts.CertificateExpiryNotification/
+  "https://netbox.example.com/api/extras/scripts/?q=CertificateExpiryNotification"
 ```
 
-Then use the `id` from the response to create a scheduled job:
+A script can also be addressed by its full name, which is the wrapper module
+followed by the name NetBox shows in that response — for example
+`netbox_ssl_scripts.scripts.expiry_notification.CertificateExpiryNotification`.
+The plugin's own module path (`netbox_ssl.scripts.…`) is **not** a valid
+identifier.
+
+Then schedule it by running it with `schedule_at` and `interval` (minutes):
 
 ```bash
-# Create a scheduled job via API (replace SCRIPT_ID with the id from above)
+# Replace SCRIPT_ID with the id from above
 curl -X POST \
   -H "Authorization: Token $NETBOX_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Daily Certificate Expiry Check",
-    "object_type": "extras.script",
-    "object_id": SCRIPT_ID,
-    "interval": 86400,
     "data": {
       "warning_days": 30,
       "critical_days": 14,
       "include_expired": true,
       "active_only": true
-    }
+    },
+    "commit": true,
+    "schedule_at": "2026-01-01T06:00:00Z",
+    "interval": 1440
   }' \
-  https://netbox.example.com/api/extras/scheduled-jobs/
+  https://netbox.example.com/api/extras/scripts/SCRIPT_ID/
 ```
+
+Leave out `schedule_at` and `interval` to run the script once, immediately.
 
 ---
 
@@ -265,7 +299,8 @@ For environments without NetBox job scheduling, use external cron:
 
 NETBOX_URL="https://netbox.example.com"
 NETBOX_TOKEN="your-api-token"
-SCRIPT_ID="netbox_ssl.scripts.CertificateExpiryNotification"
+# The wrapper module, then the script name as NetBox lists it
+SCRIPT_ID="netbox_ssl_scripts.scripts.expiry_notification.CertificateExpiryNotification"
 
 # Execute the script via API
 curl -X POST \

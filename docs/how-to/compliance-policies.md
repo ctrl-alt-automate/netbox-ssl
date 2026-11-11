@@ -90,9 +90,8 @@ are upserted per certificate/policy pair, and the report's trend chart is built
 from the stored snapshots.
 
 The script is bundled with the plugin but, like every plugin script, must first
-be exposed through a `SCRIPTS_ROOT` wrapper before it appears under
-**Customization → Scripts** — see
-[Custom Scripts](../reference/scripts.md#making-the-scripts-available-to-netbox).
+be registered with NetBox before it appears under **Customization → Scripts** —
+see [Custom Scripts](../reference/scripts.md#making-the-scripts-available-to-netbox).
 
 !!! warning "Requires v1.4 or newer"
     This script was referenced by the documentation from v0.7 onward but was

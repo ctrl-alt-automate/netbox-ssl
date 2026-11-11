@@ -209,8 +209,12 @@ exists to catch (#143).
 
 Pass `ObjectVar(model=...)` the model **class**, not a dotted string — NetBox
 calls `model.objects.all()`, so a string raises `AttributeError` at import and
-the script never registers (#143). Make sure the script is reachable from the
-`SCRIPTS_ROOT` wrapper; plugin-bundled scripts are not auto-discovered.
+the script never registers (#143). Export the script from
+`netbox_ssl/scripts/__init__.py` and add it to the wrapper module shown in
+[Custom Scripts](../reference/scripts.md#making-the-scripts-available-to-netbox):
+plugin-bundled scripts are not auto-discovered, and an operator only gets the
+ones that wrapper imports. Any how-to or tutorial that tells the reader to run
+the script must link to that section too (a test enforces it).
 
 ### Changed user-facing copy or support metadata
 

@@ -37,23 +37,28 @@ A new endpoint starts with status **Pending** — nothing has been polled yet.
     register `MonitoredEndpointPoll`, **nothing ever polls your endpoints** and
     every one of them stays on **Pending** indefinitely.
 
-Add the class to your `SCRIPTS_ROOT` wrapper module (see
-[Custom Scripts](../reference/scripts.md#making-the-scripts-available-to-netbox)):
+Put the class in a wrapper module:
 
 ```python
-# /opt/netbox/netbox/scripts/netbox_ssl_scripts.py
+# netbox_ssl_scripts.py
 from netbox_ssl.scripts import MonitoredEndpointPoll
 ```
 
-!!! warning "Requires v1.3.1 or newer"
+and register that file with NetBox under **Customization → Scripts → Add**
+(*File Upload*). Copying the file into `SCRIPTS_ROOT` is not enough on its own —
+see [Custom Scripts](../reference/scripts.md#making-the-scripts-available-to-netbox)
+for the details and for a command-line alternative.
+
+!!! warning "Requires v1.4.0 or newer"
     In v1.3.0 this import raised `ImportError` because the class was never
     re-exported from the package
     ([#163](https://github.com/ctrl-alt-automate/netbox-ssl/issues/163)).
 
 ## Step 3 — Schedule the poll
 
-Open **Customization → Scripts → Monitored Endpoint Poll** and schedule it. Daily
-is a sensible default; hourly is reasonable if you rotate certificates often.
+Open **Customization → Scripts → Monitored Endpoint Poll**, set **Recurs every**
+to the interval in minutes and click **Run Script**. Daily (`1440`) is a
+sensible default; hourly (`60`) is reasonable if you rotate certificates often.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -166,9 +171,10 @@ PLUGINS_CONFIG = {
 
 !!! question "All my endpoints are stuck on Pending"
     The poll script has never run. Confirm `MonitoredEndpointPoll` appears under
-    **Customization → Scripts**; if it does not, revisit Step 2 and check the
-    NetBox log for an `ImportError` from your wrapper module. On v1.3.0 the
-    import fails by design of the bug — upgrade to v1.3.1+.
+    **Customization → Scripts**; if it does not, the wrapper module has not been
+    registered — revisit Step 2. If the module is listed but shows an error,
+    check the NetBox log for an `ImportError`: on v1.3.0 the import fails by
+    design of the bug, so upgrade to v1.4.0 or newer.
 
 !!! question "An internal endpoint reports Unreachable"
     Private addresses are blocked unless allowlisted. Add the range to

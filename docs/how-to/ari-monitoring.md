@@ -37,7 +37,11 @@ Before ARI polling works, the certificate must have `is_acme: true` and a valid
 
 ## Step 2 — Schedule the ARI poll script
 
-Navigate to **Admin → Scripts → CertificateARIPoll** and schedule it daily.
+`CertificateARIPoll` ships with the plugin but, like every bundled script, NetBox
+only lists it after you have
+[registered it](../reference/scripts.md#making-the-scripts-available-to-netbox). Once it is registered, open **Customization → Scripts →
+ARI Renewal Window Poll**, set **Recurs every** to `1440` (minutes) and click **Run Script** to
+schedule it daily.
 
 The script:
 

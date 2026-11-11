@@ -171,9 +171,10 @@ key).
 
 Sync runs via the `ExternalSourceSync` NetBox Script, the same script every
 other external source uses. It picks up every enabled source whose schedule
-is due. Plugin-bundled scripts are not auto-registered with NetBox — see the
-`SCRIPTS_ROOT` note in [Custom Scripts](../reference/scripts.md) to expose
-it, then schedule it from **Customization → Scripts**.
+is due. Like every script bundled with the plugin it has to be
+[registered with NetBox](../reference/scripts.md#making-the-scripts-available-to-netbox)
+before it shows up under **Customization → Scripts** — installing the plugin
+registers nothing. Once it is listed, schedule it from there.
 
 ## What gets imported
 

@@ -74,6 +74,22 @@ docker-compose restart netbox netbox-worker
 pip install --upgrade netbox-ssl
 ```
 
+### A bundled script is missing from Customization → Scripts
+
+**Symptom:** the documentation tells you to run `CertificateExpiryScan`,
+`MonitoredEndpointPoll` or another bundled script, but the scripts page is empty
+or does not list it.
+
+**Cause:** NetBox does not discover scripts inside a plugin package, and it does
+not pick up a file that was only copied into `SCRIPTS_ROOT`. A script exists for
+NetBox once its module has been registered.
+
+**Solution:** create the one-line wrapper module and upload it under
+**Customization → Scripts → Add** — see
+[Custom Scripts](../reference/scripts.md#making-the-scripts-available-to-netbox).
+If the module is listed but reports an error, the wrapper imports a name your
+plugin version does not have; compare it with the list on that page.
+
 ### ARI polling returns no results
 
 **Symptom:** `CertificateARIPoll` script runs but skips all certificates.

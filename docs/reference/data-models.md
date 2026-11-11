@@ -493,7 +493,8 @@ repeatedly asks it which certificate it is actually serving. See the
 
 !!! important "Endpoints stay Pending until the poll script runs"
     Populated by the `MonitoredEndpointPoll` script, which must be registered
-    through a `SCRIPTS_ROOT` wrapper — see [Custom Scripts](scripts.md).
+    with NetBox first — see
+    [Custom Scripts](scripts.md#making-the-scripts-available-to-netbox).
 
 ---
 
