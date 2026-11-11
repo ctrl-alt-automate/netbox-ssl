@@ -231,6 +231,18 @@ Interactive topology view showing certificates per Tenant → Device/VM → Serv
 ### Email Notifications
 Receive email alerts when certificates are expiring. Configurable recipients, thresholds, and subject prefix. Sends HTML + plain-text reports.
 
+### Certificate Type
+Every certificate records its role in the TLS handshake — **Server**, **Client** or **mTLS** — detected automatically from the X.509 Extended Key Usage extension on import and editable afterwards. Client and mutual-TLS certificates are no longer indistinguishable from server certificates in the inventory.
+
+### Website Monitoring (Monitored Endpoints)
+Register the URLs you care about under **SSL Certificates → Monitored Endpoints** and let the plugin poll them: it scrapes the certificate each endpoint actually presents, links it, records rotation history, and fires events on rotation, untrusted chains and unreachable hosts. The fastest way to answer "is what we *think* is deployed the same as what is *really* deployed?"
+
+### Compliance Policies
+Define policy rules (minimum key size, allowed algorithms, forbidden issuers, wildcard bans, maximum validity, and more) in the UI, scope them by tenant or tag, and evaluate them across the fleet on a schedule with the `CertificateComplianceCheck` script. Results are browsable per policy and per certificate.
+
+### External Sources
+Sync certificates read-only from Lemur, AWS ACM, Azure Key Vault, or any REST API via the generic adapter. Credentials are stored as `env:VAR_NAME` references, never in the database. Azure Key Vault ships in the optional `netbox-ssl[azure]` extra — see the [Azure Key Vault how-to](docs/how-to/azure-key-vault-sync.md).
+
 ### Certificate Assignments
 Link certificates to the objects that use them:
 - **Services** (recommended) — Port-level granularity (e.g., HTTPS on port 443)
@@ -252,10 +264,10 @@ Add the widget to your NetBox dashboard to see:
 
 | NetBox Version | Plugin Version | Status |
 |:--------------:|:--------------:|:------:|
-| 4.7.x          | 1.4.x          | ✅ Supported |
-| 4.6.x          | 1.1.x - 1.4.x  | ✅ Primary |
-| 4.5.x          | 1.1.x - 1.4.x  | ✅ Supported |
-| 4.4.x          | 1.1.x - 1.4.x  | ✅ Supported |
+| 4.7.x          | 1.4.x - 1.5.x  | ✅ Primary |
+| 4.6.x          | 1.1.x - 1.5.x  | ✅ Supported |
+| 4.5.x          | 1.1.x - 1.5.x  | ✅ Supported |
+| 4.4.x          | 1.1.x - 1.5.x  | ✅ Supported |
 | 4.3.x and older| —              | ❌ Unsupported |
 
 ## 📚 Documentation

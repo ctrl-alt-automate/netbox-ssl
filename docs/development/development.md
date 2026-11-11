@@ -36,13 +36,14 @@ The plugin is automatically installed and ready to use.
 ## Testing Different NetBox Versions
 
 ```bash
-# NetBox 4.5 (default)
+# Newest supported NetBox (default: the floating v4.7 tag)
 docker compose up -d
 
 # NetBox 4.4
 NETBOX_VERSION=v4.4 docker compose up -d
 
-# Rebuild after changing version
+# Going back to an older version needs a fresh database: NetBox cannot
+# downgrade a volume a newer release has already migrated.
 docker compose down -v
 NETBOX_VERSION=v4.4 docker compose up -d --build
 ```

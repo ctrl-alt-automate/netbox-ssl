@@ -9,11 +9,14 @@ from netbox_ssl.utils.endpoint_monitor import poll_endpoint
 
 
 class MonitoredEndpointPoll(Script):
-    """Re-scrape each monitored endpoint and update its certificate, status, and history."""
+    """Re-scrape each monitored endpoint, reconcile its certificate and retire renewed ones."""
 
     class Meta:
         name = "Monitored Endpoint Poll"
-        description = "Re-scrape each monitored endpoint and update its certificate, status, and history."
+        description = (
+            "Re-scrape each monitored endpoint, update its certificate, status and history, "
+            "and mark certificates it has rotated away from as replaced."
+        )
         commit_default = True
         job_timeout = 600
 
@@ -52,18 +55,27 @@ class MonitoredEndpointPoll(Script):
         # Materialise counts keyed by status value (all choices start at 0).
         counts: dict[str, int] = {choice[0]: 0 for choice in MonitoredEndpointStatusChoices.CHOICES}
         rotated = 0
+        replaced = 0
 
         for endpoint in endpoints:
             result = poll_endpoint(endpoint, allowlist=allowlist)
             counts[result.status] = counts.get(result.status, 0) + 1
+            notes: list[str] = []
             if result.rotated:
                 rotated += 1
-            suffix = " (rotated)" if result.rotated else ""
+                notes.append("rotated")
+            if result.replaced_certificate_ids:
+                replaced += len(result.replaced_certificate_ids)
+                notes.append(f"{len(result.replaced_certificate_ids)} certificate(s) marked replaced")
+            suffix = f" ({', '.join(notes)})" if notes else ""
             self.log_info(f"{endpoint.name}: {result.status}{suffix}")
 
         # Build compact summary string, omitting zero-count statuses.
-        status_parts = [f"{k}={v}" for k, v in counts.items() if v]
-        summary_parts = status_parts + ([f"rotated={rotated}"] if rotated else [])
+        summary_parts = [f"{k}={v}" for k, v in counts.items() if v]
+        if rotated:
+            summary_parts.append(f"rotated={rotated}")
+        if replaced:
+            summary_parts.append(f"replaced={replaced}")
         summary = ", ".join(summary_parts) if summary_parts else "no changes"
 
         self.log_success(f"Polled {endpoints.count()} endpoint(s): {summary}")

@@ -13,7 +13,9 @@
 
 services:
   netbox: &netbox
-    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.5-4.0.0}
+    # Floating minor tag: the newest patch release of the newest supported
+    # NetBox. Override with NETBOX_VERSION (e.g. v4.4, or an exact v4.7.4).
+    image: netboxcommunity/netbox:${NETBOX_VERSION:-v4.7}
     depends_on:
       postgres:
         condition: service_healthy

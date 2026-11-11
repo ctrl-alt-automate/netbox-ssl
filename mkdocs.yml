@@ -114,6 +114,7 @@ nav:
       - how-to/endpoint-monitoring.md
       - how-to/ari-monitoring.md
       - how-to/aws-acm-sync.md
+      - how-to/azure-key-vault-sync.md
   - Reference:
       - reference/api.md
       - reference/data-models.md

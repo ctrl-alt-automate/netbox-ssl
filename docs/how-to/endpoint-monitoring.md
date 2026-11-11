@@ -37,23 +37,28 @@ A new endpoint starts with status **Pending** — nothing has been polled yet.
     register `MonitoredEndpointPoll`, **nothing ever polls your endpoints** and
     every one of them stays on **Pending** indefinitely.
 
-Add the class to your `SCRIPTS_ROOT` wrapper module (see
-[Custom Scripts](../reference/scripts.md#making-the-scripts-available-to-netbox)):
+Put the class in a wrapper module:
 
 ```python
-# /opt/netbox/netbox/scripts/netbox_ssl_scripts.py
+# netbox_ssl_scripts.py
 from netbox_ssl.scripts import MonitoredEndpointPoll
 ```
 
-!!! warning "Requires v1.3.1 or newer"
+and register that file with NetBox under **Customization → Scripts → Add**
+(*File Upload*). Copying the file into `SCRIPTS_ROOT` is not enough on its own —
+see [Custom Scripts](../reference/scripts.md#making-the-scripts-available-to-netbox)
+for the details and for a command-line alternative.
+
+!!! warning "Requires v1.4.0 or newer"
     In v1.3.0 this import raised `ImportError` because the class was never
     re-exported from the package
     ([#163](https://github.com/ctrl-alt-automate/netbox-ssl/issues/163)).
 
 ## Step 3 — Schedule the poll
 
-Open **Customization → Scripts → Monitored Endpoint Poll** and schedule it. Daily
-is a sensible default; hourly is reasonable if you rotate certificates often.
+Open **Customization → Scripts → Monitored Endpoint Poll**, set **Recurs every**
+to the interval in minutes and click **Run Script**. Daily (`1440`) is a
+sensible default; hourly (`60`) is reasonable if you rotate certificates often.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -67,7 +72,10 @@ Each run performs a TLS handshake per endpoint and then:
 2. **Records** the certificate in the endpoint's history (`first_seen` /
    `last_seen`)
 3. **Detects rotation** when the served certificate differs from the previous one
-4. **Updates** `status`, `last_checked`, `last_seen`, and `last_error`
+4. **Retires the renewed certificate**: the predecessor becomes **Replaced** and
+   its successor takes over its assignments — see
+   [What happens when a certificate is renewed](#what-happens-when-a-certificate-is-renewed)
+5. **Updates** `status`, `last_checked`, `last_seen`, and `last_error`
 
 ## Step 4 — Read the results
 
@@ -81,6 +89,56 @@ Each run performs a TLS handshake per endpoint and then:
 The endpoint detail page shows the current certificate plus the full history of
 every certificate that endpoint has served, which is what makes rotation visible
 after the fact.
+
+## What happens when a certificate is renewed
+
+A renewal performed outside NetBox — certbot, an ACME client on a load balancer,
+a hosting provider — reaches the plugin as an endpoint that suddenly presents a
+different certificate. The poll then runs the same **Janus renewal** as the
+manual import workflow, so you do not end up with the old and the new
+certificate both **Active**:
+
+- the predecessor's status becomes **Replaced** and it links to its successor
+- the successor receives a copy of the predecessor's **assignments** (the
+  predecessor keeps its own, as a record)
+- operator-maintained metadata carries over: **private key location**, the
+  **renewal note**, and — when the predecessor is an ACME certificate — the ACME
+  provider, account e-mail, challenge type, server URL, auto-renewal flag and
+  renewal days. A value already set on the successor is never overwritten.
+- the successor gets a **Renewed** entry on its Lifecycle tab naming the
+  predecessor
+- NetBox raises an *Object updated* event for the predecessor (its status
+  changes to Replaced), so an Event Rule on certificates sees the renewal
+
+A **Replaced** certificate no longer raises expiry alerts, so the poll only
+retires a predecessor when it is sure. All of the following must hold:
+
+| Condition | Why |
+|-----------|-----|
+| The poll verified the endpoint's chain (status **OK**, not **Untrusted**) | Retiring a certificate changes your inventory on the word of a remote host, so that host has to be authenticated. Anyone on the network path can answer with a self-signed certificate for the right name. |
+| This endpoint was itself seen serving the predecessor | The certificate chosen on the endpoint form is user input, not evidence; only a poll that saw the endpoint serve a certificate makes it a predecessor |
+| The certificate now served is **Active** | A revoked or already replaced certificate is not a successor |
+| The predecessor is **Active** or **Expired** | Revoked, archived and replaced certificates were already dealt with |
+| The predecessor was issued **earlier** | Falling back to an older certificate is a rollback, not a renewal |
+| Both certificates share a name (CN or SAN) | Otherwise the host now answers with an unrelated certificate — that is drift |
+| Both certificates are in the same tenant, or both in none | A renewal never crosses a tenant boundary. A certificate the poll imports takes the endpoint's tenant, so give the endpoint the tenant of its certificate. |
+| No other monitored endpoint still serves the predecessor | It is still in service somewhere; it is retired once the last endpoint has rotated |
+
+When a condition is not met the poll still records the rotation; it just leaves
+both certificates as they are.
+
+!!! note "Rotations from v1.3.0 – v1.4.0 are repaired automatically"
+    Those versions detected a rotation but never retired the predecessor
+    ([#184](https://github.com/ctrl-alt-automate/netbox-ssl/issues/184)). The
+    check covers every certificate in the endpoint's history, not just the last
+    one, so the first poll after upgrading marks those leftovers **Replaced**.
+
+!!! warning "Several nodes behind one name, each with its own certificate"
+    If a load-balanced name alternates between nodes that hold *different*
+    certificates, the poll sees a rotation whenever it reaches another node and
+    keeps only the most recently issued certificate **Active**. Monitor each
+    node through its own URL (or its own SNI) so every certificate has an
+    endpoint of its own.
 
 ## Step 5 — Alert on changes (optional)
 
@@ -113,9 +171,10 @@ PLUGINS_CONFIG = {
 
 !!! question "All my endpoints are stuck on Pending"
     The poll script has never run. Confirm `MonitoredEndpointPoll` appears under
-    **Customization → Scripts**; if it does not, revisit Step 2 and check the
-    NetBox log for an `ImportError` from your wrapper module. On v1.3.0 the
-    import fails by design of the bug — upgrade to v1.3.1+.
+    **Customization → Scripts**; if it does not, the wrapper module has not been
+    registered — revisit Step 2. If the module is listed but shows an error,
+    check the NetBox log for an `ImportError`: on v1.3.0 the import fails by
+    design of the bug, so upgrade to v1.4.0 or newer.
 
 !!! question "An internal endpoint reports Unreachable"
     Private addresses are blocked unless allowlisted. Add the range to
@@ -125,6 +184,24 @@ PLUGINS_CONFIG = {
     The plugin verifies against the system trust store of the NetBox host, which
     may not contain your internal root CA. Install the root in that trust store,
     or accept **Untrusted** as the expected state for that endpoint.
+
+!!! question "After a renewal the old and the new certificate are both Active"
+    On v1.3.0 – v1.4.0 that was a bug
+    ([#184](https://github.com/ctrl-alt-automate/netbox-ssl/issues/184)); upgrade
+    and run the poll once. If it still happens, one of the conditions under
+    [What happens when a certificate is renewed](#what-happens-when-a-certificate-is-renewed)
+    is not met. The most common ones: another monitored endpoint still serves
+    the old certificate; the endpoint is **Untrusted** — a certificate from an
+    internal CA is only recognised as a renewal once that CA's root is in the
+    trust store of the NetBox host; or the old certificate has a tenant and the
+    endpoint does not (or the other way round).
+
+!!! question "Unreachable: \"…serial number and issuer of certificate #N but a different fingerprint\""
+    The endpoint presented a certificate that copies the serial number and
+    issuer of a certificate in your inventory without being that certificate.
+    A certificate authority never issues two certificates like that, so this is
+    a forged or mis-generated certificate. The plugin refuses to record it as
+    the real one. Check what is answering on that address.
 
 !!! question "A renewal reminder quotes an old certificate"
     Reminders read the certificate the endpoint is currently linked to. If the

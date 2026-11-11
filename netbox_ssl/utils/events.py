@@ -2,8 +2,9 @@
 Certificate event utilities for firing events through NetBox's Event Rules system.
 
 NetBox Event Rules trigger on standard model changes (create/update/delete).
-This module provides helpers to build enriched event payloads and fire events
-by creating annotated ObjectChange records.
+This module provides helpers to build enriched event payloads and to fire an
+event for a certificate that has not otherwise changed, by saving it so that
+NetBox queues an ``object_updated`` event.
 """
 
 from __future__ import annotations
@@ -101,10 +102,12 @@ def fire_certificate_event(
     extra: dict | None = None,
 ) -> dict:
     """
-    Fire a certificate event by updating the certificate's last_updated timestamp.
+    Fire a certificate event by saving the certificate, unchanged.
 
-    This triggers NetBox's standard object_updated Event Rules. The event payload
-    is logged for audit purposes and returned for further use (e.g., by the scan script).
+    This triggers NetBox's standard object_updated Event Rules, provided the
+    caller runs inside a request or a script job (NetBox only tracks events
+    there). The event payload is logged for audit purposes and returned for
+    further use (e.g., by the scan script).
 
     Args:
         certificate: Certificate model instance.
@@ -122,16 +125,24 @@ def fire_certificate_event(
         extra=extra,
     )
 
-    # Touch the certificate's last_updated to trigger NetBox's object_updated Event Rules.
-    # This causes the ChangeLogging middleware to create an ObjectChange record,
-    # which in turn fires any matching Event Rules (webhooks, scripts, etc.).
+    # Save the certificate so NetBox queues an object_updated event for it.
+    #
+    # NetBox dispatches Event Rules (webhooks, scripts, notifications) from the
+    # model's post_save signal. This used to "touch" the row with
+    # QuerySet.update(), which never sends that signal — so an event fired for a
+    # certificate that had not otherwise been saved (every expiry scan event)
+    # reached no Event Rule at all.
+    #
+    # - snapshot() first: NetBox then sees that nothing changed and records no
+    #   changelog entry. The event is the point, not a phantom edit.
+    # - update_fields: the caller may hold an instance it loaded a while ago;
+    #   saving every field would write stale values over an edit made since.
     try:
-        from django.utils import timezone as dj_timezone
-
-        type(certificate).objects.filter(pk=certificate.pk).update(last_updated=dj_timezone.now())
+        certificate.snapshot()
+        certificate.save(update_fields=["last_updated"])
     except Exception as e:
-        # Don't fail the entire operation if the update fails (e.g., in tests)
-        logger.warning("Could not update last_updated for certificate %s: %s", certificate.pk, e)
+        # Don't fail the entire operation if the save fails (e.g., in tests)
+        logger.warning("Could not fire %s for certificate %s: %s", event_type, certificate.pk, e)
 
     logger.info(
         "Certificate event fired: %s for %s (id=%s, days_remaining=%s)",

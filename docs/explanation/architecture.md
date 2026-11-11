@@ -94,8 +94,11 @@ erDiagram
     Certificate }o--o| Tenant : tenant
     ExternalSource ||--o{ ExternalSourceSyncLog : has
     Certificate ||--o{ CertificateEventLog : tracks_events
-    CompliancePolicy ||--o{ ComplianceResult : produces
-    Certificate ||--o{ ComplianceResult : evaluates
+    CompliancePolicy ||--o{ ComplianceCheck : produces
+    Certificate ||--o{ ComplianceCheck : evaluates
+    ComplianceCheck }o--|| ComplianceTrendSnapshot : rolled_up_into
+    MonitoredEndpoint }o--o| Certificate : presents
+    MonitoredEndpoint ||--o{ MonitoredEndpointCertificate : rotation_history
 ```
 
 Key design choices:
@@ -109,6 +112,14 @@ Key design choices:
   duplicate events within a configurable cooldown window
 - `ExternalSource` credentials use `env:VAR_NAME` pattern, never plaintext
   (`write_only=True` on serializers)
+- `MonitoredEndpoint` inverts the certificate-centric model: it is keyed on a URL
+  and *discovers* which certificate is served there, rather than recording where
+  a known certificate was deployed. `MonitoredEndpointCertificate` keeps the
+  rotation history, so a swap remains visible after the fact
+- `ComplianceCheck` holds one row per (certificate, policy) pair, upserted on
+  each run; `ComplianceTrendSnapshot` is the daily rollup behind the 90-day
+  trend chart, because recomputing history from live checks is not possible once
+  a check is overwritten
 
 ## Data flow — scheduled expiry scan
 

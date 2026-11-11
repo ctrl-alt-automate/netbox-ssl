@@ -80,6 +80,31 @@ enforces this via `.coveragerc`'s `fail_under = 70`. Higher layers (models,
 views, scripts) are covered by Docker-based integration tests that also run
 in CI.
 
+### Azure Key Vault live tests
+
+`tests/test_azure_kv_live.py` (marker `azure_live`) runs against a real Azure
+Key Vault and is not part of the standard unit/api/browser/load lanes — it
+runs via the `Azure Integration` GitHub Actions workflow
+(`.github/workflows/azure-integration.yml`), authenticated through OIDC as a
+service principal holding only `Key Vault Reader`.
+
+One of its tests is a privilege canary: it constructs a `SecretClient` and
+asserts `get_secret()` is refused with a 403 under that identity, proving the
+CI principal is not over-privileged. It only runs when
+`AZURE_KV_LEAST_PRIVILEGE_IDENTITY=1` is set explicitly — without it, a local
+`az login` identity with broader access would make `get_secret()` succeed and
+turn a real regression into a false pass, so the test refuses to run instead
+of giving a misleading green.
+
+The workflow needs a real vault and three repository **variables**
+(`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`). The job is
+**skipped** when `AZURE_CLIENT_ID` is not set — a skipped `Azure Key Vault
+(live)` job therefore means "no test vault is configured", not "the adapter was
+verified". To run the lane, create a vault with a few test certificates, grant
+a service principal `Key Vault Reader` (nothing wider) with a federated
+credential for `refs/heads/main` only, set `AZURE_TEST_VAULT_URL` on the
+workflow's live-test step to the vault's URL, and set the three variables.
+
 ## Code style
 
 We use [Ruff](https://github.com/astral-sh/ruff) for linting and formatting:
@@ -131,9 +156,12 @@ Commits are written in English. Signed commits are appreciated but not required.
 The automated checks on PR are:
 
 - Ruff (lint + format)
-- Unit tests on Python 3.10, 3.11, 3.12
+- Unit tests on Python 3.10 through 3.14
 - Package check (wheel inclusion)
-- Integration tests on NetBox 4.4, 4.5, 4.6, and 4.7
+- Integration tests on NetBox 4.4, 4.5, 4.6, and 4.7 — each lane runs the
+  newest patch release of its minor, and the whole matrix also runs weekly
+  on `dev` so an upstream patch that breaks the plugin is noticed without
+  waiting for a pull request
 - MkDocs strict build (on docs-touching PRs)
 - Gemini code review (automatic, informational)
 
@@ -181,8 +209,12 @@ exists to catch (#143).
 
 Pass `ObjectVar(model=...)` the model **class**, not a dotted string — NetBox
 calls `model.objects.all()`, so a string raises `AttributeError` at import and
-the script never registers (#143). Make sure the script is reachable from the
-`SCRIPTS_ROOT` wrapper; plugin-bundled scripts are not auto-discovered.
+the script never registers (#143). Export the script from
+`netbox_ssl/scripts/__init__.py` and add it to the wrapper module shown in
+[Custom Scripts](../reference/scripts.md#making-the-scripts-available-to-netbox):
+plugin-bundled scripts are not auto-discovered, and an operator only gets the
+ones that wrapper imports. Any how-to or tutorial that tells the reader to run
+the script must link to that section too (a test enforces it).
 
 ### Changed user-facing copy or support metadata
 

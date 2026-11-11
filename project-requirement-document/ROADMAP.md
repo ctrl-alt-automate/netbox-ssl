@@ -26,7 +26,8 @@
 | 2026-04-17 | Initial roadmap post-v1.0 GA. |
 | 2026-04-21 | Post-v1.0.1 review. Promoted **AWS ACM** and **Azure Key Vault** read-only adapters from Later (§5.4, §5.5) to Next (now §4.1, §4.2). Demoted **DigiCert CertCentral Adapter** from Next (§4.2) to Later (§5.5), narrowed scope to a GenericRESTAdapter preset + how-to guide because a reliable first-party adapter requires a live DigiCert account the maintainer does not hold. Renumbered §4.1 Vault → §4.3 (scope unchanged), §4.3 Performance Scaling Pass → §4.4 (scope unchanged). Added §8.2 for `auth_credentials_reference` deprecation (landing with multi-credential auth pattern in v1.1.0). |
 | 2026-06-21 | Demoted **Azure Key Vault** read-only adapter ([#101](https://github.com/ctrl-alt-automate/netbox-ssl/issues/101)) from Next (§4.2) back to Later (now §5.8) — deprioritized, no active work planned for the next release (the blocking multi-credential auth dependency #99 shipped in v1.1.0, but the adapter itself is pushed further out). Renumbered §4.3 Vault → §4.2, §4.4 Performance Scaling Pass → §4.3. Closed **OpenSSL 4.0.0 impact analysis** ([#90](https://github.com/ctrl-alt-automate/netbox-ssl/issues/90)) as not planned. (Website-Centric Monitoring #149 landed in v1.3 — tracked in CHANGELOG, not a roadmap bucket.) |
-
+| 2026-09-10 | Post-v1.4.0 review. **NetBox 4.7 support** shipped (audit in `COMPATIBILITY.md`); 4.7 enters as Supported, 4.6 stays Primary until 4.7 has carried a release. **Compliance Policies/Checks UI** and the `CertificateComplianceCheck` script shipped ([#164](https://github.com/ctrl-alt-automate/netbox-ssl/issues/164)) — the compliance data model had existed since v0.7 with no presentation layer. **Certificate type** (server/client/mTLS, detected from Extended Key Usage) shipped ([#168](https://github.com/ctrl-alt-automate/netbox-ssl/issues/168)), adding the client- and mTLS-certificate support previously absent from the model. **Azure Key Vault** ([#101](https://github.com/ctrl-alt-automate/netbox-ssl/issues/101)) remains in Later (§5.8), unchanged. |
+| 2026-11-11 | Post-v1.5.0 review. **Azure Key Vault** read-only adapter shipped ([#101](https://github.com/ctrl-alt-automate/netbox-ssl/issues/101)); §5.8 is marked as shipped, and so is §4.1 (AWS ACM), which has been in the product since v1.1.0. **NetBox 4.7 promoted to Primary** (verified through 4.7.5); 4.6 moves to Supported. Three long-standing defects fixed: expiry scan events never reached Event Rules ([#189](https://github.com/ctrl-alt-automate/netbox-ssl/issues/189)), endpoint rotation never retired the predecessor ([#184](https://github.com/ctrl-alt-automate/netbox-ssl/issues/184)), and sync failed after a renewal on a stable identifier ([#180](https://github.com/ctrl-alt-automate/netbox-ssl/issues/180)). CI now follows the newest NetBox patch release and runs the REST API tests. Section numbers are left as they are so earlier rows of this table stay valid; shipped sections are removed at the next annual pruning. |
 ---
 
 ## 2. How to Read This Roadmap
@@ -60,6 +61,10 @@ milestone and work has started.*
 ## 4. Next — Committed, Scoped, Not Yet Started
 
 ### 4.1 AWS ACM Read-Only Adapter
+
+> **Shipped in v1.1.0** (2026-05-17), together with its blocking dependency
+> [#99](https://github.com/ctrl-alt-automate/netbox-ssl/issues/99). Kept until
+> the next annual pruning so the section numbers in the change log stay valid.
 
 **Goal.** Add a first-party External Source adapter for AWS Certificate
 Manager. Reads certificate metadata only, never private keys (ACM does
@@ -162,6 +167,11 @@ Different expiry thresholds and notification channels for different
 parts of the organisation. Currently thresholds are global.
 
 ### 5.8 Azure Key Vault Read-Only Adapter
+
+> **Shipped in v1.5.0** (2026-11-11) as the `azure_kv` External Source
+> adapter, within the scope boundary below: it calls only the `certificates`
+> API, and the minimum role is `Key Vault Reader`. Kept until the next annual
+> pruning so the section numbers in the change log stay valid.
 
 A first-party External Source adapter for Azure Key Vault, reading
 certificate metadata (`cer` bytes only), never private-key material.

@@ -92,7 +92,9 @@ def api_client():
         pytest.skip("NETBOX_TOKEN environment variable not set")
 
     if not _is_netbox_available():
-        pytest.skip("NetBox not available at " + NETBOX_URL)
+        # A token without a reachable NetBox is a broken lane, not an absent
+        # one: skipping here would turn the whole file green by absence.
+        pytest.fail("NETBOX_TOKEN is set but NetBox is not reachable at " + NETBOX_URL)
 
     session = requests.Session()
     # v2 tokens use "Bearer" prefix, v1 tokens use "Token" prefix
@@ -123,8 +125,9 @@ def test_certificate(api_client):
         },
     )
 
-    if resp.status_code != 201:
-        pytest.skip(f"Could not create test certificate: {resp.text}")
+    # A broken import endpoint must fail every test that depends on it. This
+    # used to skip, which would have reported a dead API as a green run.
+    assert resp.status_code == 201, f"Could not create test certificate: {resp.status_code} {resp.text}"
 
     cert_data = resp.json()
     cert_id = cert_data["id"]
@@ -140,15 +143,18 @@ def test_compliance_policy(api_client):
     """Create a test compliance policy for use in tests, cleanup after."""
     policy_data = {
         "name": f"Test Policy {os.urandom(4).hex()}",
+        "policy_type": "min_key_size",
+        "severity": "critical",
         "enabled": True,
-        "min_key_size": 2048,
-        "allowed_algorithms": ["rsa", "ecdsa"],
+        "parameters": {"min_bits": 2048},
     }
 
     resp = api_client.post(f"{API_BASE}/compliance-policies/", json=policy_data)
 
-    if resp.status_code != 201:
-        pytest.skip(f"Could not create test policy: {resp.text}")
+    # Fail, never skip: this fixture posted a payload from a long-gone schema
+    # and skipped on the resulting 400, so the one test using it had not run in
+    # a long time without anybody noticing.
+    assert resp.status_code == 201, f"Could not create test policy: {resp.status_code} {resp.text}"
 
     policy = resp.json()
     policy_id = policy["id"]

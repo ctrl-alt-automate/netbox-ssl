@@ -38,6 +38,8 @@ class CertFactory:
         issuer_cn: str = "Test CA",
         issuer_o: str = "Test Organization",
         extended_key_usage: list[str] | None = None,
+        issued_days_ago: int = 0,
+        serial: int | None = None,
     ) -> str:
         """Generate a self-signed certificate and return PEM string.
 
@@ -51,6 +53,12 @@ class CertFactory:
             issuer_o: Organization for the issuer.
             extended_key_usage: EKU purposes to add, any of "server" and
                 "client". None omits the extension entirely.
+            issued_days_ago: Backdate ``notBefore`` by this many days, so two
+                certificates can be told apart by issue date the way a real
+                predecessor and its renewal can. Ignored when ``expired``.
+            serial: Use this serial number instead of a random one. Together
+                with the default issuer this builds a certificate that reuses
+                another one's serial and issuer on a different key.
 
         Returns:
             PEM-encoded certificate as a string.
@@ -85,11 +93,12 @@ class CertFactory:
             not_before = now - timedelta(days=400)
             not_after = now - timedelta(days=35)
         else:
-            not_before = now - timedelta(hours=1)
+            not_before = now - timedelta(days=issued_days_ago, hours=1)
             not_after = now + timedelta(days=valid_days)
 
-        # Unique serial number per invocation
-        serial = int.from_bytes(os.urandom(16), byteorder="big")
+        # Unique serial number per invocation, unless the caller picks one
+        if serial is None:
+            serial = int.from_bytes(os.urandom(16), byteorder="big")
 
         # Build SAN extension
         san_names = [x509.DNSName(name) for name in sans]
