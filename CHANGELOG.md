@@ -37,6 +37,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   REST adapters supply none of the three and are therefore behaviourally
   unchanged.
 
+### Changed
+
+- **Verified against NetBox 4.7.5**, the newest release (2026-11-10): the
+  integration suite, REST API tests, browser tests, system checks, OpenAPI
+  generation and migration-drift check all pass. No plugin change was needed;
+  `COMPATIBILITY.md` lists the 4.7.1 – 4.7.5 changes that were reviewed.
+- **Python 3.13 and 3.14 are now declared and tested.** NetBox 4.7 ships on
+  Python 3.14, so the plugin was already running there; the unit suite now
+  covers 3.10 through 3.14 and the package classifiers say so.
+- **CI follows the newest NetBox patch release.** Every integration lane uses
+  the floating image tag of its minor (`v4.7`, `v4.6`, `v4.5`, `v4.4`) instead
+  of a pinned `.0`, and the matrix re-runs weekly on `dev`. The 4.7 lane had
+  been testing 4.7.0 while 4.7.1 through 4.7.5 shipped. The OpenAPI
+  `--fail-on-warn` and migration-drift gates now run on 4.7 as well as 4.6.
+- **The REST API integration tests now run in CI**, on every supported NetBox
+  version. `tests/test_api_endpoints.py` needs a token and a running NetBox,
+  so it skipped in the container lane and was never selected by the browser
+  job — no pipeline ran it. One of its 40 tests had been skipping on a fixture
+  that posted a compliance-policy payload from an old schema; setup failures in
+  that file now fail instead of skip.
+- **Browser tests run on NetBox 4.5 and 4.7** rather than 4.5 only.
+- The development `docker-compose.yml` defaults to the newest supported NetBox
+  (`v4.7`) instead of 4.5.
+
 ### Fixed
 
 - **External source sync failed on every run after a certificate was renewed**

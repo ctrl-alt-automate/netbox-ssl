@@ -156,9 +156,12 @@ Commits are written in English. Signed commits are appreciated but not required.
 The automated checks on PR are:
 
 - Ruff (lint + format)
-- Unit tests on Python 3.10, 3.11, 3.12
+- Unit tests on Python 3.10 through 3.14
 - Package check (wheel inclusion)
-- Integration tests on NetBox 4.4, 4.5, 4.6, and 4.7
+- Integration tests on NetBox 4.4, 4.5, 4.6, and 4.7 — each lane runs the
+  newest patch release of its minor, and the whole matrix also runs weekly
+  on `dev` so an upstream patch that breaks the plugin is noticed without
+  waiting for a pull request
 - MkDocs strict build (on docs-touching PRs)
 - Gemini code review (automatic, informational)
 
