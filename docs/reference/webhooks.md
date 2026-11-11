@@ -5,7 +5,8 @@ NetBox SSL integrates with NetBox's [Event Rules](https://docs.netbox.dev/en/sta
 ## How It Works
 
 1. Certificate changes (create, update, delete) automatically trigger NetBox Event Rules
-2. The **Certificate Expiry Scan** script periodically checks for expiring certificates and logs events
+2. The **Certificate Expiry Scan** script periodically checks for expiring certificates and raises an
+   **Object Updated** event for each one that crosses a threshold, so the same rule covers it
 3. You configure Event Rules in NetBox to match certificate events and forward them to your notification channels
 
 ## Certificate Events
@@ -69,6 +70,40 @@ PLUGINS_CONFIG = {
 | Dry Run | No | Preview events without firing them |
 | Ignore Cooldown | No | Fire events even if recently fired |
 | Cleanup Old Events | Yes | Remove event log entries older than 90 days |
+
+### What a scan event looks like
+
+Nothing about a certificate changes when it merely gets closer to its expiry
+date, so NetBox would never raise an event for it. The scan therefore saves
+each certificate that has crossed a threshold — unchanged — which makes NetBox
+queue an ordinary **Object Updated** event for it. No changelog entry is
+written, because no field differs.
+
+The payload is the standard one: `event` is `updated` and `data` is the
+certificate as the REST API returns it, including `days_remaining` and
+`expiry_status`. Use those in the rule's conditions so that an everyday edit of
+a healthy certificate does not raise an alert — for example, only certificates
+inside the widest scan threshold:
+
+```json
+{
+    "and": [
+        {"attr": "days_remaining", "value": 90, "op": "lte"}
+    ]
+}
+```
+
+A scan event is only raised when the script runs with **Commit changes** on and
+**Dry Run** off, and at most once per certificate, threshold and cooldown
+window.
+
+!!! warning "Scan events did not reach Event Rules before v1.5"
+    Up to and including v1.4.0 the scan reported its events as fired and logged
+    them, but NetBox never saw them: no Event Rule, webhook or notification
+    was triggered by a scan. Only real edits to a certificate — a status
+    change, for instance — raised an event. If you set up expiry alerting on an
+    earlier release, upgrade and run the scan once with **Ignore Cooldown** to
+    confirm your rule now fires.
 
 ### Idempotency
 

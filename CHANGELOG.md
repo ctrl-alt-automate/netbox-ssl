@@ -50,6 +50,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   regardless of row order, and earlier versions of an identifier the source
   still serves are no longer reported as removals. Affects AWS ACM sources since
   v1.1.0.
+- **The scheduled expiry scan never triggered a NetBox Event Rule.**
+  `CertificateExpiryScan` reported its events as fired, logged them and applied
+  its cooldown, but no Event Rule, webhook or notification ever received one —
+  in any release since the scan was introduced in v0.6. An event was "fired" by
+  touching the certificate's `last_updated` through a queryset update, which
+  bypasses the `post_save` signal NetBox dispatches Event Rules from. Firing an
+  event now saves the certificate, unchanged: NetBox queues an **Object Updated**
+  event, a rule on certificates fires as documented, and the payload carries
+  `days_remaining` and `expiry_status`. No changelog entry is written (nothing
+  changed) and only `last_updated` is saved, so a concurrent edit is never
+  overwritten.
+
+  **If you alert on certificate expiry through Event Rules, this is the release
+  that makes it work.** After upgrading, run the scan once with *Ignore Cooldown*
+  and confirm the rule fires; expect one event per certificate per threshold per
+  cooldown window.
+- **An expiry scan dry run no longer touches certificates.** With *Dry Run* on,
+  the scan still updated `last_updated` on every certificate it reported; it now
+  only builds the payloads it would send.
 
 ### Documentation
 
