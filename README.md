@@ -264,10 +264,10 @@ Add the widget to your NetBox dashboard to see:
 
 | NetBox Version | Plugin Version | Status |
 |:--------------:|:--------------:|:------:|
-| 4.7.x          | 1.4.x          | ✅ Supported |
-| 4.6.x          | 1.1.x - 1.4.x  | ✅ Primary |
-| 4.5.x          | 1.1.x - 1.4.x  | ✅ Supported |
-| 4.4.x          | 1.1.x - 1.4.x  | ✅ Supported |
+| 4.7.x          | 1.4.x - 1.5.x  | ✅ Primary |
+| 4.6.x          | 1.1.x - 1.5.x  | ✅ Supported |
+| 4.5.x          | 1.1.x - 1.5.x  | ✅ Supported |
+| 4.4.x          | 1.1.x - 1.5.x  | ✅ Supported |
 | 4.3.x and older| —              | ❌ Unsupported |
 
 ## 📚 Documentation
