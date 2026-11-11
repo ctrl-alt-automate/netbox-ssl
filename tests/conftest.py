@@ -27,6 +27,38 @@ def get_plugin_source_dir() -> Path:
     return local  # fallback
 
 
+def pytest_collection_modifyitems(config, items):
+    """Deselect ``azure_live`` tests unless they were asked for by name.
+
+    WHY: ``pytestmark = pytest.mark.azure_live`` only *selects* those tests in
+    the dedicated Azure workflow (`-m azure_live`); a marker excludes nothing
+    anywhere else. The in-container integration lane runs the whole directory
+    with no ``-m`` filter, so those tests were collected AND executed there,
+    reaching out to the maintainer's real Key Vault from CI (#101 review C5).
+    Until the Azure SDK was added to that lane they merely happened to error on
+    the import instead -- green-by-absence, the exact failure mode this repo
+    keeps being bitten by.
+
+    This is a collection-time rule rather than a per-file guard on purpose: any
+    future test marked ``azure_live`` is opted out of every ordinary lane
+    automatically, so the mistake cannot be reintroduced by adding a file.
+    ``-m azure_live`` (the documented local command and the workflow's own
+    invocation) still selects them, and so does ``-m "not azure_live"``, which
+    pytest's own filter then handles.
+    """
+    markexpr = config.getoption("markexpr", default="") or ""
+    if "azure_live" in markexpr:
+        return
+
+    kept, deselected = [], []
+    for item in items:
+        (deselected if item.get_closest_marker("azure_live") else kept).append(item)
+
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = kept
+
+
 import requests
 
 # Try to import Django - not needed for browser tests

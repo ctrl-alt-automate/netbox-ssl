@@ -14,10 +14,16 @@ endpoint — without manual CSV exports.
 
 ## Supported adapters
 
-| Adapter | Source | Config |
-|---------|--------|--------|
-| `lemur` | Netflix Lemur | Lemur API URL + API key (via env var) |
-| `generic_rest` | Any JSON REST endpoint | URL + optional auth header + field mapping |
+| Adapter | Source | Config | Extra required |
+|---------|--------|--------|----------------|
+| `lemur` | Netflix Lemur | Lemur API URL + API key (via env var) | — |
+| `generic_rest` | Any JSON REST endpoint | URL + optional auth header + field mapping | — |
+| `aws_acm` | AWS Certificate Manager | Region + IAM role or access key (via env var) | `netbox-ssl[aws]` |
+| `azure_kv` | Azure Key Vault | Vault URL + managed identity or service principal | `netbox-ssl[azure]` |
+
+`aws_acm` and `azure_kv` are registered only when their optional extra is
+installed; without it the source type does not appear in the form. See
+[AWS ACM sync](aws-acm-sync.md) and [Azure Key Vault sync](azure-key-vault-sync.md).
 
 Adapters live under `netbox_ssl/adapters/`. New adapters can be added by
 subclassing `BaseAdapter`.
@@ -50,11 +56,24 @@ Azure Key Vault with explicit service-principal credentials:
 
 ```json
 {
-  "tenant_id": "env:AZURE_TENANT_ID",
-  "client_id": "env:AZURE_CLIENT_ID",
-  "client_secret": "env:AZURE_CLIENT_SECRET"
+  "tenant_id": "env:NETBOX_AZURE_TENANT_ID",
+  "client_id": "env:NETBOX_AZURE_CLIENT_ID",
+  "client_secret": "env:NETBOX_AZURE_CLIENT_SECRET"
 }
 ```
+
+!!! danger "Do not name these variables `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET`"
+    Those three names are what Azure's own `EnvironmentCredential` reads, and
+    `DefaultAzureCredential` — which the `azure_managed_identity` method uses
+    — tries `EnvironmentCredential` **first**, ahead of managed identity. On a
+    host where all three are set, a source configured for managed identity
+    silently authenticates as this service principal instead. Nothing in
+    NetBox reports it: the sync succeeds, under the wrong identity and the
+    wrong permissions.
+
+    The `env:VAR_NAME` resolver reads whatever name you give it, so choose one
+    Azure's chain cannot claim. `NETBOX_AZURE_*` is the prefix this plugin's
+    documentation uses throughout.
 
 ### Role-based auth (cloud-native)
 
@@ -67,7 +86,18 @@ When NetBox runs on an AWS EC2 instance with an IAM role or on Azure with a Mana
 Supported role-based `auth_method` values:
 
 - `aws_instance_role` — AWS IAM role attached to the NetBox host (EC2, ECS, Lambda). Requires IMDSv2 enabled.
-- `azure_managed_identity` — Azure Managed Identity (system- or user-assigned). For user-assigned, include `client_id` pointing at the identity's client-ID.
+- `azure_managed_identity` — Azure Managed Identity (system- or user-assigned), a federated
+  workload identity, or a local `az login`. Leave `auth_credentials` empty: the adapter builds
+  `DefaultAzureCredential()` with no arguments, so any key you put there is ignored.
+  To select a **user-assigned** identity, set the `AZURE_CLIENT_ID` environment variable on the
+  NetBox and worker processes — `DefaultAzureCredential` reads it. There is no `client_id`
+  credential field for this auth method.
+
+  `AZURE_CLIENT_ID` on its own is safe and is the documented way to pick a user-assigned
+  identity. It is only dangerous alongside `AZURE_TENANT_ID` and `AZURE_CLIENT_SECRET`: that
+  full triple switches `DefaultAzureCredential` over to `EnvironmentCredential`, which wins
+  ahead of managed identity. Keep service-principal credentials under `NETBOX_AZURE_*` names
+  (see the warning above) and the two can coexist on one host.
 
 ### Deprecated — `auth_credentials_reference`
 
