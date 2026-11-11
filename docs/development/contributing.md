@@ -96,6 +96,15 @@ CI principal is not over-privileged. It only runs when
 turn a real regression into a false pass, so the test refuses to run instead
 of giving a misleading green.
 
+The workflow needs a real vault and three repository **variables**
+(`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`). The job is
+**skipped** when `AZURE_CLIENT_ID` is not set — a skipped `Azure Key Vault
+(live)` job therefore means "no test vault is configured", not "the adapter was
+verified". To run the lane, create a vault with a few test certificates, grant
+a service principal `Key Vault Reader` (nothing wider) with a federated
+credential for `refs/heads/main` only, set `AZURE_TEST_VAULT_URL` on the
+workflow's live-test step to the vault's URL, and set the three variables.
+
 ## Code style
 
 We use [Ruff](https://github.com/astral-sh/ruff) for linting and formatting:

@@ -103,6 +103,55 @@ def test_live_test_step_declares_least_privilege_identity() -> None:
     )
 
 
+def _find_live_test_job(workflow: dict) -> dict:
+    """Return the job dict that contains the live-test step."""
+    for job in workflow.get("jobs", {}).values():
+        if any("test_azure_kv_live.py" in step.get("run", "") for step in job.get("steps", [])):
+            return job
+    raise AssertionError(f"No job running test_azure_kv_live.py found in {_WORKFLOW_PATH}.")
+
+
+@_requires_workflow_file
+def test_live_job_skips_when_the_test_resources_are_not_configured() -> None:
+    """Without the repository variables the job must skip, not fail at login.
+
+    The Azure test resources are temporary. Once they and the three repository
+    variables are removed, `azure/login` has an empty client id to log in with,
+    so every later push to main that touches the adapter would show a red run
+    for a reason that has nothing to do with the code. A job-level condition on
+    the variable turns that into a visible "skipped" and makes re-enabling the
+    lane a matter of setting the variables again.
+    """
+    workflow = yaml.safe_load(_WORKFLOW_PATH.read_text())
+    condition = str(_find_live_test_job(workflow).get("if", ""))
+
+    assert "vars.AZURE_CLIENT_ID != ''" in condition, (
+        f"The live-test job's `if:` is {condition!r}. It must also require "
+        "`vars.AZURE_CLIENT_ID != ''`, otherwise the job fails at `azure/login` "
+        "as soon as the temporary test resources and their repository "
+        "variables are removed."
+    )
+
+
+@_requires_workflow_file
+def test_live_job_stays_restricted_to_main() -> None:
+    """The variable check must be added to the main-only condition, not replace it.
+
+    The federated credential is scoped to refs/heads/main. The `if:` is what
+    keeps a `workflow_dispatch` from another branch from even attempting a
+    login; an `||`, or a rewrite that drops the ref check, would lose that.
+    """
+    workflow = yaml.safe_load(_WORKFLOW_PATH.read_text())
+    condition = str(_find_live_test_job(workflow).get("if", ""))
+
+    assert "github.ref == 'refs/heads/main'" in condition, (
+        f"The live-test job's `if:` is {condition!r}; it no longer restricts the job to refs/heads/main."
+    )
+    assert "||" not in condition, (
+        f"The live-test job's `if:` is {condition!r}. Every clause must hold, so combine them with `&&` only."
+    )
+
+
 def test_conftest_deselects_azure_live_outside_an_explicit_selection() -> None:
     """The live tests must never be collected by a lane that did not ask for them.
 

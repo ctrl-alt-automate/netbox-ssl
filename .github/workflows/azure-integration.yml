@@ -20,7 +20,12 @@ jobs:
   integration-azure:
     name: Azure Key Vault (live)
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    # Main only (the federated credential is scoped to it), and only while the
+    # test resources exist. They are temporary: once the vault and the three
+    # repository variables are removed, `azure/login` has nothing to log in
+    # with, and this job must show as skipped rather than fail for a reason
+    # unrelated to the code. Setting the variables again re-enables it.
+    if: github.ref == 'refs/heads/main' && vars.AZURE_CLIENT_ID != ''
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
