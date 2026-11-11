@@ -7,8 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Azure Key Vault external source** ([#101](https://github.com/ctrl-alt-automate/netbox-ssl/issues/101)):
+  read-only sync of certificate metadata from one Azure Key Vault, with managed
+  identity / workload identity or an explicit service principal. Certificate
+  fields are parsed from the vault's DER bytes by the plugin's own parser, so
+  they match every other import path — including EKU-based certificate type.
+  Optional tag sync (`sync_tags`, off by default) copies Azure tags onto
+  imported certificates; when enabled the vault is authoritative, so each run
+  replaces the certificate's full tag set and an untagged vault certificate
+  clears it. Requires `pip install netbox-ssl[azure]`. The minimum
+  Azure role is **`Key Vault Reader`**; `Key Vault Certificate User` is
+  deliberately *not* required, because it also grants private-key export.
+  Migration 0028 is additive.
+- **Sync engine can now apply status, certificate type and tags**:
+  `FetchedCertificate` gained three optional fields (`status`,
+  `certificate_type`, `tags`), closing two long-standing gaps — sync used to
+  hardcode every imported certificate to Active, and never applied the
+  EKU-based certificate type added in v1.4.0. All three are honoured on every
+  lifecycle path: create, update and renewal. The new Azure Key Vault adapter
+  populates all three.
+
+  Each field is written only when the adapter actually supplies it. On create,
+  an adapter that supplies nothing still produces exactly what sync produced
+  before (Active / server / no tags); on update and renewal, a field the
+  adapter has no opinion about is left alone, so an operator's
+  `certificate_type` override survives. The existing Lemur, AWS ACM and Generic
+  REST adapters supply none of the three and are therefore behaviourally
+  unchanged.
+
 ### Fixed
 
+- **External source sync failed on every run after a certificate was renewed**
+  ([#180](https://github.com/ctrl-alt-automate/netbox-ssl/issues/180)): AWS ACM
+  and Azure Key Vault keep the same identifier when a certificate is renewed, so
+  after a renewal two local certificates share it — the Replaced predecessor and
+  its successor. The sync engine looked the identifier up and got the
+  predecessor, so each later run planned the same renewal again, failed with an
+  integrity error on the duplicate serial, and flagged the live certificate as
+  removed from the source. The current certificate now wins the lookup
+  regardless of row order, and earlier versions of an identifier the source
+  still serves are no longer reported as removals. Affects AWS ACM sources since
+  v1.1.0.
+- **The scheduled expiry scan never triggered a NetBox Event Rule.**
+  `CertificateExpiryScan` reported its events as fired, logged them and applied
+  its cooldown, but no Event Rule, webhook or notification ever received one —
+  in any release since the scan was introduced in v0.6. An event was "fired" by
+  touching the certificate's `last_updated` through a queryset update, which
+  bypasses the `post_save` signal NetBox dispatches Event Rules from. Firing an
+  event now saves the certificate, unchanged: NetBox queues an **Object Updated**
+  event, a rule on certificates fires as documented, and the payload carries
+  `days_remaining` and `expiry_status`. No changelog entry is written (nothing
+  changed) and only `last_updated` is saved, so a concurrent edit is never
+  overwritten.
+
+  **If you alert on certificate expiry through Event Rules, this is the release
+  that makes it work.** After upgrading, run the scan once with *Ignore Cooldown*
+  and confirm the rule fires; expect one event per certificate per threshold per
+  cooldown window.
+- **An expiry scan dry run no longer touches certificates.** With *Dry Run* on,
+  the scan still updated `last_updated` on every certificate it reported; it now
+  only builds the payloads it would send.
 - **A certificate renewed outside NetBox stayed Active next to its successor**
   ([#184](https://github.com/ctrl-alt-automate/netbox-ssl/issues/184)): when the
   Monitored Endpoint Poll saw an endpoint present a new certificate it imported

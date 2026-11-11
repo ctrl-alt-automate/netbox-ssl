@@ -24,6 +24,7 @@ from netbox_ssl.models.event_log import CertificateEventLog
 from netbox_ssl.utils.events import (
     EVENT_CERTIFICATE_EXPIRED,
     EVENT_CERTIFICATE_EXPIRING_SOON,
+    build_certificate_event_payload,
     fire_certificate_event,
 )
 
@@ -72,6 +73,13 @@ class CertificateExpiryScan(Script):
     def get_plugin_setting(self, name: str, default=None):
         """Get a plugin setting value."""
         return settings.PLUGINS_CONFIG.get("netbox_ssl", {}).get(name, default)
+
+    @staticmethod
+    def _event(cert, event_type: str, *, dry_run: bool, threshold_days: int | None = None) -> dict:
+        """Fire the event, or in a dry run only build the payload it would carry."""
+        if dry_run:
+            return build_certificate_event_payload(cert, event_type, threshold_days=threshold_days)
+        return fire_certificate_event(cert, event_type, threshold_days=threshold_days)
 
     def run(self, data, commit):
         """Execute the expiry scan."""
@@ -123,7 +131,7 @@ class CertificateExpiryScan(Script):
                 events_skipped += 1
                 continue
 
-            payload = fire_certificate_event(cert, EVENT_CERTIFICATE_EXPIRED)
+            payload = self._event(cert, EVENT_CERTIFICATE_EXPIRED, dry_run=dry_run)
 
             if not dry_run and commit:
                 CertificateEventLog.objects.create(
@@ -164,7 +172,7 @@ class CertificateExpiryScan(Script):
                     events_skipped += 1
                     continue
 
-                payload = fire_certificate_event(cert, EVENT_CERTIFICATE_EXPIRING_SOON, threshold_days=threshold)
+                payload = self._event(cert, EVENT_CERTIFICATE_EXPIRING_SOON, threshold_days=threshold, dry_run=dry_run)
 
                 if not dry_run and commit:
                     CertificateEventLog.objects.create(
