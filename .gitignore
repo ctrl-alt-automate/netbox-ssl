@@ -133,3 +133,9 @@ docker-volumes/
 # Development database
 *.sqlite3
 .venv-docs/
+
+# Subagent-driven-development scratch (ledgers, briefs, review packages)
+.superpowers/
+
+# Azure SDK for the host test lane (see .superpowers ledger / CONTRIBUTING)
+.azure-deps/

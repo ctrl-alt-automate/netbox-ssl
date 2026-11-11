@@ -241,7 +241,7 @@ Register the URLs you care about under **SSL Certificates → Monitored Endpoint
 Define policy rules (minimum key size, allowed algorithms, forbidden issuers, wildcard bans, maximum validity, and more) in the UI, scope them by tenant or tag, and evaluate them across the fleet on a schedule with the `CertificateComplianceCheck` script. Results are browsable per policy and per certificate.
 
 ### External Sources
-Sync certificates read-only from Lemur, AWS ACM, or any REST API via the generic adapter. Credentials are stored as `env:VAR_NAME` references, never in the database.
+Sync certificates read-only from Lemur, AWS ACM, Azure Key Vault, or any REST API via the generic adapter. Credentials are stored as `env:VAR_NAME` references, never in the database. Azure Key Vault ships in the optional `netbox-ssl[azure]` extra — see the [Azure Key Vault how-to](docs/how-to/azure-key-vault-sync.md).
 
 ### Certificate Assignments
 Link certificates to the objects that use them:

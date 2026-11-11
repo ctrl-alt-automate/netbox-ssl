@@ -55,6 +55,30 @@
               {% endif %}
             </td>
           </tr>
+          {# Tag sync is shown here, not only on the edit form: enabling it makes
+             the external source authoritative for this certificate's tags, and a
+             setting with that blast radius should be visible where an operator
+             inspects the source. #}
+          <tr>
+            <th scope="row">Sync Tags</th>
+            <td>
+              {% if object.sync_tags %}
+                {% if object.source_type == "azure_kv" %}
+                  <span class="badge text-bg-info">Enabled</span>
+                  <span class="text-muted ms-1">source is authoritative for tags</span>
+                {% else %}
+                  {# The switch is offered on every source type, but only adapters
+                     that populate FetchedCertificate.tags honour it. Saying
+                     "authoritative" here for an adapter that supplies no tags
+                     would describe a destructive behaviour that does not happen. #}
+                  <span class="badge text-bg-secondary">Enabled</span>
+                  <span class="text-muted ms-1">no effect &mdash; this source type supplies no tags</span>
+                {% endif %}
+              {% else %}
+                <span class="badge text-bg-secondary">Disabled</span>
+              {% endif %}
+            </td>
+          </tr>
           <tr>
             <th scope="row">Sync Interval</th>
             <td>
