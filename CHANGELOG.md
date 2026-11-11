@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Azure Key Vault external source** ([#101](https://github.com/ctrl-alt-automate/netbox-ssl/issues/101)):
+  read-only sync of certificate metadata from one Azure Key Vault, with managed
+  identity / workload identity or an explicit service principal. Certificate
+  fields are parsed from the vault's DER bytes by the plugin's own parser, so
+  they match every other import path — including EKU-based certificate type.
+  Optional tag sync (`sync_tags`, off by default) copies Azure tags onto
+  imported certificates; when enabled the vault is authoritative, so each run
+  replaces the certificate's full tag set and an untagged vault certificate
+  clears it. Requires `pip install netbox-ssl[azure]`. The minimum
+  Azure role is **`Key Vault Reader`**; `Key Vault Certificate User` is
+  deliberately *not* required, because it also grants private-key export.
+  Migration 0028 is additive.
+- **Sync engine can now apply status, certificate type and tags**:
+  `FetchedCertificate` gained three optional fields (`status`,
+  `certificate_type`, `tags`), closing two long-standing gaps — sync used to
+  hardcode every imported certificate to Active, and never applied the
+  EKU-based certificate type added in v1.4.0. All three are honoured on every
+  lifecycle path: create, update and renewal. The new Azure Key Vault adapter
+  populates all three.
+
+  Each field is written only when the adapter actually supplies it. On create,
+  an adapter that supplies nothing still produces exactly what sync produced
+  before (Active / server / no tags); on update and renewal, a field the
+  adapter has no opinion about is left alone, so an operator's
+  `certificate_type` override survives. The existing Lemur, AWS ACM and Generic
+  REST adapters supply none of the three and are therefore behaviourally
+  unchanged.
+
 ### Changed
 
 - **Verified against NetBox 4.7.5**, the newest release (2026-11-10): the
@@ -30,6 +60,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Browser tests run on NetBox 4.5 and 4.7** rather than 4.5 only.
 - The development `docker-compose.yml` defaults to the newest supported NetBox
   (`v4.7`) instead of 4.5.
+
+### Fixed
+
+- **External source sync failed on every run after a certificate was renewed**
+  ([#180](https://github.com/ctrl-alt-automate/netbox-ssl/issues/180)): AWS ACM
+  and Azure Key Vault keep the same identifier when a certificate is renewed, so
+  after a renewal two local certificates share it — the Replaced predecessor and
+  its successor. The sync engine looked the identifier up and got the
+  predecessor, so each later run planned the same renewal again, failed with an
+  integrity error on the duplicate serial, and flagged the live certificate as
+  removed from the source. The current certificate now wins the lookup
+  regardless of row order, and earlier versions of an identifier the source
+  still serves are no longer reported as removals. Affects AWS ACM sources since
+  v1.1.0.
+- **The scheduled expiry scan never triggered a NetBox Event Rule.**
+  `CertificateExpiryScan` reported its events as fired, logged them and applied
+  its cooldown, but no Event Rule, webhook or notification ever received one —
+  in any release since the scan was introduced in v0.6. An event was "fired" by
+  touching the certificate's `last_updated` through a queryset update, which
+  bypasses the `post_save` signal NetBox dispatches Event Rules from. Firing an
+  event now saves the certificate, unchanged: NetBox queues an **Object Updated**
+  event, a rule on certificates fires as documented, and the payload carries
+  `days_remaining` and `expiry_status`. No changelog entry is written (nothing
+  changed) and only `last_updated` is saved, so a concurrent edit is never
+  overwritten.
+
+  **If you alert on certificate expiry through Event Rules, this is the release
+  that makes it work.** After upgrading, run the scan once with *Ignore Cooldown*
+  and confirm the rule fires; expect one event per certificate per threshold per
+  cooldown window.
+- **An expiry scan dry run no longer touches certificates.** With *Dry Run* on,
+  the scan still updated `last_updated` on every certificate it reported; it now
+  only builds the payloads it would send.
+- **A certificate renewed outside NetBox stayed Active next to its successor**
+  ([#184](https://github.com/ctrl-alt-automate/netbox-ssl/issues/184)): when the
+  Monitored Endpoint Poll saw an endpoint present a new certificate it imported
+  that certificate and re-pointed the endpoint, but never retired the old one,
+  so every ACME renewal left two Active certificates behind. The poll now runs
+  the Janus renewal: the predecessor becomes **Replaced** and links to its
+  successor, its assignments are copied across, and the private key location,
+  renewal note and ACME settings carry over without overwriting anything
+  already set on the successor. The successor gets a **Renewed** lifecycle
+  entry naming its predecessor.
+
+  Because a Replaced certificate stops raising expiry alerts, a predecessor is
+  only retired when the poll verified the endpoint's chain, the endpoint was
+  itself seen serving the predecessor, the certificate now served is Active, was
+  issued later, shares a name with it and is in the same tenant, and no other
+  monitored endpoint still serves the old one. An **Untrusted** endpoint — one
+  using an internal CA the NetBox host does not trust, for instance — still has
+  its certificate recorded but never retires one. Rotations that v1.3.0 – v1.4.0
+  left unlinked are repaired by the first poll after upgrading. The run summary
+  reports `replaced=N`.
+
+### Security
+
+- **A scraped certificate is matched to an inventory certificate by fingerprint,
+  not by serial number and issuer alone.** URL import and endpoint monitoring
+  looked an incoming certificate up by serial number and issuer. Both are plain
+  fields that anyone can copy into a self-signed certificate, and the scrape of
+  an untrusted endpoint does not verify the chain — so a look-alike was taken to
+  *be* the inventory certificate: its `last seen` and discovery URL were updated,
+  and a monitored endpoint was linked to it and recorded as having served it. A
+  certificate with a known serial number and issuer but a different fingerprint
+  is now refused, and the endpoint reports **Unreachable** with an explanatory
+  error. Present since URL import was added in v1.2.0.
 
 ### Documentation
 

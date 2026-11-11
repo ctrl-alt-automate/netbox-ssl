@@ -58,6 +58,15 @@ def scrape_and_import(
     parsed = CertificateParser.parse(pem)
 
     existing = Certificate.objects.filter(serial_number=parsed.serial_number, issuer=parsed.issuer).first()
+    if existing and existing.fingerprint_sha256 != parsed.fingerprint_sha256:
+        # Serial and issuer are just fields of the certificate; on a chain that
+        # was not verified, anyone can copy them. Only an equal fingerprint
+        # makes this the certificate already in the inventory. Refuse the
+        # look-alike rather than record that this host serves the real one.
+        raise TLSScrapeError(
+            f"{host}:{port} presents a certificate with the serial number and issuer of certificate "
+            f"#{existing.pk} but a different fingerprint; refusing to treat it as that certificate."
+        )
     if existing:
         existing.last_seen_at = timezone.now()
         if set_discovered_url and not existing.discovered_via_url:

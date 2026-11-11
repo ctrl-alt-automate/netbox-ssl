@@ -38,6 +38,7 @@ class ExternalSourceForm(NetBoxModelForm):
             "base_url",
             "enabled",
             "verify_ssl",
+            "sync_tags",
             name=_("Source"),
         ),
         FieldSet(
@@ -74,6 +75,7 @@ class ExternalSourceForm(NetBoxModelForm):
             "enabled",
             "tenant",
             "verify_ssl",
+            "sync_tags",
             "tags",
             "comments",
         ]

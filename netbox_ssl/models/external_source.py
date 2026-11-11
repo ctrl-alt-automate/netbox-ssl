@@ -82,11 +82,13 @@ class ExternalSourceTypeChoices(ChoiceSet):
     TYPE_LEMUR = "lemur"
     TYPE_GENERIC_REST = "generic_rest"
     TYPE_AWS_ACM = "aws_acm"
+    TYPE_AZURE_KV = "azure_kv"
 
     CHOICES = [
         (TYPE_LEMUR, "Lemur", "purple"),
         (TYPE_GENERIC_REST, "Generic REST API", "blue"),
         (TYPE_AWS_ACM, "AWS Certificate Manager", "orange"),
+        (TYPE_AZURE_KV, "Azure Key Vault", "cyan"),
     ]
 
 
@@ -219,6 +221,16 @@ class ExternalSource(NetBoxModel):
         help_text=(
             "Verify TLS certificates when connecting to the source. "
             "WARNING: Disabling this removes protection against MITM attacks."
+        ),
+    )
+    sync_tags = models.BooleanField(
+        default=False,
+        help_text=(
+            "Copy tags from the external source onto imported certificates. "
+            "Only Azure Key Vault sources supply tags today; on other source "
+            "types this has no effect. Where it applies, the source becomes "
+            "authoritative: each sync replaces the full tag set, and clears it "
+            "when the source has no tags."
         ),
     )
 

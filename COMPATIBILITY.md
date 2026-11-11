@@ -85,6 +85,13 @@ Actions CI. Every integration lane follows the floating image tag of its minor
 (`v4.7`, `v4.6`, …), so it always runs the newest patch release, and the matrix
 re-runs weekly on `dev` to catch an upstream patch that breaks the plugin.
 
+### Optional extras
+
+The Azure Key Vault External Source adapter requires the optional `azure`
+extra (`pip install netbox-ssl[azure]`); without it the plugin works
+normally and `azure_kv` is simply not offered as a source type. See the
+[Azure Key Vault how-to](docs/how-to/azure-key-vault-sync.md).
+
 ## Upgrade Path
 
 For upgrade instructions, see [docs/operations/upgrading.md](docs/operations/upgrading.md).
