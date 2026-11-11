@@ -26,6 +26,34 @@ sudo systemctl restart netbox netbox-rq
 
 ## Version-Specific Notes
 
+### v1.4.x → v1.5.0
+
+**No breaking changes.** One additive migration (0028). Three fixes change what
+an existing installation does after the upgrade, so read these before the first
+scheduled jobs run:
+
+- **Event Rules on certificates start receiving expiry scan events.** Until
+  v1.5.0 the scheduled `CertificateExpiryScan` logged its events but never
+  delivered one to an Event Rule. A rule on *Object updated* for certificates
+  now fires — once per certificate, per threshold, per cooldown window. Check
+  the rule's conditions before the first scan, or run the scan once with
+  *Dry Run* to see which events it would raise. See
+  [Events & Webhooks](../reference/webhooks.md).
+- **The first Monitored Endpoint Poll retires leftover predecessors.** A
+  rotation that v1.3.0 – v1.4.0 left as two Active certificates is linked on
+  the first poll: the older certificate becomes **Replaced** and its
+  assignments are copied to the successor. This happens only for endpoints
+  whose certificate chain verifies; see
+  [Endpoint monitoring](../how-to/endpoint-monitoring.md).
+- **A scraped certificate is matched by fingerprint.** An endpoint serving a
+  certificate with a known serial number and issuer but a different
+  fingerprint is reported **Unreachable** instead of being matched to the
+  inventory certificate.
+
+The Azure Key Vault adapter is optional and needs its extra dependencies:
+`pip install 'netbox-ssl[azure]'`. NetBox 4.7 is now the Primary supported
+release; 4.4 – 4.6 remain supported.
+
 ### v0.9.x → v1.0.0
 
 **No breaking changes.** v1.0 is a stability and documentation release.

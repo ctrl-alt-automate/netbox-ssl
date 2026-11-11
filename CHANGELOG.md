@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-11
+
 ### Added
 
 - **Azure Key Vault external source** ([#101](https://github.com/ctrl-alt-automate/netbox-ssl/issues/101)):
@@ -39,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **NetBox 4.7 is now the Primary supported release**; 4.6 moves to Supported,
+  alongside 4.5 and 4.4. A new NetBox minor enters as Supported and is promoted
+  once it has carried a plugin release, which 4.7 has since v1.4.0. Nothing
+  changes for an existing installation: `min_version` and `max_version` are
+  unchanged (4.4.0 – 4.7.99).
 - **Verified against NetBox 4.7.5**, the newest release (2026-11-10): the
   integration suite, REST API tests, browser tests, system checks, OpenAPI
   generation and migration-drift check all pass. No plugin change was needed;
@@ -1204,7 +1211,8 @@ Initial release of NetBox SSL Plugin.
 - NetBox 4.4.0 - 4.5.x
 - Python 3.10+
 
-[Unreleased]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/ctrl-alt-automate/netbox-ssl/compare/v1.2.1...v1.2.2
